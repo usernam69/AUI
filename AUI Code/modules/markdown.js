@@ -24,9 +24,9 @@ export function renderRichMarkdown(container, source, { streaming = false } = {}
     if (!streaming) remember(text, html);
   }
 
-  if (container._talkatonRenderedSource !== text) {
+  if (container._auiRenderedSource !== text) {
     container.innerHTML = html;
-    container._talkatonRenderedSource = text;
+    container._auiRenderedSource = text;
   }
 
   // Code controls are lightweight and remain useful while the response streams.

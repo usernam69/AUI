@@ -1,4 +1,4 @@
--- Talkaton custom request and approval queue
+-- AUI custom request and approval queue
 -- Run once in the Supabase SQL Editor for project cxulgeojkjnskdyoktkj.
 
 create table if not exists public.beta_requests (

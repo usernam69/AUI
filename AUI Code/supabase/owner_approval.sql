@@ -1,4 +1,4 @@
--- Add the Talkaton Owner account to the private beta approval queue.
+-- Add the AUI Owner account to the private beta approval queue.
 -- Safe to run after beta_requests.sql.
 
 drop policy if exists "Support can view all requests" on public.beta_requests;

@@ -52,7 +52,7 @@ async function initialize() {
       applySession(session);
     });
   } catch (error) {
-    showGate("Approval inbox unavailable", error.message || "Talkaton account access could not be checked.");
+    showGate("Approval inbox unavailable", error.message || "AUI account access could not be checked.");
   }
 }
 
@@ -67,12 +67,12 @@ async function applySession(session) {
   reviewerEmail = reviewerSession ? email : "";
 
   if (!session?.user) {
-    showGate("Log in to an approval account", "Use the confirmed Talkaton Owner or Support account, then return to this page.");
+    showGate("Log in to an approval account", "Use the confirmed AUI Owner or Support account, then return to this page.");
     return;
   }
 
   if (!reviewerSession) {
-    showGate("This account cannot open the inbox", `Signed in as ${email}. Only the Talkaton Owner or Support account can review requests.`);
+    showGate("This account cannot open the inbox", `Signed in as ${email}. Only the AUI Owner or Support account can review requests.`);
     return;
   }
 
@@ -233,7 +233,7 @@ function createReviewedRequestCard(request) {
   const expires = request.access_expires_at
     ? ` · access ends ${formatDate(request.access_expires_at)}`
     : "";
-  reviewed.textContent = `Reviewed ${formatDate(request.reviewed_at || request.updated_at)} by ${request.reviewed_by || "Talkaton staff"}${expires}`;
+  reviewed.textContent = `Reviewed ${formatDate(request.reviewed_at || request.updated_at)} by ${request.reviewed_by || "AUI staff"}${expires}`;
   card.append(reviewed);
   return card;
 }
@@ -286,7 +286,7 @@ function createAdminRequestCard(request) {
   );
   const email = document.createElement("a");
   email.className = "betaSecondaryBtn";
-  email.href = `mailto:${encodeURIComponent(request.user_email)}?subject=${encodeURIComponent(`Talkaton request: ${request.title}`)}`;
+  email.href = `mailto:${encodeURIComponent(request.user_email)}?subject=${encodeURIComponent(`AUI request: ${request.title}`)}`;
   email.textContent = "Email user";
   actions.append(email);
 
@@ -299,7 +299,7 @@ function createAdminRequestCard(request) {
     const expires = request.access_expires_at
       ? ` · access ends ${formatDate(request.access_expires_at)}`
       : "";
-    reviewed.textContent = `Last reviewed ${formatDate(request.reviewed_at)} by ${request.reviewed_by || "Talkaton staff"}${expires}`;
+    reviewed.textContent = `Last reviewed ${formatDate(request.reviewed_at)} by ${request.reviewed_by || "AUI staff"}${expires}`;
     card.append(reviewed);
   }
   return card;

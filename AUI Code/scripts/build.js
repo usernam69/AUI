@@ -6,8 +6,8 @@ const swPath = join(root, "chat", "sw.js");
 const version = `t${Date.now()}`;
 
 const sw = readFileSync(swPath, "utf8").replace(
-  /talkaton-(?:__BUILD_VERSION__|t\d+)/,
-  `talkaton-${version}`
+  /aui-(?:__BUILD_VERSION__|t\d+)/,
+  `aui-${version}`
 );
 writeFileSync(swPath, sw);
 

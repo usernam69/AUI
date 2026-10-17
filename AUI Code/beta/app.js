@@ -40,7 +40,7 @@ const REQUEST_TYPES = {
     titlePrefix: "",
     inputLabel: "Why do you need Dev Access?",
     placeholder: "Example: Dev Access for building and testing",
-    hint: "Only approved Beta members can request Dev Access. If approved, it unlocks unlimited messages, images, and web searches for a time chosen by Talkaton staff.",
+    hint: "Only approved Beta members can request Dev Access. If approved, it unlocks unlimited messages, images, and web searches for a time chosen by AUI staff.",
     suggestions: ["Dev Access"]
   },
   existing_model: {
@@ -48,7 +48,7 @@ const REQUEST_TYPES = {
     titlePrefix: "Existing model",
     inputLabel: "Which available model do you want?",
     placeholder: "Example: GPT-5.4 Mini",
-    hint: "Choose a model already listed in Talkaton.",
+    hint: "Choose a model already listed in AUI.",
     suggestions: [
       "GPT-5.4 Nano",
       "GPT-4.1 Mini",
@@ -63,7 +63,7 @@ const REQUEST_TYPES = {
   new_model: {
     featureKey: "custom",
     titlePrefix: "New model",
-    inputLabel: "Which new model should Talkaton add?",
+    inputLabel: "Which new model should AUI add?",
     placeholder: "Example: a newer Claude or Gemini model",
     hint: "You can request any provider or model that is not currently listed.",
     suggestions: []
@@ -71,9 +71,9 @@ const REQUEST_TYPES = {
   new_mode: {
     featureKey: "custom",
     titlePrefix: "New mode",
-    inputLabel: "What new response mode should Talkaton add?",
+    inputLabel: "What new response mode should AUI add?",
     placeholder: "Example: Study Mode",
-    hint: "Describe a mode that changes how Talkaton thinks or responds.",
+    hint: "Describe a mode that changes how AUI thinks or responds.",
     suggestions: ["Study Mode", "Research Mode", "Debate Mode", "Tutor Mode", "Focus Mode"]
   },
   existing_tool: {
@@ -81,21 +81,21 @@ const REQUEST_TYPES = {
     titlePrefix: "Existing tool",
     inputLabel: "Which available tool do you want?",
     placeholder: "Example: Web search",
-    hint: "Request access to a tool that Talkaton already supports.",
+    hint: "Request access to a tool that AUI already supports.",
     suggestions: ["Web search", "Image generation", "File uploads", "Folder uploads", "Voice input", "Memory"]
   },
   new_tool: {
     featureKey: "custom",
     titlePrefix: "New tool or integration",
-    inputLabel: "What tool or integration should Talkaton add?",
+    inputLabel: "What tool or integration should AUI add?",
     placeholder: "Example: Google Drive",
-    hint: "Name the service and explain what it should do inside Talkaton.",
+    hint: "Name the service and explain what it should do inside AUI.",
     suggestions: ["Google Drive", "Gmail", "Slack", "Notion", "GitHub"]
   },
   custom: {
     featureKey: "custom",
     titlePrefix: "Custom feature",
-    inputLabel: "What custom feature should Talkaton add?",
+    inputLabel: "What custom feature should AUI add?",
     placeholder: "Example: Shared chats",
     hint: "Request any other improvement that is not covered above.",
     suggestions: ["Shared chats", "Chat folders", "Conversation export", "Custom themes"]
@@ -133,7 +133,7 @@ async function submitRequest(event) {
   event.preventDefault();
   if (!form.reportValidity()) return;
   if (!currentSession?.user) {
-    setRequestMessage("Log in to your confirmed Talkaton account before submitting.", "error");
+    setRequestMessage("Log in to your confirmed AUI account before submitting.", "error");
     return;
   }
   if (typeInput.value === "dev_access" && !betaAccessApproved) {
@@ -216,8 +216,8 @@ async function checkBetaAccess() {
     setAccessState({
       label: "Sign-in required",
       title: "Check your Beta Lab seat",
-      detail: "Use the confirmed Talkaton account from your request.",
-      message: "No signed-in Talkaton account was found in this browser.",
+      detail: "Use the confirmed AUI account from your request.",
+      message: "No signed-in AUI account was found in this browser.",
       action: "Log in and check",
       href: "/chat?auth=login&beta=1"
     });
@@ -241,7 +241,7 @@ async function checkBetaAccess() {
         title: "Unlimited access is active",
         detail: "Infinite messages, image generations, and web searches are unlocked.",
         message: `${currentSession.user?.email || "This account"} is trusted for Dev Access${formatExpiry(result.devExpiresAt)}.`,
-        action: "Open Talkaton →",
+        action: "Open AUI →",
         href: "/chat?beta=1",
         approved: true
       });
@@ -264,7 +264,7 @@ async function checkBetaAccess() {
     setAccessState({
       label: "Not approved yet",
       title: "Request trusted Beta access",
-      detail: "Beta is private. Talkaton’s Owner or Support account approves only trusted people.",
+      detail: "Beta is private. AUI’s Owner or Support account approves only trusted people.",
       message: `${currentSession.user?.email || "This account"} is not in the trusted Beta yet.`,
       action: "Request access",
       href: "#request"
@@ -275,7 +275,7 @@ async function checkBetaAccess() {
       title: "Beta Lab is still online",
       detail: "The access check could not finish right now.",
       message: error.message || "Refresh the page and try again.",
-      action: "Open Talkaton",
+      action: "Open AUI",
       href: "/chat"
     });
   }
@@ -357,7 +357,7 @@ function createRequestCard(request) {
   if (request.admin_note) {
     const note = document.createElement("aside");
     const noteTitle = document.createElement("strong");
-    noteTitle.textContent = "Talkaton staff note";
+    noteTitle.textContent = "AUI staff note";
     const noteBody = document.createElement("span");
     noteBody.textContent = request.admin_note;
     note.append(noteTitle, noteBody);
@@ -423,7 +423,7 @@ async function initialize() {
     });
   } catch (error) {
     submitButton.disabled = true;
-    setRequestMessage(error.message || "Talkaton account access is temporarily unavailable.", "error");
+    setRequestMessage(error.message || "AUI account access is temporarily unavailable.", "error");
     requestHistory.replaceChildren(emptyMessage("Request history is temporarily unavailable."));
   }
 }

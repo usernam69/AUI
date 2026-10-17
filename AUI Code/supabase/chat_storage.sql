@@ -1,4 +1,4 @@
--- Talkaton cloud chat storage
+-- AUI cloud chat storage
 -- Run this once in the Supabase SQL Editor (Dashboard → SQL Editor → New Query → paste → Run).
 
 -- 1. Table: one row per user storing all chat data as JSONB.

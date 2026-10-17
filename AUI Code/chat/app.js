@@ -271,7 +271,7 @@ function startApp() {
   appInitialized = true;
   init().catch(error => {
     appInitialized = false;
-    console.error("Talkaton failed to initialize:", error);
+    console.error("AUI failed to initialize:", error);
     document.body.classList.add("appInitFailed");
   });
 }
@@ -1381,7 +1381,7 @@ function renderMessages(options = {}) {
 }
 
 function messageElementNeedsUpdate(article, message) {
-  const previous = article._talkatonRenderState;
+  const previous = article._auiRenderState;
   if (!previous) return true;
   return previous.content !== message.content
     || previous.status !== message.status
@@ -1419,7 +1419,7 @@ function createEmptyState() {
   wrapper.setAttribute("aria-labelledby", "landingTitle");
   wrapper.innerHTML = `
     <div class="emptyBrand" aria-hidden="true">T</div>
-    <h1 id="landingTitle">Talkaton</h1>
+    <h1 id="landingTitle">AUI</h1>
     <p class="heroTagline">Smart. Funny. <span>Slightly unhinged.</span></p>
     <p class="heroQuestion">What are we building today?</p>
     <div class="suggestionGrid">
@@ -1436,14 +1436,14 @@ function createMessageElement(message, index, { animate = true } = {}) {
   const article = element("article", `message ${isUser ? "userMessage" : "assistantMessage"}${animate ? " messageEnter" : ""}`);
   article.dataset.messageId = message.id;
   article.dataset.status = message.status || "complete";
-  article._talkatonRenderState = captureMessageRenderState(message);
+  article._auiRenderState = captureMessageRenderState(message);
 
   const inner = element("div", "messageInner");
   const header = element("header", "messageHeader");
   const identity = element("div", "messageIdentity");
   identity.innerHTML = isUser
     ? `<span class="messageAvatar userAvatar" aria-hidden="true">Y</span><strong>You</strong>`
-    : `<span class="messageAvatar assistantAvatar" aria-hidden="true">T</span><strong>Talkaton</strong>`;
+    : `<span class="messageAvatar assistantAvatar" aria-hidden="true">T</span><strong>AUI</strong>`;
   header.append(identity);
 
   if (!isUser && message.comparisonLabel) {
@@ -1484,7 +1484,7 @@ function createMessageElement(message, index, { animate = true } = {}) {
     const download = element("a", "generatedImageDownload");
     const extension = getGeneratedImageExtension(message.generatedImage);
     download.href = message.generatedImage;
-    download.download = `${slugify(getChat()?.title || "talkaton-image")}-${String(message.id).slice(-8)}.${extension}`;
+    download.download = `${slugify(getChat()?.title || "aui-image")}-${String(message.id).slice(-8)}.${extension}`;
     download.textContent = "Download image ↓";
     download.setAttribute("aria-label", "Download this generated image");
     caption.append(download);
@@ -1540,7 +1540,7 @@ function createMessageFooter(message, index) {
     }
     if (message.status === "stopped") actions.append(actionButton("Continue", "continue"));
     const model = element("span", "modelName");
-    model.textContent = MODEL_NAMES[message.model] || message.model || "Talkaton";
+    model.textContent = MODEL_NAMES[message.model] || message.model || "AUI";
     model.title = "Model used for this response";
     actions.append(model);
   } else {
@@ -1561,7 +1561,7 @@ function actionButton(label, action) {
 function createTypingIndicator() {
   const indicator = element("div", "typingIndicator");
   indicator.setAttribute("role", "status");
-  indicator.setAttribute("aria-label", "Talkaton is thinking");
+  indicator.setAttribute("aria-label", "AUI is thinking");
   indicator.innerHTML = "<span></span><span></span><span></span>";
   return indicator;
 }
@@ -1813,7 +1813,7 @@ function downloadMessage(message) {
   const blob = new Blob([message.content], { type: "text/markdown;charset=utf-8" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = `${slugify(chat?.title || "talkaton-response")}.md`;
+  link.download = `${slugify(chat?.title || "aui-response")}.md`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 }
@@ -2081,7 +2081,7 @@ async function addFolder(fileList) {
     return;
   }
 
-  const firstPath = files[0].webkitRelativePath || files[0].talkatonRelativePath || "";
+  const firstPath = files[0].webkitRelativePath || files[0].auiRelativePath || "";
   const folderName = firstPath.includes("/") ? firstPath.split("/")[0] : "Uploaded folder";
   const placeholder = {
     id: createId("upload"),
@@ -2252,7 +2252,7 @@ async function readDroppedEntry(entry, parentPath, files) {
 
   if (entry.isFile) {
     const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
-    file.talkatonRelativePath = path;
+    file.auiRelativePath = path;
     files.push(file);
     return;
   }
@@ -2293,7 +2293,7 @@ function updateSearchMode() {
   DOM.searchBtn.setAttribute("aria-pressed", String(searchMode));
   DOM.searchBtn.classList.toggle("active", searchMode);
   DOM.composer.classList.toggle("searchMode", searchMode);
-  DOM.input.placeholder = searchMode ? "Search the web with Talkaton" : "Message Talkaton";
+  DOM.input.placeholder = searchMode ? "Search the web with AUI" : "Message AUI";
   toast(searchMode ? "Web search on" : "Web search off");
 }
 
@@ -2326,7 +2326,7 @@ function setCompareMode(enabled) {
   }
   DOM.input.placeholder = compareMode
     ? "Ask two models the same thing"
-    : (searchMode ? "Search the web with Talkaton" : "Message Talkaton");
+    : (searchMode ? "Search the web with AUI" : "Message AUI");
   if (compareMode) toast("Model comparison on");
   DOM.input.focus();
 }
@@ -2614,7 +2614,7 @@ async function restoreSession() {
     console.warn("Session restore unavailable:", error);
     if (getAuthRedirectState(new URL(window.location.href)).isAuthRedirect) {
       clearAuthRedirectUrl();
-      openAuthFailure("Talkaton couldn’t finish authentication. Check your connection and try again.");
+      openAuthFailure("AUI couldn’t finish authentication. Check your connection and try again.");
     }
   }
 }
@@ -2705,7 +2705,7 @@ function activateRequestedBetaMode() {
     state.mode = defaultState.mode;
     DOM.modeSelect.value = state.mode;
     persist();
-    toast("This account is not approved for Beta Lab yet. Request access at talkaton.org/beta.", "error");
+    toast("This account is not approved for Beta Lab yet. Request access at aui.org/beta.", "error");
     return;
   }
 
@@ -3141,8 +3141,8 @@ function setAuthMode(mode, { focus = true } = {}) {
 
   DOM.signInTab.setAttribute("aria-pressed", String(!isSignUp));
   DOM.signUpTab.setAttribute("aria-pressed", String(isSignUp));
-  DOM.authEyebrow.textContent = isSignUp ? "Join Talkaton" : "Welcome back";
-  DOM.authTitle.textContent = isSignUp ? "Create your account" : "Log in to Talkaton";
+  DOM.authEyebrow.textContent = isSignUp ? "Join AUI" : "Welcome back";
+  DOM.authTitle.textContent = isSignUp ? "Create your account" : "Log in to AUI";
   DOM.authIntro.textContent = isSignUp
     ? "Enter your email and create a password. We’ll email you a confirmation link."
     : "Welcome back. Enter your account details to continue.";
@@ -3166,7 +3166,7 @@ async function requestPasswordReset() {
   setAuthMessage("");
 
   if (!email || !DOM.authEmail.checkValidity()) {
-    setAuthMessage("Enter the email address for your Talkaton account.");
+    setAuthMessage("Enter the email address for your AUI account.");
     DOM.authEmail.focus();
     DOM.authEmail.reportValidity();
     return;
@@ -3231,7 +3231,7 @@ async function resendConfirmationEmail({ emailOverride = "", automatic = false }
 
     setAuthMessage(
       automatic
-        ? "Your email is not confirmed, so Talkaton requested a new confirmation link. Check Inbox, Spam, and All Mail."
+        ? "Your email is not confirmed, so AUI requested a new confirmation link. Check Inbox, Spam, and All Mail."
         : "Confirmation email requested. Check Inbox, Spam, and All Mail. Delivery can take a few minutes.",
       "success"
     );
@@ -3242,7 +3242,7 @@ async function resendConfirmationEmail({ emailOverride = "", automatic = false }
     if (/rate limit|too many/i.test(message)) {
       setAuthMessage("Too many confirmation emails were requested. Wait about an hour and try again.");
     } else if (/not authorized/i.test(message)) {
-      setAuthMessage("Talkaton’s email service is not authorized to deliver to this address yet. Contact support.");
+      setAuthMessage("AUI’s email service is not authorized to deliver to this address yet. Contact support.");
     } else {
       setAuthMessage(message || "Couldn’t resend the confirmation email. Please try again.");
     }
@@ -3362,7 +3362,7 @@ function completeEmailSignupConfirmation() {
   clearAuthRedirectUrl();
   closeDialog(DOM.authDialog);
   updateAccount();
-  toast("Email confirmed. Your Talkaton account is ready.");
+  toast("Email confirmed. Your AUI account is ready.");
   announce("Email confirmed. Your account is ready.");
 }
 
@@ -4079,7 +4079,7 @@ function formatRelativeTime(timestamp) {
 }
 
 function slugify(value) {
-  return String(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "talkaton-response";
+  return String(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "aui-response";
 }
 
 function escapeHtml(value) {

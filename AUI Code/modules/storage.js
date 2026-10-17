@@ -1,4 +1,4 @@
-const STORAGE_KEY = "talkaton";
+const STORAGE_KEY = "aui";
 const MAX_ATTACHMENT_DATA_LENGTH = 1_200_000;
 
 export function loadStoredState(defaultState) {
@@ -33,7 +33,7 @@ export function saveStoredState(state) {
     });
     localStorage.setItem(STORAGE_KEY, serialized);
   } catch (error) {
-    console.warn("Talkaton could not save all local data:", error);
+    console.warn("AUI could not save all local data:", error);
   }
 }
 
@@ -43,7 +43,7 @@ export function createId(prefix = "") {
 }
 
 export function getVisitorId() {
-  const storageKey = "talkatonVisitorId";
+  const storageKey = "auiVisitorId";
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   let visitorId = localStorage.getItem(storageKey);
 

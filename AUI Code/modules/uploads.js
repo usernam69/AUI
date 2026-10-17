@@ -222,7 +222,7 @@ function isReadableFolderFile(file) {
 }
 
 function getRelativePath(file) {
-  return String(file.webkitRelativePath || file.talkatonRelativePath || file.name)
+  return String(file.webkitRelativePath || file.auiRelativePath || file.name)
     .replaceAll("\\", "/")
     .replace(/^\/+/, "");
 }

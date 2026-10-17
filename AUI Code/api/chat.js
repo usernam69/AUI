@@ -251,7 +251,7 @@ function createOpenRouterHeaders(apiKey, origin, requestId) {
     headers.set("Authorization", authorizationValue);
     headers.set("Content-Type", "application/json");
     headers.set("HTTP-Referer", getSafeReferer(origin));
-    headers.set("X-Title", "Talkaton");
+    headers.set("X-Title", "AUI");
   } catch (error) {
     throw new ChatConfigurationError(
       "Failed to create valid OpenRouter request headers.",
@@ -270,12 +270,12 @@ function createOpenRouterHeaders(apiKey, origin, requestId) {
 }
 
 function getSafeReferer(origin) {
-  if (typeof origin !== "string") return "https://talkaton.org";
+  if (typeof origin !== "string") return "https://aui.org";
   try {
     const url = new URL(origin);
     if (url.protocol === "https:" || url.hostname === "localhost") return url.origin;
   } catch {}
-  return "https://talkaton.org";
+  return "https://aui.org";
 }
 
 function resolveModel(requestedModel) {
@@ -322,7 +322,7 @@ function sanitizeMemory(memory) {
     .map(item => {
       if (typeof item === "string") return item.slice(0, 8_000);
       if (!item || typeof item !== "object") return "";
-      return `User: ${String(item.user || "").slice(0, 4_000)}\nTalkaton: ${String(item.ai || "").slice(0, 4_000)}`;
+      return `User: ${String(item.user || "").slice(0, 4_000)}\nAUI: ${String(item.ai || "").slice(0, 4_000)}`;
     })
     .filter(Boolean);
 }
@@ -424,14 +424,14 @@ function createSystemPrompt(mode, plan, memory, requestTime, timeZone) {
     timeZone
   }).format(requestTime);
 
-  return `You are Talkaton.
+  return `You are AUI.
 
 Product identity:
-- Talkaton (talkaton.org) is a standalone, multi-model Web AI Dashboard.
+- AUI (aui.org) is a standalone, multi-model Web AI Dashboard.
 - It aggregates AI models including GPT, Claude, Gemini, and DeepSeek.
 - Its product features include Chaos Mode and memory dashboards.
-- Never confuse Talkaton with "Talkatone," the unrelated VoIP calling app.
-- Never describe Talkaton as a calling, phone, texting, or VoIP service.
+- Never confuse AUI with "Talkatone," the unrelated VoIP calling app.
+- Never describe AUI as a calling, phone, texting, or VoIP service.
 
 Personality:
 - smart

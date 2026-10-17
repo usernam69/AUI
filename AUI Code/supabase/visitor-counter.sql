@@ -1,14 +1,14 @@
--- Run this once in the Supabase SQL editor for the Talkaton project.
+-- Run this once in the Supabase SQL editor for the AUI project.
 -- It stores only a random browser ID; no IP address or personal data is recorded.
 
-create table if not exists public.talkaton_visitors (
+create table if not exists public.aui_visitors (
   visitor_id uuid primary key,
   first_seen_at timestamptz not null default now()
 );
 
-alter table public.talkaton_visitors enable row level security;
+alter table public.aui_visitors enable row level security;
 
-revoke all on table public.talkaton_visitors from public, anon, authenticated;
+revoke all on table public.aui_visitors from public, anon, authenticated;
 
 create or replace function public.record_unique_visit(p_visitor_id uuid)
 returns bigint
@@ -19,12 +19,12 @@ as $$
 declare
   visitor_total bigint;
 begin
-  insert into public.talkaton_visitors (visitor_id)
+  insert into public.aui_visitors (visitor_id)
   values (p_visitor_id)
   on conflict (visitor_id) do nothing;
 
   select count(*) into visitor_total
-  from public.talkaton_visitors;
+  from public.aui_visitors;
 
   return visitor_total;
 end;

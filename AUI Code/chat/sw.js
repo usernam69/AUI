@@ -1,4 +1,4 @@
-const CACHE_NAME = "talkaton-t1785249083495";
+const CACHE_NAME = "aui-t1785249083495";
 const ASSET_VERSION = "20260728-model-compare19";
 const versioned = path => `${path}?v=${ASSET_VERSION}`;
 

@@ -4,18 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b0b0c">
-  <meta name="description" content="Welcome to Talkaton! This is an AI website.">
+  <meta name="description" content="Welcome to AUI! This is an AI website.">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Talkaton">
+  <meta property="og:title" content="AUI">
   <meta property="og:description" content="Smart. Funny. Slightly unhinged.">
-  <meta property="og:image" content="https://talkaton.org/og.png">
+  <meta property="og:image" content="https://aui.org/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Talkaton">
+  <meta name="twitter:title" content="AUI">
   <meta name="twitter:description" content="Smart. Funny. Slightly unhinged.">
-  <meta name="twitter:image" content="https://talkaton.org/og.png">
-  <title>Talkaton</title>
+  <meta name="twitter:image" content="https://aui.org/og.png">
+  <title>AUI</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
@@ -29,10 +29,10 @@
   <div class="app isEmpty" id="app">
     <aside class="sidebar" id="sidebar" aria-label="Conversation history">
       <div class="brandRow">
-        <a class="brand" href="/" aria-label="Talkaton home">
+        <a class="brand" href="/" aria-label="AUI home">
           <span class="brandMark" aria-hidden="true">T</span>
           <span>
-            <strong>Talkaton</strong>
+            <strong>AUI</strong>
             <small>Smart. Funny. Slightly unhinged.</small>
           </span>
         </a>
@@ -55,7 +55,7 @@
       <div class="chatList" id="chatList" role="list"></div>
       <div class="chatListSentinel" id="chatListSentinel" aria-hidden="true"></div>
 
-      <nav class="sidebarBottom" aria-label="Talkaton">
+      <nav class="sidebarBottom" aria-label="AUI">
         <button id="memoryBtn" type="button"><span>Memory</span><span class="navHint" id="memoryCount">0</span></button>
         <a href="/about"><span>About</span><span class="navHint">↗</span></a>
         <button id="settingsBtn" type="button"><span>Settings</span><span class="navHint">⌘ ,</span></button>
@@ -114,8 +114,8 @@
               id="messageInput"
               rows="1"
               maxlength="32000"
-              placeholder="Message Talkaton or attach files"
-              aria-label="Message Talkaton"
+              placeholder="Message AUI or attach files"
+              aria-label="Message AUI"
             ></textarea>
           </div>
 
@@ -165,7 +165,7 @@
             <span>Images, documents, spreadsheets, text, and code</span>
           </div>
         </form>
-        <p class="composerHint">Enter to send · Shift + Enter for a new line · Talkaton can make mistakes</p>
+        <p class="composerHint">Enter to send · Shift + Enter for a new line · AUI can make mistakes</p>
       </footer>
     </main>
   </div>
@@ -174,7 +174,7 @@
     <button id="popoverImageUpload" type="button"><span aria-hidden="true">▧</span><span><strong>Upload images</strong><small>Analyze one or more images</small></span></button>
     <button id="popoverFileUpload" type="button"><span aria-hidden="true">⌁</span><span><strong>Attach files</strong><small>Documents, sheets, text, and code</small></span></button>
     <button id="popoverFolderUpload" type="button"><span aria-hidden="true">▤</span><span><strong>Attach a folder</strong><small>Analyze a project or document folder</small></span></button>
-    <button id="generateImageBtn" type="button"><span aria-hidden="true">✦</span><span><strong>Create an image</strong><small>Generate with Talkaton</small></span></button>
+    <button id="generateImageBtn" type="button"><span aria-hidden="true">✦</span><span><strong>Create an image</strong><small>Generate with AUI</small></span></button>
     <button id="popoverWebSearch" type="button"><span aria-hidden="true">⌕</span><span><strong>Search the web</strong><small>Find current information</small></span></button>
   </div>
 
@@ -186,7 +186,7 @@
     <form method="dialog" class="dialogPanel">
       <header><div><p class="eyebrow">Preferences</p><h2 id="settingsTitle">Settings</h2></div><button class="iconBtn" value="close" aria-label="Close settings">×</button></header>
       <div class="settingsBody">
-        <label class="settingRow"><span><strong>Theme</strong><small>Choose how Talkaton looks</small></span><select id="themeSelect"><option value="system">System</option><option value="dark">Dark</option><option value="light">Light</option></select></label>
+        <label class="settingRow"><span><strong>Theme</strong><small>Choose how AUI looks</small></span><select id="themeSelect"><option value="system">System</option><option value="dark">Dark</option><option value="light">Light</option></select></label>
         <label class="settingRow"><span><strong>Show timestamps</strong><small>Display when each message was sent</small></span><input id="timestampsToggle" type="checkbox" role="switch"></label>
         <label class="settingRow"><span><strong>Auto-scroll</strong><small>Follow responses while they stream</small></span><input id="autoScrollToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow"><span><strong>Memory</strong><small>Use saved context in future chats</small></span><input id="memoryToggle" type="checkbox" role="switch" checked></label>
@@ -206,7 +206,7 @@
 
   <dialog class="dialog" id="authDialog" aria-labelledby="authTitle">
     <form class="dialogPanel compactDialog" id="authForm">
-      <header><div><p class="eyebrow" id="authEyebrow">Welcome back</p><h2 id="authTitle">Log in to Talkaton</h2></div><button class="iconBtn dialogCloseBtn" type="button" data-close-dialog="authDialog" aria-label="Close account dialog">×</button></header>
+      <header><div><p class="eyebrow" id="authEyebrow">Welcome back</p><h2 id="authTitle">Log in to AUI</h2></div><button class="iconBtn dialogCloseBtn" type="button" data-close-dialog="authDialog" aria-label="Close account dialog">×</button></header>
       <div class="dialogContent formStack">
         <div class="authModeTabs" aria-label="Choose account action">
           <button id="signInTab" type="button" aria-pressed="true">Log in</button>
@@ -272,7 +272,7 @@
 
   <dialog class="dialog" id="promptDialog" aria-labelledby="promptTitle">
     <form class="dialogPanel compactDialog" id="promptForm" method="dialog">
-      <header><div><p class="eyebrow" id="promptEyebrow">Talkaton</p><h2 id="promptTitle">Create an image</h2></div><button class="iconBtn" type="button" id="promptCancelX" aria-label="Close">×</button></header>
+      <header><div><p class="eyebrow" id="promptEyebrow">AUI</p><h2 id="promptTitle">Create an image</h2></div><button class="iconBtn" type="button" id="promptCancelX" aria-label="Close">×</button></header>
       <div class="dialogContent formStack">
         <label id="promptLabel">
           Show the prompt you want
