@@ -121,7 +121,6 @@ let searchMode = false;
 let compareMode = false;
 let authMode = "signIn";
 let passwordRecoveryPending = false;
-let signupConfirmationPending = false;
 let resendConfirmationAvailableAt = 0;
 let resendConfirmationTimer = null;
 let initialSessionResolved = false;
@@ -2830,7 +2829,6 @@ async function submitAuth(event) {
 
     if (isSignUp) {
       const redirectUrl = new URL("/chat/", window.location.origin);
-      signupConfirmationPending = true;
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -2840,22 +2838,24 @@ async function submitAuth(event) {
       });
       if (error) throw error;
 
-      // Supabase sends the confirmation from signUp when email confirmation is
-      // enabled. If it is disabled, require an emailed OTP before keeping a
-      // local session so signup still follows the same confirmation flow.
+      // With email confirmation disabled in Supabase, signUp returns a session
+      // and the user is signed in straight away.
       if (data.session?.user) {
-        const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
-        if (signOutError) throw signOutError;
-        const { error: confirmationError } = await supabase.auth.signInWithOtp({
-          email,
-          options: {
-            shouldCreateUser: false,
-            emailRedirectTo: redirectUrl.toString()
-          }
-        });
-        if (confirmationError) throw confirmationError;
+        state.user = data.session.user;
+        state.loggedIn = true;
+        await refreshBetaAccess();
+        DOM.authPassword.value = "";
+        DOM.authConfirmPassword.value = "";
+        closeDialog(DOM.authDialog);
+        updateAccount();
+        setAuthMessage("");
+        announce("Account created. You are signed in");
+        await pullFromCloud();
+        activateRequestedBetaMode();
+        return;
       }
 
+      // No session means Supabase still requires email confirmation.
       state.user = null;
       state.loggedIn = false;
       DOM.authPassword.value = "";
@@ -2895,7 +2895,6 @@ async function submitAuth(event) {
       setAuthMessage(message || (isSignUp ? "Sign up failed." : "Log in failed."));
     }
   } finally {
-    signupConfirmationPending = false;
     submit.disabled = false;
     DOM.signInTab.disabled = false;
     DOM.signUpTab.disabled = false;
@@ -4148,7 +4147,6 @@ function getSupabase() {
             if (initialSessionResolved) return;
             initialSessionResolved = true;
           }
-          if (signupConfirmationPending && event === "SIGNED_IN") return;
           if (!["SIGNED_IN", "SIGNED_OUT", "INITIAL_SESSION", "PASSWORD_RECOVERY", "USER_UPDATED"].includes(event)) return;
           const wasLoggedIn = state.loggedIn;
           state.user = session?.user || null;
