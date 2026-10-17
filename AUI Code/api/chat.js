@@ -5,7 +5,7 @@ const MAX_MEMORY_ITEMS = 8;
 const MAX_ATTACHMENTS = 10;
 const MAX_EXTRACTED_TEXT = 260_000;
 const OPENROUTER_KEY_PATTERN = /^sk-or-v1-[A-Za-z0-9_-]{16,}$/;
-const DEFAULT_MODEL = "openai/gpt-5.4-nano";
+const DEFAULT_MODEL = "openai/gpt-6-astra";
 const SUPPORTED_MODELS = new Set([
   DEFAULT_MODEL,
   "openai/gpt-4.1-mini",
