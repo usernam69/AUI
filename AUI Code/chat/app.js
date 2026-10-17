@@ -18,7 +18,7 @@ const CONFIG = {
   INITIAL_CHAT_BATCH: 30,
   CHAT_BATCH_SIZE: 25,
   ACCOUNT_ROLES: {
-    "kantertal1@gmail.com": {
+    "sdgoldstein14@gmail.com": {
       tier: "owner",
       label: "Owner",
       description: "Full owner access · unlimited"

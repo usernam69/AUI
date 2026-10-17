@@ -109,7 +109,7 @@ create policy "Support and owner can view all requests"
   using (
     lower(coalesce(auth.jwt() ->> 'email', '')) in (
       'supportaton@gmail.com',
-      'kantertal1@gmail.com'
+      'sdgoldstein14@gmail.com'
     )
   );
 
@@ -119,13 +119,13 @@ create policy "Support and owner can review requests"
   using (
     lower(coalesce(auth.jwt() ->> 'email', '')) in (
       'supportaton@gmail.com',
-      'kantertal1@gmail.com'
+      'sdgoldstein14@gmail.com'
     )
   )
   with check (
     lower(coalesce(auth.jwt() ->> 'email', '')) in (
       'supportaton@gmail.com',
-      'kantertal1@gmail.com'
+      'sdgoldstein14@gmail.com'
     )
   );
 

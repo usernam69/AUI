@@ -20,17 +20,17 @@ const CONFIG = {
   DAILY_LIMITS: {
     guest: 25,
     free: 45,
-    unlimitedEmails: ["kantertal1@gmail.com"]
+    unlimitedEmails: ["sdgoldstein14@gmail.com"]
   },
   IMAGE_DAILY_LIMITS: {
     guest: 5,
     free: 10,
-    unlimitedEmails: ["kantertal1@gmail.com"]
+    unlimitedEmails: ["sdgoldstein14@gmail.com"]
   },
   SEARCH_DAILY_LIMITS: {
     guest: 5,
     free: 15,
-    unlimitedEmails: ["kantertal1@gmail.com"]
+    unlimitedEmails: ["sdgoldstein14@gmail.com"]
   }
 };
 
