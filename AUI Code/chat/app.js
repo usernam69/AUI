@@ -1418,7 +1418,7 @@ function createEmptyState() {
   const wrapper = element("div", "emptyState");
   wrapper.setAttribute("aria-labelledby", "landingTitle");
   wrapper.innerHTML = `
-    <div class="emptyBrand" aria-hidden="true">T</div>
+    <div class="emptyBrand" aria-hidden="true">A</div>
     <h1 id="landingTitle">AUI</h1>
     <p class="heroTagline">Smart. Funny. <span>Slightly unhinged.</span></p>
     <p class="heroQuestion">What are we building today?</p>
@@ -1443,7 +1443,7 @@ function createMessageElement(message, index, { animate = true } = {}) {
   const identity = element("div", "messageIdentity");
   identity.innerHTML = isUser
     ? `<span class="messageAvatar userAvatar" aria-hidden="true">Y</span><strong>You</strong>`
-    : `<span class="messageAvatar assistantAvatar" aria-hidden="true">T</span><strong>AUI</strong>`;
+    : `<span class="messageAvatar assistantAvatar" aria-hidden="true">A</span><strong>AUI</strong>`;
   header.append(identity);
 
   if (!isUser && message.comparisonLabel) {
