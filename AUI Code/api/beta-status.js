@@ -35,7 +35,10 @@ export default async function handler(req, res) {
     const email = String(user?.email || "").trim().toLowerCase();
     const approvedByMetadata = user?.app_metadata?.beta === true
       || user?.app_metadata?.beta_approved === true;
-    const role = ACCOUNT_ROLES.get(email) || null;
+    const emailVerified = Boolean(user?.email_confirmed_at || user?.confirmed_at);
+    // Owner and support access is tied to an email address, so only grant it
+    // once Supabase reports that address as verified.
+    const role = emailVerified ? (ACCOUNT_ROLES.get(email) || null) : null;
     const grants = await getApprovedRequests(authorization, user?.id);
     const activeGrants = grants.filter(isGrantActive);
     const betaGrant = activeGrants.find(grant => grant.feature_key === "beta_lab");
