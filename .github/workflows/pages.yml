@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [claude/blissful-hopper-04f4rj]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
