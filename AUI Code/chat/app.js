@@ -950,6 +950,7 @@ async function sendMessage(options = {}) {
   renderMessages({ focusMessageId: assistantMessage.id });
   announce(`Generating with ${MODEL_NAMES[requestModel] || requestModel}`);
 
+  let loadingShown = false;
   try {
     const history = options.historyOverride
       || createHistory(chat, assistantMessage.id, Boolean(options.targetMessage));
@@ -958,7 +959,6 @@ async function sendMessage(options = {}) {
       ...history,
       { role: "user", content: buildSlmUserText(text, attachments) }
     ];
-    let loadingShown = false;
     for await (const token of streamSlm(slmMessages, {
       signal: abortController.signal,
       onProgress: report => {
@@ -987,9 +987,11 @@ async function sendMessage(options = {}) {
     announce("Response complete");
   } catch (error) {
     if (error.name === "AbortError") {
+      if (loadingShown) assistantMessage.content = "";
       assistantMessage.status = "stopped";
       announce("Generation stopped");
     } else {
+      if (loadingShown) assistantMessage.content = "";
       assistantMessage.status = "error";
       assistantMessage.error = error.message || "The response failed.";
       toast(assistantMessage.error, "error");
@@ -3845,8 +3847,12 @@ function checkpointMessages({ immediate = false } = {}) {
   scheduleCloudSync(immediate ? 0 : 500);
 }
 
+function hasCloudAccount() {
+  return Boolean(state.loggedIn && state.user && state.user.id !== PLACEHOLDER_OWNER_USER.id);
+}
+
 function scheduleCloudSync(delay = CLOUD_SYNC_DELAY) {
-  if (!state.loggedIn || !state.user) return;
+  if (!hasCloudAccount()) return;
   cloudDirty = true;
   if (cloudSyncInFlight || cloudRetryTimer) return;
 
@@ -3862,7 +3868,7 @@ function scheduleCloudSync(delay = CLOUD_SYNC_DELAY) {
 }
 
 async function syncToCloud() {
-  if (!state.loggedIn || !state.user) return;
+  if (!hasCloudAccount()) return;
   if (cloudSyncInFlight) {
     cloudDirty = true;
     return;
@@ -3889,7 +3895,7 @@ async function syncToCloud() {
 }
 
 async function pullFromCloud({ background = false } = {}) {
-  if (!state.loggedIn || !state.user || !navigator.onLine) return;
+  if (!hasCloudAccount() || !navigator.onLine) return;
   if (cloudPullInFlight) return;
   if (background && (
     document.hidden
@@ -4151,8 +4157,9 @@ function getSupabase() {
           }
           if (!["SIGNED_IN", "SIGNED_OUT", "INITIAL_SESSION", "PASSWORD_RECOVERY", "USER_UPDATED"].includes(event)) return;
           const wasLoggedIn = state.loggedIn;
-          state.user = session?.user || null;
-          state.loggedIn = Boolean(session?.user);
+          state.user = session?.user
+            || (AUTO_OWNER_LOGIN && event !== "SIGNED_OUT" ? PLACEHOLDER_OWNER_USER : null);
+          state.loggedIn = Boolean(state.user);
           if (event === "PASSWORD_RECOVERY") {
             passwordRecoveryPending = true;
             openPasswordRecoveryDialog();
