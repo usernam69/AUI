@@ -1859,19 +1859,18 @@
 
   .toolsPopover:popover-open {
     position: fixed;
-    inset: auto auto 112px max(calc((100vw - var(--content-width)) / 2 + 12px), 20px);
+    inset: 0;
+    margin: auto;
+    height: fit-content;
     animation: popoverIn 160ms var(--ease-out) both;
-  }
-
-  body.landingMode .toolsPopover:popover-open,
-  body.landingMode .toolsPopover[data-fallback-open] {
-    bottom: clamp(176px, calc(112px + 12vh), 232px);
   }
 
   .toolsPopover[data-fallback-open] {
     position: fixed;
     z-index: 100;
-    inset: auto auto 112px max(calc((100vw - var(--content-width)) / 2 + 12px), 20px);
+    inset: 0;
+    margin: auto;
+    height: fit-content;
     display: block;
     animation: popoverIn 160ms var(--ease-out) both;
   }
@@ -1922,6 +1921,7 @@
   }
 
   .dialog {
+    margin: auto;
     width: min(94vw, 620px);
     max-height: min(86vh, 760px);
     overflow: hidden;
@@ -2389,9 +2389,11 @@
   .toastRegion {
     position: fixed;
     z-index: 10000;
-    right: max(var(--space-4), env(safe-area-inset-right));
-    bottom: max(var(--space-4), env(safe-area-inset-bottom));
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     display: grid;
+    justify-items: center;
     gap: var(--space-2);
     pointer-events: none;
   }
@@ -2702,15 +2704,7 @@
     }
 
     .toolsPopover:popover-open {
-      right: 12px;
-      bottom: 86px;
-      left: 12px;
-      width: auto;
-    }
-
-    body.landingMode .toolsPopover:popover-open,
-    body.landingMode .toolsPopover[data-fallback-open] {
-      bottom: 142px;
+      width: min(250px, calc(100vw - 24px));
     }
 
     .messageContent table {
