@@ -49,6 +49,16 @@ const CONFIG = {
   }
 };
 
+// Temporary placeholder: every visitor appears signed in as the owner in the UI.
+// This is a local-only user with no Supabase session, so it grants no server or
+// database access. Set AUTO_OWNER_LOGIN to false to restore normal sign-in.
+const AUTO_OWNER_LOGIN = true;
+const PLACEHOLDER_OWNER_USER = {
+  id: "local-owner",
+  email: "sdgoldstein14@gmail.com",
+  user_metadata: {}
+};
+
 const SLM_MODEL = "slm/llama-3.2-1b";
 
 const MODEL_NAMES = {
@@ -2561,7 +2571,7 @@ async function restoreSession() {
       session = await waitForAuthSession(supabase);
     }
 
-    state.user = session?.user || null;
+    state.user = session?.user || (AUTO_OWNER_LOGIN ? PLACEHOLDER_OWNER_USER : null);
     state.loggedIn = Boolean(state.user);
 
     if (redirect.error) {
