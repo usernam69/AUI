@@ -33,6 +33,8 @@ jobs:
           rm -rf api supabase scripts package.json pnpm-lock.yaml vercel.json
           # Project pages are served from /AUI/, so prefix root-absolute links
           find . -name '*.html' -exec sed -i -E 's#(src|href|content)="/([^/"][^"]*)?"#\1="/AUI/\2"#g' {} +
+          # Same for page links and redirect URLs held in JS (the service worker is left alone)
+          find . -name '*.js' ! -path './chat/sw.js' -exec sed -i -E 's#"/(chat|beta|about)(/?)(["?])#"/AUI/\1\2\3#g' {} +
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
