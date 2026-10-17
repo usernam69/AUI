@@ -6,6 +6,7 @@ import {
   prepareFiles,
   prepareFolder
 } from "../modules/uploads.js?v=20260728-model-compare19";
+import { streamSlm } from "../modules/slm.js";
 import { isMessageSubmitKey } from "../modules/keyboard.js?v=20260728-model-compare19";
 
 const CONFIG = {
@@ -48,27 +49,15 @@ const CONFIG = {
   }
 };
 
+const SLM_MODEL = "slm/llama-3.2-1b";
+
 const MODEL_NAMES = {
-  "openai/gpt-5.4-nano": "GPT-5.4 Nano",
-  "openai/gpt-4.1-mini": "GPT-4.1 Mini",
-  "anthropic/claude-3-haiku": "Claude 3 Haiku",
-  "google/gemini-2.5-flash-lite": "Gemini",
-  "deepseek/deepseek-chat": "DeepSeek Chat",
-  "meta-llama/llama-3.1-8b-instruct": "Llama 3.1 8B",
-  "mistralai/mistral-small-3.1-24b-instruct": "Mistral Small",
-  "openai/gpt-5.4-mini": "GPT-5.4 Mini"
+  [SLM_MODEL]: "AUI SLM"
 };
 
-const FREE_MODELS = new Set([
-  "openai/gpt-5.4-nano",
-  "deepseek/deepseek-chat",
-  "meta-llama/llama-3.1-8b-instruct",
-  "mistralai/mistral-small-3.1-24b-instruct"
-]);
+const FREE_MODELS = new Set([SLM_MODEL]);
 
-const MODEL_ALIASES = {
-  "google/gemini-pro": "google/gemini-2.5-flash-lite"
-};
+const MODEL_ALIASES = {};
 
 const RESPONSE_MODES = new Set(["Normal", "Chaos", "Safe Mode", "Coder Mode", "Creative", "Beta Lab"]);
 
@@ -80,7 +69,7 @@ const defaultState = {
   memory: [],
   loading: false,
   mode: "Normal",
-  model: "openai/gpt-5.4-nano",
+  model: SLM_MODEL,
   settings: {
     voice: true,
     markdown: true,
@@ -577,13 +566,11 @@ function bindEvents() {
   DOM.modelSelect.addEventListener("change", event => {
     const tier = getUserTier();
     if (tier === "guest") {
-      event.target.value = "openai/gpt-5.4-nano";
-      toast("Guest accounts are limited to GPT-5.4 Nano. Sign up for more models.", "error");
+      event.target.value = SLM_MODEL;
       return;
     }
     if (tier === "free" && !betaApproved && !FREE_MODELS.has(event.target.value)) {
       event.target.value = state.model;
-      toast("Free plan includes GPT-5.4 Nano, DeepSeek, Llama 3.1 8B, and Mistral Small. Beta members unlock all models.", "error");
       return;
     }
     state.model = event.target.value;
@@ -768,13 +755,13 @@ async function sendMessage(options = {}) {
     return sendSearchMessage(text);
   }
 
-  if (getUserTier() === "guest" && state.model !== "openai/gpt-5.4-nano") {
-    state.model = "openai/gpt-5.4-nano";
+  if (getUserTier() === "guest" && state.model !== SLM_MODEL) {
+    state.model = SLM_MODEL;
     DOM.modelSelect.value = state.model;
   }
 
   if (getUserTier() === "free" && !betaApproved && !FREE_MODELS.has(state.model)) {
-    state.model = "openai/gpt-5.4-nano";
+    state.model = SLM_MODEL;
     DOM.modelSelect.value = state.model;
   }
 
@@ -956,41 +943,29 @@ async function sendMessage(options = {}) {
   try {
     const history = options.historyOverride
       || createHistory(chat, assistantMessage.id, Boolean(options.targetMessage));
-    const requestHeaders = await getChatRequestHeaders();
-    const response = await fetch(CONFIG.CHAT_API, {
-      method: "POST",
-      headers: requestHeaders,
+    const slmMessages = [
+      { role: "system", content: buildSlmSystemPrompt() },
+      ...history,
+      { role: "user", content: buildSlmUserText(text, attachments) }
+    ];
+    let loadingShown = false;
+    for await (const token of streamSlm(slmMessages, {
       signal: abortController.signal,
-      body: JSON.stringify({
-        message: text,
-        model: requestModel,
-        mode: state.mode,
-        plan: getRequestPlan(),
-        timeZone: getClientTimeZone(),
-        history,
-        memory: state.settings.memory ? state.memory.slice(-8) : [],
-        attachments: attachments.map(attachment => ({
-          name: attachment.name,
-          type: attachment.type,
-          kind: attachment.kind,
-          dataUrl: attachment.dataUrl,
-          extractedText: attachment.extractedText
-        }))
-      })
-    });
-
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      throw new Error(data?.error || `Chat failed (${response.status}).`);
+      onProgress: report => {
+        loadingShown = true;
+        assistantMessage.content = `Loading the AUI model in your browser… ${Math.round((report.progress || 0) * 100)}% (first time only)`;
+        scheduleStreamingRender(assistantMessage);
+      }
+    })) {
+      if (loadingShown) {
+        loadingShown = false;
+        assistantMessage.content = "";
+      }
+      assistantMessage.content += token;
+      checkpointMessages();
+      scheduleStreamingRender(assistantMessage);
     }
-
-    const contentType = response.headers.get("content-type") || "";
-    if (!contentType.includes("text/event-stream") || !response.body) {
-      const data = await response.json().catch(() => ({}));
-      assistantMessage.content += data.reply || "";
-    } else {
-      await consumeEventStream(response.body, assistantMessage);
-    }
+    if (loadingShown) assistantMessage.content = "";
 
     assistantMessage.status = assistantMessage.content ? "complete" : "error";
     if (!assistantMessage.content) assistantMessage.error = "The model returned an empty response.";
@@ -1020,6 +995,23 @@ async function sendMessage(options = {}) {
     updateComposerState();
     renderMessages({ focusMessageId: assistantMessage.id, preserveScroll: userPausedScroll });
   }
+}
+
+function buildSlmSystemPrompt() {
+  const memory = state.settings.memory ? state.memory.slice(-8) : [];
+  const parts = [
+    "You are AUI, a helpful, concise AI assistant running privately in the user's browser.",
+    `Response mode: ${state.mode}.`
+  ];
+  if (memory.length) parts.push(`Things you remember about the user: ${JSON.stringify(memory)}`);
+  return parts.join("\n");
+}
+
+function buildSlmUserText(text, attachments = []) {
+  const extra = attachments
+    .filter(attachment => attachment.extractedText)
+    .map(attachment => `[Attached file: ${attachment.name}]\n${String(attachment.extractedText).slice(0, 6000)}`);
+  return extra.length ? `${text}\n\n${extra.join("\n\n")}` : text;
 }
 
 async function consumeEventStream(body, assistantMessage) {
