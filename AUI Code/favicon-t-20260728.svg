@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    .aui-letter { fill: #ffffff; }
+    @media (prefers-color-scheme: dark) {
+      .aui-letter { fill: #111111; }
+    }
+  </style>
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="#f43f46"/>
+  <path class="aui-letter" fill-rule="evenodd" d="M28 17h8l11 30h-7.6l-2-5.6H26.6l-2 5.6H17zm4 10.5l-3.1 8.9h6.2z"/>
+</svg>
