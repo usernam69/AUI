@@ -951,6 +951,7 @@ async function sendMessage(options = {}) {
   announce(`Generating with ${MODEL_NAMES[requestModel] || requestModel}`);
 
   let loadingShown = false;
+  const priorContent = assistantMessage.content;
   try {
     const history = options.historyOverride
       || createHistory(chat, assistantMessage.id, Boolean(options.targetMessage));
@@ -969,13 +970,13 @@ async function sendMessage(options = {}) {
     })) {
       if (loadingShown) {
         loadingShown = false;
-        assistantMessage.content = "";
+        assistantMessage.content = priorContent;
       }
       assistantMessage.content += token;
       checkpointMessages();
       scheduleStreamingRender(assistantMessage);
     }
-    if (loadingShown) assistantMessage.content = "";
+    if (loadingShown) assistantMessage.content = priorContent;
 
     assistantMessage.status = assistantMessage.content ? "complete" : "error";
     if (!assistantMessage.content) assistantMessage.error = "The model returned an empty response.";
@@ -987,11 +988,11 @@ async function sendMessage(options = {}) {
     announce("Response complete");
   } catch (error) {
     if (error.name === "AbortError") {
-      if (loadingShown) assistantMessage.content = "";
+      if (loadingShown) assistantMessage.content = priorContent;
       assistantMessage.status = "stopped";
       announce("Generation stopped");
     } else {
-      if (loadingShown) assistantMessage.content = "";
+      if (loadingShown) assistantMessage.content = priorContent;
       assistantMessage.status = "error";
       assistantMessage.error = error.message || "The response failed.";
       toast(assistantMessage.error, "error");
