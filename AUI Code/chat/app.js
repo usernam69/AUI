@@ -1089,6 +1089,7 @@ function fitSlmMessages(systemPrompt, history, userText) {
     budget -= cost;
     kept.unshift(history[index]);
   }
+  while (kept.length && kept[0].role !== "user") kept.shift();
   return [
     { role: "system", content: systemPrompt },
     ...kept,

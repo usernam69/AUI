@@ -37,6 +37,14 @@ await test("cloud storage functions", async () => {
   const cloud = serializeForCloud(state);
   assert.deepEqual(Object.keys(cloud), ["chats", "memory", "settings", "updated_at"]);
   assert.equal(cloud.chats[0].messages[0].attachments[0].dataUrl, undefined);
+  assert.equal(cloud.memory[0].user, "u", "memory keeps its nested user field");
+  const store = {};
+  globalThis.localStorage = { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = v; } };
+  const { saveStoredState, loadStoredState } = await load("modules/storage.js");
+  saveStoredState(state);
+  const back = loadStoredState({ settings: {}, chats: [], memory: [] });
+  assert.equal(back.memory[0].user, "u");
+  assert.equal(back.user, null);
   const builder = result => {
     const calls = [];
     const q = { };
