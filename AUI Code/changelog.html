@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#161b26">
+  <meta name="description" content="What's new in AUI.">
+  <title>What's new in AUI</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <script>document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";</script>
+  <style>
+    body { overflow: auto; padding: 40px 16px 80px; }
+    main { max-width: 760px; margin: 0 auto; line-height: 1.7; }
+    h1 { font-size: 30px; }
+    article { margin-top: 28px; padding: 18px 20px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+    article h2 { font-size: 18px; margin-bottom: 6px; }
+    time { color: var(--muted); font-size: 13px; }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <main>
+    <a href="/chat">← Back to AUI</a>
+    <h1>What's new</h1>
+
+    <article>
+      <h2>A big redesign <time datetime="2026-10-18">October 18, 2026</time></h2>
+      <ul>
+        <li>A new ChatGPT-style look in blue, with an Appearance tab: accent colors, Ocean, Midnight, OLED, Sky and Sepia themes, fonts, bubble styles.</li>
+        <li>Pick your model: Tiny, Fastest, Balanced, Smart or Smartest. The model now runs in a background worker so the page stays smooth.</li>
+        <li>Faster replies: shorter prompts, reuse of work between turns, and smarter limits.</li>
+        <li>Sidebar: date groups, folders, tags, colors, emoji, drag to reorder pins, fuzzy search, bulk actions, trash, starred messages and a collapsible icon rail.</li>
+        <li>Composer: slash commands, per-chat drafts, smart paste, prompt improver, emoji, follow-up chips, message queue and push to talk.</li>
+        <li>Replies: run code, line numbers, Mermaid diagrams, charts, callouts, footnotes, task lists, sortable tables, TL;DR and version diffs.</li>
+        <li>Accurate math and unit conversions, plus optional Wikipedia, dictionary and weather lookups.</li>
+        <li>Fixed: updating AUI no longer deletes the downloaded model.</li>
+      </ul>
+    </article>
+
+    <article>
+      <h2>Model reliability <time datetime="2026-10-17">October 2026</time></h2>
+      <ul>
+        <li>The model rebuilds itself after a failed generation, and copying handles clipboard errors.</li>
+        <li>Seventeen bug fixes from a deep review.</li>
+      </ul>
+    </article>
+  </main>
+</body>
+</html>

@@ -181,6 +181,27 @@ export function warmSlm() {
   loadSlm().catch(() => {});
 }
 
+// Remove every model file WebLLM stored in Cache Storage and IndexedDB.
+export async function deleteCachedModels() {
+  let removed = false;
+  try {
+    for (const name of await caches.keys()) {
+      if (name.startsWith("webllm")) removed = (await caches.delete(name)) || removed;
+    }
+  } catch {}
+  try {
+    const databases = await indexedDB.databases?.() || [];
+    for (const { name } of databases) {
+      if (name?.startsWith("webllm")) {
+        indexedDB.deleteDatabase(name);
+        removed = true;
+      }
+    }
+  } catch {}
+  plannedModel = null;
+  return removed;
+}
+
 let engineReady = false;
 export function isSlmReady() {
   return engineReady;

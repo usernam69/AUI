@@ -1,5 +1,5 @@
-const CACHE_NAME = "aui-t20261018-b9";
-const ASSET_VERSION = "20261018-b9";
+const CACHE_NAME = "aui-t20261018-b10";
+const ASSET_VERSION = "20261018-b10";
 const versioned = path => `${path}?v=${ASSET_VERSION}`;
 
 // The worker lives in <base>chat/, so resolve everything from there. That keeps it
@@ -7,7 +7,9 @@ const versioned = path => `${path}?v=${ASSET_VERSION}`;
 const BASE = new URL("../", self.registration.scope).pathname;
 const at = path => `${BASE}${path}`;
 
-const PRECACHE_PAGES = [at("chat"), at("about")];
+const PRECACHE_PAGES = [at("chat"), at("about"), at("help.html"), at("changelog.html")];
+const RUNTIME_CACHE = "aui-runtime";
+const RUNTIME_HOSTS = ["esm.sh", "cdn.jsdelivr.net", "fonts.googleapis.com", "fonts.gstatic.com"];
 const PRECACHE_ASSETS = [
   at(versioned("style.css")),
   at(versioned("chat/app.js")),
@@ -36,7 +38,9 @@ self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
-        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+        // Only remove AUI's own older asset caches. Other caches (like the downloaded
+        // WebLLM model, hundreds of MB) must survive app updates.
+        keys.filter(key => key.startsWith("aui-t") && key !== CACHE_NAME).map(key => caches.delete(key))
       ))
       .then(() => self.clients.claim())
   );
@@ -48,7 +52,20 @@ self.addEventListener("fetch", event => {
 
   const url = new URL(request.url);
 
-  if (url.origin !== location.origin) return;
+  // Libraries and styles from these CDNs are kept so formatting works offline (402).
+  if (url.origin !== location.origin) {
+    if (!RUNTIME_HOSTS.includes(url.hostname)) return;
+    event.respondWith(
+      caches.open(RUNTIME_CACHE).then(cache => cache.match(request).then(cached => {
+        const network = fetch(request).then(response => {
+          if (response.ok || response.type === "opaque") cache.put(request, response.clone());
+          return response;
+        }).catch(() => cached);
+        return cached || network;
+      }))
+    );
+    return;
+  }
 
   const isNavigation = request.mode === "navigate";
   const extension = url.pathname.split(".").pop();

@@ -1088,3 +1088,9 @@ Skipped: 302 and 303 (browsers stop idle service workers after about 30 seconds,
 Built: 352, 353, 354 (math goes through the calculator), 355, 356, 357, 358, 359, 360, 361 (359 to 361 are behind an "Online lookups" switch, off by default), 363, 364, 365, 369, 370, 371, 373, 375, 376, 377, 378 (ratings shown in Model stats), 380, 381, 382 to 396 and 398 (as one-click prompt presets in Explore, since modes were removed), 397 (/timer).
 Already in AUI: 362 (the Run button from 257), 366 (the engine stops at end-of-turn tokens), 367 (184), 368 (233's follow-up chips), 374, 399, 400.
 Skipped: 351 (example conversations lengthen every prompt and undo 305's speedup), 372 (needs testing the model on a real WebGPU device), 379 (one person's ratings are too few to compare prompts).
+
+### Batch 10 - category 9 (offline, installable app & GitHub Pages)
+Built: 401, 402 (formatting libraries are now cached for offline use), 404, 405, 406, 411, 412, 413, 423, 426, 427, 428, 429, 430, 432, 433, 434, 436, 438, 439, 440, 442, 444, 446, 447, 448.
+Bug fixed along the way: the service worker deleted every other cache on each update, including the downloaded model, so every site update forced a full model re-download. It now only removes its own old caches (covered by a new test).
+Already in AUI: 403, 408, 414, 415 (Wikipedia lookups, 359), 417, 418, 420, 421, 422, 425, 431, 435, 437, 441, 443 (the build has nothing to cache), 449.
+Skipped: 407 (needs a domain and DNS access), 409 and 445 (need the GitHub environment setting changed by the repo owner), 410 (Pages hosts one site per repo, so branch previews would replace the live site), 416 (in-browser image models are 1 to 2 GB and very slow), 419 (would bring back a server), 424 (robots.txt only works at the domain root, outside this repo), 450 (the workflow's link rewriting is tested and now link-checked; a second mechanism adds risk).

@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b9";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b10";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b9";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm } from "../modules/slm.js?v=20261018-b9";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b9";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b9";
+} from "../modules/uploads.js?v=20261018-b10";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b10";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b10";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b10";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -512,7 +512,7 @@ function setupQuickWins() {
   byId("copyChatBtn")?.addEventListener("click", copyWholeChat);
   byId("resetSettingsBtn")?.addEventListener("click", resetSettings);
   const version = byId("settingsVersion");
-  if (version) version.textContent = `AUI v${APP_VERSION}`;
+  if (version) version.innerHTML = `AUI v${APP_VERSION} · <a href="../changelog.html" target="_blank" rel="noopener">What's new</a> · <a href="../help.html" target="_blank" rel="noopener">Help</a>`;
   // Popovers float over the page; close them when it scrolls under them.
   DOM.chatViewport.addEventListener("scroll", () => hideToolsPopover(), { passive: true });
   if (!matchMedia("(pointer: coarse)").matches && !location.hash) {
@@ -526,7 +526,7 @@ const SETTINGS_TABS = [
   ["general", "General", ["enterToSendToggle", "counterSelect", "composerStyleSelect", "spellcheckToggle", "voiceAutoSendToggle", "typingSoundToggle", "timestampsToggle", "autoScrollToggle", "notifyToggle", "soundToggle"]],
   ["appearance", "Appearance", ["themeSelect", "themeSwatches", "accentSwatches", "fontSelect", "fontWeightInput", "lineHeightSelect", "contentWidthSelect", "bubbleSelect", "bubbleColorInput", "iconWeightSelect", "fontScaleInput", "densitySelect", "seasonalToggle", "effectsToggle"]],
   ["personal", "Personalization", ["answerLengthSelect", "onlineLookupsToggle", "speedSelect", "perfBtn", "backgroundDownloadToggle", "unloadIdleToggle", "customInstructionsInput", "aiTitlesToggle", "memoryToggle", "markdownToggle", "voiceOutputToggle", "speechRateInput"]],
-  ["data", "Data controls", ["preloadModelBtn", "exportAllBtn", "storageMeter", "autoArchiveToggle", "archivedChatsList", "trashList", "resetSettingsBtn"]]
+  ["data", "Data controls", ["preloadModelBtn", "deleteModelsBtn", "exportAllBtn", "storageMeter", "autoArchiveToggle", "archivedChatsList", "trashList", "resetSettingsBtn"]]
 ];
 
 // Group the long settings list into ChatGPT-style tabs with a left-hand nav.
@@ -2851,6 +2851,93 @@ async function runQualityCheck(output) {
   output.textContent = `${correct}/10 facts correct on this model`;
 }
 
+// --- Offline, install & hosting from The Probe (category 9) ---
+
+let deferredInstallPrompt = null;
+function setupInstallPrompt() {
+  window.addEventListener("beforeinstallprompt", event => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    const button = byId("installAppBtn");
+    if (button) button.hidden = false;
+  });
+  window.addEventListener("appinstalled", () => {
+    deferredInstallPrompt = null;
+    if (byId("installAppBtn")) byId("installAppBtn").hidden = true;
+    toast("AUI is installed. Open it from your apps.");
+  });
+  const more = document.querySelector(".moreLinksInner");
+  if (more && !byId("installAppBtn")) {
+    const button = element("button", "");
+    button.id = "installAppBtn";
+    button.type = "button";
+    button.hidden = true;
+    button.innerHTML = '<span>Install app</span><span class="navHint">⤓</span>';
+    button.addEventListener("click", async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice.catch(() => {});
+      deferredInstallPrompt = null;
+      button.hidden = true;
+    });
+    more.prepend(button);
+  }
+}
+
+// Tell people when a new version takes over, and check for one every hour.
+function setupUpdateChecks() {
+  if (!("serviceWorker" in navigator)) return;
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController) return;
+    toast("AUI was updated.", "info", { label: "Reload", duration: 15000, onClick: () => location.reload() });
+  });
+  navigator.serviceWorker.ready.then(registration => {
+    setInterval(() => registration.update().catch(() => {}), 60 * 60_000);
+  }).catch(() => {});
+}
+
+// Text shared from other apps (share target), web+aui: links, or ?q= opens a new chat with it typed.
+function prefillFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const parts = [params.get("title"), params.get("text"), params.get("url"), params.get("q")].filter(Boolean);
+  if (!parts.length) return;
+  let text = parts.join("\n");
+  if (text.startsWith("web+aui:")) text = decodeURIComponent(text.slice(8)).replace(/^\/+/, "");
+  if (getChat()?.messages.length) createChat();
+  DOM.input.value = text.slice(0, 32000);
+  scheduleTextareaResize();
+  updateComposerState();
+  DOM.input.focus();
+  history.replaceState(null, "", location.pathname);
+}
+
+// Files opened with AUI from the operating system (installed app on desktop Chrome).
+function setupFileHandling() {
+  if (!("launchQueue" in window)) return;
+  window.launchQueue.setConsumer(async params => {
+    if (!params.files?.length) return;
+    const files = await Promise.all(params.files.map(handle => handle.getFile()));
+    addFiles(files);
+  });
+}
+
+async function deleteDownloadedModels() {
+  const confirmed = await askForConfirmation({
+    eyebrow: "Model files",
+    title: "Delete downloaded models?",
+    message: "This frees the space the AI models use in this browser. The next reply downloads the model again.",
+    submitLabel: "Delete",
+    cancelLabel: "Cancel"
+  });
+  if (!confirmed) return;
+  unloadSlm();
+  const removed = await deleteCachedModels();
+  preloadPromise = null;
+  toast(removed ? "Downloaded models deleted" : "No downloaded models found");
+  renderStorageMeter();
+}
+
 let appInitialized = false;
 
 if (document.readyState === "loading") {
@@ -2892,6 +2979,10 @@ async function init() {
   setupComposerExtras();
   DOM.chatArea.addEventListener("dblclick", showDefinition);
   setupIdleUnload();
+  setupInstallPrompt();
+  setupUpdateChecks();
+  setupFileHandling();
+  setTimeout(prefillFromUrl);
   setupBackgroundDownload();
   setInterval(updateReadyBadge, 3000);
   // 318: hovering the message box warms an already-downloaded model.
@@ -3317,6 +3408,7 @@ function bindEvents() {
   byId("timestampsToggle").addEventListener("change", saveSettingsFromDialog);
   byId("speedSelect").addEventListener("change", saveSettingsFromDialog);
   byId("perfBtn").addEventListener("click", openPerformancePanel);
+  byId("deleteModelsBtn").addEventListener("click", deleteDownloadedModels);
   ["counterSelect", "composerStyleSelect", "spellcheckToggle", "voiceAutoSendToggle", "typingSoundToggle", "backgroundDownloadToggle", "unloadIdleToggle", "answerLengthSelect", "onlineLookupsToggle"].forEach(id => byId(id).addEventListener("change", saveSettingsFromDialog));
   byId("customInstructionsInput").addEventListener("change", saveSettingsFromDialog);
   byId("autoScrollToggle").addEventListener("change", saveSettingsFromDialog);
@@ -4486,7 +4578,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b9");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b10");
   return markdownModulePromise;
 }
 

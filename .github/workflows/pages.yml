@@ -4,6 +4,11 @@ on:
   push:
     branches: [claude/blissful-hopper-04f4rj]
   workflow_dispatch:
+    inputs:
+      ref:
+        description: "Commit, tag or branch to deploy (leave empty for the latest). Use an older commit to roll back."
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -22,6 +27,13 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run tests
+        run: node tests/run.mjs
       - uses: actions/configure-pages@v5
       - name: Build static site
         run: |
@@ -31,6 +43,10 @@ jobs:
           cp -r . ../_site
           cd ../_site
           rm -rf supabase scripts package.json pnpm-lock.yaml
+          # One version per deploy: stamp the commit into every cache-busting query string
+          VERSION="$(git -C .. rev-parse --short=10 HEAD)"
+          OLD="$(grep -oE 'ASSET_VERSION = "[^"]+"' chat/sw.js | cut -d'"' -f2)"
+          sed -i "s/$OLD/$VERSION/g" chat/index.html chat/app.js chat/sw.js
           # Smaller stylesheet: drop comments, indentation and blank lines
           node -e "const f='style.css';const fs=require('fs');fs.writeFileSync(f,fs.readFileSync(f,'utf8').replace(/\/\*[\s\S]*?\*\//g,'').replace(/^\s+/gm,'').replace(/\n{2,}/g,'\n'))"
           # Project pages are served from /AUI/, so prefix root-absolute links
@@ -39,6 +55,8 @@ jobs:
           find . -name '*.html' -exec sed -i -E 's#register\("/chat/sw\.js"#register("/AUI/chat/sw.js"#' {} +
           # Same for page links and redirect URLs held in JS (the service worker is left alone)
           find . -name '*.js' ! -path './chat/sw.js' -exec sed -i -E 's#"/(chat|beta|about)(/?)(["?])#"/AUI/\1\2\3#g' {} +
+      - name: Check internal links
+        run: node scripts/check-links.mjs _site /AUI/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

@@ -1,0 +1,29 @@
+name: Lighthouse
+
+# Scores the live chat page after each deploy. Reports are saved as a build artifact.
+on:
+  workflow_run:
+    workflows: ["Deploy to GitHub Pages"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lighthouse:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run Lighthouse
+        run: |
+          npx --yes @lhci/cli@0.14.0 collect --url=https://usernam69.github.io/AUI/chat/ --numberOfRuns=1
+          npx --yes @lhci/cli@0.14.0 upload --target=filesystem --outputDir=./lighthouse
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report
+          path: lighthouse

@@ -20,12 +20,17 @@
   <link rel="icon" href="/favicon-t-20260728.svg" type="image/svg+xml">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-startup-image" href="/icons/splash-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)">
+  <link rel="apple-touch-startup-image" href="/icons/splash-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)">
+  <link rel="apple-touch-startup-image" href="/icons/splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)">
   <link rel="shortcut icon" href="/favicon-t-20260728.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="/style.css?v=20261018-b9">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css" integrity="sha384-wH75j6z1lH97ZOpMOInqhgKzFkAInZPPSPlZpYKYTOqsaizPvhQZmAtLcPKXpLyH" crossorigin="anonymous" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="/style.css?v=20261018-b10">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -247,6 +252,7 @@
         <label class="settingRow"><span><strong>AI chat titles</strong><small>Let the model name new chats after the first reply</small></span><input id="aiTitlesToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow settingRowStack"><span><strong>Custom instructions</strong><small>How should AUI answer? For example: "Keep it short" or "Explain like I'm new to coding"</small></span><textarea id="customInstructionsInput" rows="3" maxlength="1500" placeholder="Anything AUI should know or do in every reply"></textarea></label>
         <div class="settingRow"><span><strong>Model</strong><small>Download it now so your first reply starts fast</small></span><button class="secondaryBtn" id="preloadModelBtn" type="button">Download the model now</button></div>
+        <div class="settingRow"><span><strong>Downloaded models</strong><small>Free the space AI models use in this browser</small></span><button class="secondaryBtn dangerButton" id="deleteModelsBtn" type="button">Delete models</button></div>
         <div class="settingRow"><span><strong>Your chats</strong><small>Back up, restore or wipe chats in this browser</small></span><span class="settingActions"><button class="secondaryBtn" id="exportAllBtn" type="button">Export all</button><button class="secondaryBtn" id="importChatsBtn" type="button">Import</button><button class="secondaryBtn dangerButton" id="deleteAllChatsBtn" type="button">Delete all</button></span></div>
         <input id="importChatsInput" type="file" accept=".json,application/json" hidden>
         <div class="settingRow settingRowStack"><span><strong>Storage</strong><small>Space AUI uses in this browser</small></span><p id="storageMeter" class="archivedList">Checking…</p></div>
@@ -401,6 +407,6 @@
       navigator.serviceWorker.register("/chat/sw.js").catch(() => {});
     }
   </script>
-  <script type="module" src="/chat/app.js?v=20261018-b9"></script>
+  <script type="module" src="/chat/app.js?v=20261018-b10"></script>
 </body>
 </html>

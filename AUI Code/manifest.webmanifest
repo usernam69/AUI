@@ -25,6 +25,24 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-48.png",
+      "sizes": "48x48",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ],
   "shortcuts": [
@@ -39,5 +57,43 @@
         }
       ]
     }
+  ],
+  "id": "chat/",
+  "share_target": {
+    "action": "chat/",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+aui",
+      "url": "chat/?q=%s"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "chat/",
+      "accept": {
+        "text/plain": [
+          ".txt",
+          ".md",
+          ".csv",
+          ".json",
+          ".js",
+          ".py"
+        ],
+        "application/pdf": [
+          ".pdf"
+        ]
+      }
+    }
+  ],
+  "categories": [
+    "productivity",
+    "utilities"
   ]
 }

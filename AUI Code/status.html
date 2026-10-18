@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#161b26">
+  <meta name="description" content="Live status of the services AUI uses.">
+  <title>AUI status</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <script>document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";</script>
+  <style>
+    body { overflow: auto; padding: 40px 16px; }
+    main { max-width: 620px; margin: 0 auto; }
+    h1 { font-size: 28px; margin-bottom: 20px; }
+    .row { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+    .row small { display: block; color: var(--muted); }
+    .state { font-weight: 700; }
+    .ok { color: var(--success); }
+    .bad { color: var(--danger); }
+    .wait { color: var(--muted); }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <main>
+    <a href="/chat">← Back to AUI</a>
+    <h1>Status</h1>
+    <div id="rows"></div>
+    <p style="color:var(--muted);font-size:13px">Checked from your browser just now. AUI's chat itself runs on your device and doesn't depend on these.</p>
+  </main>
+  <script>
+    const checks = [
+      ["Website", "GitHub Pages", () => fetch("favicon.svg", { cache: "no-store" })],
+      ["Accounts & sync", "Supabase", () => fetch("https://cxulgeojkjnskdyoktkj.supabase.co/auth/v1/health", { headers: { apikey: "sb_publishable_GgxtfIaIamzZFY_jMU4_Cw_V8NKm475" } })],
+      ["Model downloads", "Hugging Face", () => fetch("https://huggingface.co/api/models/mlc-ai/Llama-3.2-1B-Instruct-q4f16_1-MLC", { mode: "cors" })],
+      ["Formatting libraries", "esm.sh", () => fetch("https://esm.sh/marked@16.1.2", { mode: "cors" })],
+      ["WebGPU on this device", "Your browser", async () => ({ ok: Boolean(await navigator.gpu?.requestAdapter()) })]
+    ];
+    const rows = document.getElementById("rows");
+    checks.forEach(([name, provider, run]) => {
+      const row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML = `<span><strong>${name}</strong><small>${provider}</small></span><span class="state wait">Checking…</span>`;
+      rows.append(row);
+      const state = row.querySelector(".state");
+      const timeout = new Promise(resolve => setTimeout(() => resolve({ ok: false, timeout: true }), 8000));
+      Promise.race([run(), timeout]).then(result => {
+        state.textContent = result.ok ? "Working" : result.timeout ? "Not responding" : "Problem";
+        state.className = `state ${result.ok ? "ok" : "bad"}`;
+      }).catch(() => {
+        state.textContent = "Unreachable";
+        state.className = "state bad";
+      });
+    });
+  </script>
+</body>
+</html>

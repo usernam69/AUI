@@ -296,6 +296,28 @@ await test("service worker works under a sub-path and survives a missing page", 
   assert.ok(added.length >= 10 && added.every(url => url.startsWith("/AUI/")), added.join(", "));
   assert.ok(added.includes("/AUI/chat"));
 });
+await test("service worker updates keep the downloaded model and runtime caches", async () => {
+  const vm = await import("node:vm");
+  const handlers = {};
+  const deleted = [];
+  const context = {
+    URL, location: { origin: "https://x.github.io" },
+    caches: {
+      open: async () => ({ addAll: async () => {}, add: async () => {} }),
+      keys: async () => ["aui-t20250101-old", "webllm/model", "webllm/config", "aui-runtime", "someone-else"],
+      delete: async key => { deleted.push(key); return true; },
+      match: async () => undefined
+    },
+    self: { registration: { scope: "https://x.github.io/AUI/chat/" }, addEventListener: (type, fn) => { handlers[type] = fn; }, skipWaiting: async () => {}, clients: { claim: async () => {} } },
+    fetch: async () => ({})
+  };
+  vm.createContext(context);
+  vm.runInContext(readFileSync(join(root, "chat/sw.js"), "utf8"), context);
+  let finished;
+  handlers.activate({ waitUntil: promise => { finished = promise; } });
+  await finished;
+  assert.deepEqual(deleted, ["aui-t20250101-old"]);
+});
 await test("root page redirects to the chat and the workflow rewrites the worker path", () => {
   const index = readFileSync(join(root, "index.html"), "utf8");
   assert.ok(/location\.replace\("chat\/"/.test(index) && !index.includes("app.js"));
