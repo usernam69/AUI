@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-blue1";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-nomodes1";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-blue1";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm } from "../modules/slm.js?v=20261018-blue1";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-blue1";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-blue1";
+} from "../modules/uploads.js?v=20261018-nomodes1";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm } from "../modules/slm.js?v=20261018-nomodes1";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-nomodes1";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-nomodes1";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -187,8 +187,6 @@ const DOM = {
   chatListSentinel: byId("chatListSentinel"),
   chatSearchInput: byId("chatSearchInput"),
   loginBtn: byId("loginBtn"),
-  modeSelect: byId("modeSelect"),
-  betaModeOption: byId("betaModeOption"),
   modelSelect: byId("modelSelect"),
   compareBtn: byId("compareBtn"),
   compareBar: byId("compareBar"),
@@ -634,15 +632,6 @@ function bindEvents() {
   byId("deleteAllChatsBtn").addEventListener("click", deleteAllChats);
   byId("preloadModelBtn")?.addEventListener("click", preloadModel);
   DOM.input.addEventListener("keydown", handleComposerKeydown);
-  DOM.modeSelect.addEventListener("change", event => {
-    if (event.target.value === "Beta Lab" && !betaApproved) {
-      event.target.value = state.mode === "Beta Lab" ? defaultState.mode : state.mode;
-      toast("Beta Lab requires approval. Request access from the Beta page.", "error");
-      return;
-    }
-    state.mode = event.target.value;
-    persist();
-  });
   DOM.modelSelect.addEventListener("change", event => {
     const tier = getUserTier();
     if (tier === "guest") {
@@ -1113,15 +1102,6 @@ async function sendMessage(options = {}) {
   }
 }
 
-const MODE_GUIDANCE = {
-  Normal: "Answer clearly and directly.",
-  Chaos: "Be playful and surprising, but stay helpful and accurate.",
-  "Safe Mode": "Use careful, family-friendly language and decline anything harmful.",
-  "Coder Mode": "Focus on code: give short explanations and complete, working snippets in fenced code blocks.",
-  Creative: "Be imaginative and vivid while staying on topic.",
-  "Beta Lab": "Answer clearly and directly."
-};
-
 function buildSlmSystemPrompt() {
   const parts = [
     "You are AUI, a friendly assistant that runs privately on the user's own device. You are a small model, so be honest about it.",
@@ -1129,7 +1109,7 @@ function buildSlmSystemPrompt() {
       + "if you are not sure of a fact, a number or a date, say so instead of guessing; "
       + "you cannot browse the web, see images, or know today's date unless the user tells you; "
       + "ask one short clarifying question when a request is ambiguous.",
-    MODE_GUIDANCE[state.mode] || MODE_GUIDANCE.Normal
+    "Answer clearly and directly."
   ];
   if (state.settings.memory && state.memory.length) {
     const notes = state.memory.slice(-3)
@@ -1783,7 +1763,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-blue1");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-nomodes1");
   return markdownModulePromise;
 }
 
@@ -2800,7 +2780,7 @@ function saveSettingsFromDialog() {
 }
 
 function applyPreferences() {
-  DOM.modeSelect.value = state.mode;
+  
   DOM.modelSelect.value = state.model;
   DOM.app.classList.toggle("sidebarCollapsed", Boolean(state.sidebarCollapsed));
   document.documentElement.style.setProperty("--chat-font-scale", String(state.settings.fontScale || 1));
@@ -3030,14 +3010,14 @@ function activateRequestedBetaMode() {
   betaModeRequested = false;
   if (!betaApproved) {
     state.mode = defaultState.mode;
-    DOM.modeSelect.value = state.mode;
+    
     persist();
     toast("This account is not approved for Beta Lab yet. Request access at aui.org/beta.", "error");
     return;
   }
 
   state.mode = "Beta Lab";
-  DOM.modeSelect.value = state.mode;
+  
   persist();
   toast("Beta Lab enabled: all models, higher limits, model comparison, and deep answers are active.");
   announce("Beta Lab mode enabled");
@@ -3082,11 +3062,9 @@ async function refreshBetaAccess() {
 }
 
 function syncBetaModeAvailability() {
-  DOM.betaModeOption.hidden = !betaApproved;
-  DOM.betaModeOption.disabled = !betaApproved;
   if (!betaApproved && state.mode === "Beta Lab") {
     state.mode = defaultState.mode;
-    DOM.modeSelect.value = state.mode;
+    
     persist();
   }
 }
@@ -3793,7 +3771,6 @@ function updateComposerState() {
   DOM.sendBtn.setAttribute("aria-label", state.loading ? "Stop generation" : "Send message");
   DOM.input.disabled = false;
   DOM.modelSelect.disabled = state.loading;
-  DOM.modeSelect.disabled = state.loading;
   DOM.compareBtn.disabled = state.loading;
   DOM.compareModelSelect.disabled = state.loading;
   const words = DOM.input.value.trim() ? DOM.input.value.trim().split(/\s+/).length : 0;
