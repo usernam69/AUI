@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-nomodes1";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-fix1";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-nomodes1";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm } from "../modules/slm.js?v=20261018-nomodes1";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-nomodes1";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-nomodes1";
+} from "../modules/uploads.js?v=20261018-fix1";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm } from "../modules/slm.js?v=20261018-fix1";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-fix1";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-fix1";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -1763,7 +1763,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-nomodes1");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-fix1");
   return markdownModulePromise;
 }
 
@@ -2800,7 +2800,7 @@ function applyTheme() {
   const theme = choice === "system" ? (systemDark ? "dark" : "light") : (choice === "contrast" ? "dark" : choice);
   document.documentElement.dataset.theme = theme;
   document.documentElement.dataset.contrast = choice === "contrast" ? "high" : "";
-  document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? "#0b0b0c" : "#f7f7f8";
+  document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? (choice === "contrast" ? "#000000" : "#161b26") : "#f7f9fd";
 }
 
 function cycleTheme() {
@@ -3010,14 +3010,12 @@ function activateRequestedBetaMode() {
   betaModeRequested = false;
   if (!betaApproved) {
     state.mode = defaultState.mode;
-    
     persist();
     toast("This account is not approved for Beta Lab yet. Request access at aui.org/beta.", "error");
     return;
   }
 
   state.mode = "Beta Lab";
-  
   persist();
   toast("Beta Lab enabled: all models, higher limits, model comparison, and deep answers are active.");
   announce("Beta Lab mode enabled");
@@ -3064,7 +3062,6 @@ async function refreshBetaAccess() {
 function syncBetaModeAvailability() {
   if (!betaApproved && state.mode === "Beta Lab") {
     state.mode = defaultState.mode;
-    
     persist();
   }
 }

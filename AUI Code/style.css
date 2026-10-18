@@ -3085,3 +3085,34 @@ body { font-size: 16px; }
 .primaryBtn { background: var(--accent); color: #fff; }
 .toolBtn.active, .toolBtn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
 .suggestionGrid button:hover { border-color: var(--accent-border); background: var(--accent-soft); }
+
+/* Keep Settings working on top of the theme overrides above */
+.messageHeader { display: flex; }
+.messageIdentity > .messageAvatar,
+.messageIdentity > strong { display: none; }
+.messageHeader:not(:has(time, .comparisonBadge)) { display: none; }
+.messageContent,
+.assistantMessage .messageContent { font-size: calc(16px * var(--chat-font-scale, 1)); }
+:root[data-density="compact"] .message + .message { margin-top: var(--space-4); }
+:root[data-density="compact"] .userMessage .messageContent { padding: 8px 12px; }
+:root[data-contrast="high"] {
+  --bg: #000;
+  --sidebar: #000;
+  --surface: #0a0a0a;
+  --surface-raised: #141414;
+  --surface-hover: #1c1c1c;
+  --surface-active: #262626;
+  --border: #8a8a92;
+  --border-strong: #c4c4cc;
+  --text: #fff;
+  --text-secondary: #f0f0f0;
+  --muted: #d0d0d6;
+  --accent: #7ab0ff;
+  --accent-hover: #a3c8ff;
+}
+:root[data-contrast="high"] .userMessage .messageContent { background: #0b3a8c; border: 1px solid #7ab0ff; }
+:root[data-contrast="high"] .sendBtn,
+:root[data-contrast="high"] .primaryBtn { color: #000; }
+@media (max-width: 720px) {
+  .userMessage .messageInner { max-width: 88%; }
+}
