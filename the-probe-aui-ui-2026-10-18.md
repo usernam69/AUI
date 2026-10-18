@@ -1048,3 +1048,7 @@ Ideas marked here were built. "Skipped" means the idea contradicts another, need
 ### Batch 1 - top 10
 Built: 67 (thumbs feedback added to the existing action row), 141, 151, 284 (plus 347 first-word time), 301, 308, 312, 319, 320, 344, 400, 414.
 Skipped: 409 (needs the GitHub environment setting changed by the repo owner).
+
+### Batch 2 - category 1 (quick wins)
+Built: 4, 5, 6, 8, 9, 10, 11, 12, 16, 17, 18, 19, 21, 23, 24, 25, 26, 27, 28, 29, 32, 33, 34, 35, 36, 37, 38, 39 (pages share the new theme), 40, 41, 42, 44, 45, 46, 47, 48, 49, 50.
+Already in AUI: 1, 2, 3, 7, 13, 14, 15, 20, 22, 30, 31, 43.

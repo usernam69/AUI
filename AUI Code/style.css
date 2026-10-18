@@ -3077,3 +3077,57 @@
   .settingRowStack textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); resize: vertical; }
   .feedbackBtn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
 }
+
+/* Quick wins from The Probe (category 1) */
+@layer components {
+  .uiIcon { display: block; }
+  .uiTooltip {
+    position: fixed; z-index: 10000; padding: 5px 9px; border-radius: 8px;
+    background: #0b0f17; color: #fff; font-size: 12px; font-weight: 500; white-space: nowrap;
+    pointer-events: none; opacity: 0; transform: translate(-50%, -100%) translateY(4px);
+    transition: opacity 120ms, transform 120ms;
+  }
+  .uiTooltip.visible { opacity: 1; transform: translate(-50%, -100%); }
+  .selectionAskBtn {
+    position: fixed; z-index: 9000; padding: 6px 12px; border-radius: 999px;
+    background: var(--accent); color: #fff; font-size: 13px; font-weight: 600;
+    box-shadow: var(--shadow-md); transform: translate(-50%, -100%);
+  }
+  .selectionAskBtn[hidden] { display: none; }
+  .topBar { transition: box-shadow var(--duration-fast); }
+  .topBar.isScrolled { box-shadow: 0 1px 0 var(--border), 0 6px 16px rgb(0 0 0 / 0.12); }
+  .modelBadge { cursor: pointer; border-radius: 10px; padding: 4px 10px; }
+  .modelBadge::after { content: " ▾"; font-size: 12px; opacity: 0.7; }
+  .modelBadge:hover { background: var(--surface-hover); color: var(--text); }
+  #conversationTitle { cursor: text; }
+  .messageContent.isCollapsible.isCollapsed {
+    max-height: 22rem; overflow: hidden;
+    -webkit-mask-image: linear-gradient(#000 70%, transparent);
+    mask-image: linear-gradient(#000 70%, transparent);
+  }
+  .showMoreBtn { align-self: flex-start; margin-top: 6px; padding: 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 600; }
+  .userMessage .showMoreBtn { align-self: flex-end; }
+  .scrollBottomBtn { border-radius: 999px; background: var(--accent); color: #fff; border: 0; box-shadow: var(--shadow-md); }
+  .typingIndicator span { background: var(--accent); }
+  .charCount.nearMax { color: var(--accent); }
+  .charCount.atMax { color: var(--danger); font-weight: 600; }
+  .messageCounter { background: conic-gradient(var(--accent-soft) calc(var(--used, 0) * 360deg), transparent 0); }
+  .newChatBtn kbd { opacity: 0; transition: opacity var(--duration-fast); }
+  .newChatBtn:hover kbd, .newChatBtn:focus-visible kbd { opacity: 1; }
+  .messageContent a[href^="http"]::after { content: " ↗"; font-size: 0.8em; opacity: 0.7; }
+  button:not(:disabled):active { transform: scale(0.97); }
+  .userMessage.messageEnter { animation: bubbleIn 280ms var(--ease-out) both; }
+  @keyframes bubbleIn { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+  :root[data-hint-seen="true"] .composerHint { font-size: 0; }
+  :root[data-hint-seen="true"] .composerHint .appVersion { display: none; }
+  :root[data-hint-seen="true"] .composerHint::after { content: "AUI can make mistakes. Check important info."; font-size: 12px; }
+}
+@layer components {
+  .chatSearch kbd { white-space: nowrap; }
+  .modelSelectWrap[hidden] { display: none; }
+}
+@layer responsive {
+  @media (max-width: 720px) {
+    .emptyState h1 { font-size: 26px; line-height: 1.2; }
+  }
+}

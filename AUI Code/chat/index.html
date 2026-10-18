@@ -24,7 +24,7 @@
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css">
-  <link rel="stylesheet" href="/style.css?v=20261018-b1">
+  <link rel="stylesheet" href="/style.css?v=20261018-b2">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -85,7 +85,7 @@
           <div class="conversationHeading">
             <strong id="conversationTitle">New chat</strong>
             <span id="connectionStatus" class="connectionStatus"><i aria-hidden="true"></i>Online</span>
-            <span id="modelBadge" class="modelBadge">AUI SLM</span>
+            <button id="modelBadge" class="modelBadge" type="button" title="Change model speed">AUI SLM</button>
           </div>
         </div>
 
@@ -96,6 +96,7 @@
             <span>visitors</span>
           </div>
           <span class="statPill messageCounter" id="messageCounter" title="Messages remaining today">25/25</span>
+          <button class="iconBtn" id="copyChatBtn" type="button" aria-label="Copy this chat" title="Copy this chat"><svg class="uiIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
           <button class="iconBtn clearBtn" id="clearChatBtn" type="button" aria-label="Clear conversation" title="Clear conversation">⌫</button>
         </div>
       </header>
@@ -209,6 +210,7 @@
         <div class="settingRow"><span><strong>Model</strong><small>Download it now so your first reply starts fast</small></span><button class="secondaryBtn" id="preloadModelBtn" type="button">Download the model now</button></div>
         <div class="settingRow"><span><strong>Your chats</strong><small>Back up, restore or wipe chats in this browser</small></span><span class="settingActions"><button class="secondaryBtn" id="exportAllBtn" type="button">Export all</button><button class="secondaryBtn" id="importChatsBtn" type="button">Import</button><button class="secondaryBtn dangerButton" id="deleteAllChatsBtn" type="button">Delete all</button></span></div>
         <input id="importChatsInput" type="file" accept=".json,application/json" hidden>
+        <div class="settingRow"><span><strong>Reset settings</strong><small id="settingsVersion">AUI</small></span><button class="secondaryBtn" id="resetSettingsBtn" type="button">Reset to defaults</button></div>
         <p class="settingsFooter">Press <kbd>?</kbd> for keyboard shortcuts.</p>
       </div>
     </form>
@@ -356,6 +358,6 @@
       navigator.serviceWorker.register("/chat/sw.js").catch(() => {});
     }
   </script>
-  <script type="module" src="/chat/app.js?v=20261018-b1"></script>
+  <script type="module" src="/chat/app.js?v=20261018-b2"></script>
 </body>
 </html>

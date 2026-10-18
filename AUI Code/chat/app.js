@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b1";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b2";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b1";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS } from "../modules/slm.js?v=20261018-b1";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b1";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b1";
+} from "../modules/uploads.js?v=20261018-b2";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS } from "../modules/slm.js?v=20261018-b2";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b2";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b2";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -276,6 +276,245 @@ const DOM = {
   toolsPopover: byId("toolsPopover")
 };
 
+// --- Quick wins from The Probe (category 1) ---
+
+const SVG_ICONS = {
+  send: '<path d="M12 19V5M5 12l7-7 7 7"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+  paperclip: '<path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l9-9a3.5 3.5 0 0 1 5 5l-9 9a2 2 0 0 1-3-3l8-8"/>',
+  image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
+  compare: '<path d="M7 7h13M16 3l4 4-4 4M17 17H4M8 13l-4 4 4 4"/>',
+  pencil: '<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  sidebar: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
+  trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+  close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
+  share: '<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v13M7 8l5-5 5 5"/>'
+};
+
+function svgIcon(name, size = 18) {
+  return `<svg class="uiIcon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SVG_ICONS[name] || ""}</svg>`;
+}
+
+// One consistent stroke icon set instead of mixed unicode glyphs.
+function applySvgIcons() {
+  const set = (selector, icon, size) => {
+    const target = document.querySelector(selector);
+    if (target) target.innerHTML = svgIcon(icon, size);
+  };
+  set("#sendBtn .sendIcon", "send", 18);
+  set("#toolsBtn", "plus", 18);
+  set("#voiceBtn", "mic", 18);
+  set("#attachmentBtn", "paperclip", 17);
+  set("#imageUploadBtn", "image", 17);
+  set("#compareBtn", "compare", 17);
+  set("#menuBtn", "menu", 20);
+  set("#sidebarCollapseBtn", "sidebar", 19);
+  set("#clearChatBtn", "trash", 18);
+  set("#sidebarCloseBtn", "close", 18);
+  set("#newChatBtn > span:first-child", "pencil", 17);
+}
+
+function getGreeting(date = new Date()) {
+  const hour = date.getHours();
+  if (hour < 5) return "Up late?";
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+// Delayed custom tooltips: native titles appear instantly-ish and can't be styled.
+function setupTooltips() {
+  const tip = element("div", "uiTooltip");
+  tip.setAttribute("role", "tooltip");
+  document.body.append(tip);
+  let timer = null;
+  const hide = () => {
+    clearTimeout(timer);
+    tip.classList.remove("visible");
+  };
+  document.addEventListener("pointerover", event => {
+    const target = event.target.closest(".composerToolbar [title], .topBar [title], .messageActions [title]");
+    if (!target || event.pointerType === "touch") return;
+    hide();
+    const text = target.getAttribute("title");
+    target.dataset.tip = text;
+    target.removeAttribute("title");
+    timer = setTimeout(() => {
+      tip.textContent = target.dataset.tip;
+      const box = target.getBoundingClientRect();
+      tip.style.left = `${Math.round(box.left + box.width / 2)}px`;
+      tip.style.top = `${Math.round(box.top - 8)}px`;
+      tip.classList.add("visible");
+    }, 400);
+    target.addEventListener("pointerleave", () => {
+      hide();
+      if (target.dataset.tip) target.setAttribute("title", target.dataset.tip);
+    }, { once: true });
+  });
+  document.addEventListener("scroll", hide, true);
+  document.addEventListener("pointerdown", hide);
+}
+
+// Smart quotes outside code: "x" -> “x”, it's -> it’s.
+function applySmartQuotes(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: node => node.parentElement?.closest("code, pre, kbd, .katex, script, style")
+      ? NodeFilter.FILTER_REJECT
+      : NodeFilter.FILTER_ACCEPT
+  });
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const node of nodes) {
+    const text = node.nodeValue;
+    if (!/["']/.test(text)) continue;
+    node.nodeValue = text
+      .replace(/(^|[\s([{—-])"/g, "$1“")
+      .replace(/"/g, "”")
+      .replace(/(\w)'(\w)/g, "$1’$2")
+      .replace(/(^|[\s([{—-])'/g, "$1‘")
+      .replace(/'/g, "’");
+  }
+}
+
+// Fold very long messages behind "Show more".
+function addCollapseToggle(article, message) {
+  const body = article.querySelector(".messageContent");
+  if (!body || message.status === "streaming") return;
+  const isUser = message.role === "user";
+  const long = isUser
+    ? message.content.length > 1200 || message.content.split("\n").length > 20
+    : message.content.length > 6000;
+  if (!long) return;
+  body.classList.add("isCollapsible", "isCollapsed");
+  const toggle = element("button", "showMoreBtn");
+  toggle.type = "button";
+  toggle.textContent = "Show more";
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.addEventListener("click", () => {
+    const collapsed = body.classList.toggle("isCollapsed");
+    toggle.textContent = collapsed ? "Show more" : "Show less";
+    toggle.setAttribute("aria-expanded", String(!collapsed));
+  });
+  body.after(toggle);
+}
+
+// Select text in a reply to quote it into the composer.
+function setupSelectionAsk() {
+  const button = element("button", "selectionAskBtn");
+  button.type = "button";
+  button.textContent = "Ask AUI";
+  button.hidden = true;
+  document.body.append(button);
+  let quoted = "";
+  const hide = () => { button.hidden = true; };
+  DOM.chatArea.addEventListener("mouseup", () => {
+    setTimeout(() => {
+      const selection = window.getSelection();
+      const text = selection?.toString().trim();
+      const inReply = selection?.anchorNode?.parentElement?.closest(".assistantMessage .messageContent");
+      if (!text || !inReply || text.length > 2000) return hide();
+      quoted = text;
+      const box = selection.getRangeAt(0).getBoundingClientRect();
+      button.style.left = `${Math.round(box.left + box.width / 2)}px`;
+      button.style.top = `${Math.round(box.top - 10)}px`;
+      button.hidden = false;
+    });
+  });
+  document.addEventListener("pointerdown", event => { if (event.target !== button) hide(); });
+  DOM.chatViewport.addEventListener("scroll", hide, { passive: true });
+  button.addEventListener("click", () => {
+    const quote = quoted.split("\n").map(line => `> ${line}`).join("\n");
+    DOM.input.value = `${quote}\n\n${DOM.input.value}`.trimEnd() + "\n";
+    hide();
+    window.getSelection()?.removeAllRanges();
+    DOM.input.focus();
+    DOM.input.setSelectionRange(DOM.input.value.length, DOM.input.value.length);
+    scheduleTextareaResize();
+    updateComposerState();
+  });
+}
+
+function setupHeaderShadow() {
+  const header = document.querySelector(".topBar");
+  DOM.chatViewport.addEventListener("scroll", () => {
+    header?.classList.toggle("isScrolled", DOM.chatViewport.scrollTop > 4);
+  }, { passive: true });
+}
+
+// After five sends people know the keys; hide the hint to reduce clutter.
+const HINT_SEEN_KEY = "aui.sendsSeen";
+function countSendForHint() {
+  try {
+    const sends = Number(localStorage.getItem(HINT_SEEN_KEY) || 0) + 1;
+    localStorage.setItem(HINT_SEEN_KEY, String(sends));
+    if (sends >= 5) document.documentElement.dataset.hintSeen = "true";
+  } catch {}
+}
+
+function restoreHintState() {
+  try {
+    if (Number(localStorage.getItem(HINT_SEEN_KEY) || 0) >= 5) document.documentElement.dataset.hintSeen = "true";
+  } catch {}
+}
+
+async function copyWholeChat() {
+  const chat = getChat();
+  if (!chat?.messages.length) return toast("This chat is empty.", "error");
+  try {
+    await copyText(chatToMarkdown(chat));
+    toast("Chat copied");
+  } catch {
+    toast("Couldn’t copy the chat.", "error");
+  }
+}
+
+function resetSettings() {
+  askForConfirmation({
+    eyebrow: "Settings",
+    title: "Reset all settings?",
+    message: "Theme, text size, voice and other preferences go back to their defaults. Your chats and memory are kept.",
+    submitLabel: "Reset",
+    cancelLabel: "Cancel"
+  }).then(confirmed => {
+    if (!confirmed) return;
+    state.settings = { ...defaultState.settings };
+    setSlmSpeed("balanced");
+    persist();
+    applyPreferences();
+    openSettings();
+    renderMessages();
+    toast("Settings reset");
+  });
+}
+
+function setupQuickWins() {
+  applySvgIcons();
+  setupTooltips();
+  setupSelectionAsk();
+  setupHeaderShadow();
+  restoreHintState();
+  byId("modelBadge")?.addEventListener("click", () => {
+    openSettings();
+    byId("speedSelect")?.focus();
+  });
+  byId("conversationTitle")?.addEventListener("click", () => {
+    const chat = getChat();
+    if (chat?.messages.length) renameChat(chat);
+  });
+  byId("copyChatBtn")?.addEventListener("click", copyWholeChat);
+  byId("resetSettingsBtn")?.addEventListener("click", resetSettings);
+  const version = byId("settingsVersion");
+  if (version) version.textContent = `AUI v${APP_VERSION}`;
+  // Popovers float over the page; close them when it scrolls under them.
+  DOM.chatViewport.addEventListener("scroll", () => hideToolsPopover(), { passive: true });
+  if (!matchMedia("(pointer: coarse)").matches && !location.hash) {
+    requestAnimationFrame(() => DOM.input.focus({ preventScroll: true }));
+  }
+}
+
 let appInitialized = false;
 
 if (document.readyState === "loading") {
@@ -296,6 +535,8 @@ function startApp() {
 
 // Web search and image generation need a server, which the GitHub Pages site doesn't have.
 function hideServerOnlyTools() {
+  const modelPicker = document.querySelector(".modelSelectWrap");
+  if (modelPicker && Object.keys(MODEL_NAMES).length < 2) modelPicker.hidden = true;
   if (ONLINE_TOOLS_ENABLED) return;
   ["searchBtn", "imageGenerateBtn", "popoverWebSearch", "generateImageBtn"].forEach(id => {
     const button = byId(id);
@@ -307,6 +548,7 @@ async function init() {
   normalizeState();
   bindEvents();
   hideServerOnlyTools();
+  setupQuickWins();
   applyPreferences();
   updateShortcutLabels();
   updateNetworkStatus();
@@ -1590,9 +1832,8 @@ function createEmptyState() {
   wrapper.setAttribute("aria-labelledby", "landingTitle");
   wrapper.innerHTML = `
     <div class="emptyBrand" aria-hidden="true">A</div>
-    <h1 id="landingTitle">AUI</h1>
-    <p class="heroTagline">Smart. Funny. <span>Slightly unhinged.</span></p>
-    <p class="heroQuestion">What are we building today?</p>
+    <h1 id="landingTitle">${getGreeting()}. What can I help with?</h1>
+    <p class="heroTagline">AUI · Smart. Funny. <span>Slightly unhinged.</span></p>
     <div class="suggestionGrid">
       <button type="button" data-suggestion="Help me plan a focused week with realistic priorities" aria-label="Start with: Plan my week"><strong>Plan my week</strong><span>Turn a messy list into a clear plan</span></button>
       <button type="button" data-suggestion="Explain a difficult concept to me using a simple analogy" aria-label="Start with: Make it click"><strong>Make it click</strong><span>Explain something without the jargon</span></button>
@@ -1632,7 +1873,8 @@ function createMessageElement(message, index, { animate = true } = {}) {
   if (state.settings.timestamps) {
     const time = element("time", "messageTime");
     time.dateTime = new Date(message.timestamp).toISOString();
-    time.textContent = formatTime(message.timestamp);
+    time.textContent = formatRelativeTime(message.timestamp);
+    time.title = new Date(message.timestamp).toLocaleString();
     header.append(time);
   }
 
@@ -1693,6 +1935,7 @@ function createMessageElement(message, index, { animate = true } = {}) {
 
   inner.append(createMessageFooter(message, index));
   article.append(inner);
+  addCollapseToggle(article, message);
   return article;
 }
 
@@ -1794,13 +2037,14 @@ async function renderMessageBody(container, content, streaming = false) {
   try {
     const markdown = await loadMarkdown();
     markdown.renderRichMarkdown(container, content, { streaming });
+    if (!streaming) applySmartQuotes(container);
   } catch {
     container.textContent = content;
   }
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b1");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b2");
   return markdownModulePromise;
 }
 
@@ -2342,14 +2586,7 @@ function deleteChat(chatId) {
 async function clearConversation() {
   const chat = getChat();
   if (!chat?.messages.length || state.loading) return;
-  const confirmation = await askForText({
-    eyebrow: "Clear conversation",
-    title: "Start this chat over?",
-    label: "Type clear to confirm",
-    placeholder: "clear",
-    submitLabel: "Clear"
-  });
-  if (confirmation?.toLowerCase() !== "clear") return;
+  const saved = { messages: chat.messages, title: chat.title, updatedAt: chat.updatedAt };
   chat.messages = [];
   chat.title = "New chat";
   chat.updatedAt = Date.now();
@@ -2357,7 +2594,18 @@ async function clearConversation() {
   renderChats();
   renderMessages();
   DOM.input.focus();
-  toast("Conversation cleared");
+  toast("Conversation cleared", "success", {
+    label: "Undo",
+    duration: 10000,
+    onClick: () => {
+      if (chat.messages.length) return;
+      Object.assign(chat, saved);
+      persistChatChange();
+      renderChats();
+      renderMessages();
+      toast("Conversation restored");
+    }
+  });
 }
 
 async function addFiles(fileList) {
@@ -2869,8 +3117,8 @@ function applyPreferences() {
   const hint = document.querySelector(".composerHint");
   if (hint?.firstChild) {
     hint.firstChild.textContent = state.settings.enterToSend
-      ? "Enter to send · Shift + Enter for a new line · AUI can make mistakes"
-      : "Ctrl + Enter to send · Enter for a new line · AUI can make mistakes";
+      ? "Enter to send · Shift + Enter for a new line · AUI can make mistakes. Check important info."
+      : "Ctrl + Enter to send · Enter for a new line · AUI can make mistakes. Check important info.";
   }
   applyTheme();
 }
@@ -3831,6 +4079,7 @@ function updateMessageCounter() {
     DOM.messageCounter.title = `${remaining} messages remaining today`;
     DOM.messageCounter.classList.toggle("atLimit", remaining === 0);
     DOM.messageCounter.classList.toggle("nearLimit", remaining > 0 && remaining <= 5);
+    DOM.messageCounter.style.setProperty("--used", String(limit ? 1 - remaining / limit : 0));
   }
 }
 
@@ -3852,6 +4101,8 @@ function updateComposerState() {
   DOM.compareBtn.disabled = state.loading;
   DOM.compareModelSelect.disabled = state.loading;
   const words = DOM.input.value.trim() ? DOM.input.value.trim().split(/\s+/).length : 0;
+  DOM.charCount.classList.toggle("nearMax", DOM.input.value.length > 24000);
+  DOM.charCount.classList.toggle("atMax", DOM.input.value.length >= 31000);
   DOM.charCount.textContent = words
     ? `${words} ${words === 1 ? "word" : "words"}${DOM.input.value.length > 2000 ? ` · ${DOM.input.value.length.toLocaleString()} chars` : ""}`
     : "";
@@ -3866,8 +4117,31 @@ function handleComposerKeydown(event) {
       state.loading ? stopGeneration() : sendMessage();
     }
   }
-  if (event.key === "Escape" && state.loading) stopGeneration();
+  if (event.key === "Escape" && state.loading) {
+    stopGeneration();
+  } else if (event.key === "Escape" && DOM.input.value) {
+    if (lastEscapeAt && Date.now() - lastEscapeAt < 600) {
+      DOM.input.value = "";
+      saveDraft();
+      scheduleTextareaResize();
+      updateComposerState();
+      toast("Draft cleared");
+      lastEscapeAt = 0;
+    } else {
+      lastEscapeAt = Date.now();
+    }
+  }
+  if (event.key === "ArrowUp" && !DOM.input.value && !state.loading && !event.shiftKey) {
+    const chat = getChat();
+    const lastUser = [...(chat?.messages || [])].reverse().find(item => item.role === "user");
+    const article = lastUser && DOM.chatArea.querySelector(`[data-message-id="${CSS.escape(lastUser.id)}"]`);
+    if (article) {
+      event.preventDefault();
+      editUserMessage(lastUser, article);
+    }
+  }
 }
+let lastEscapeAt = 0;
 
 function handleComposerSubmit(event) {
   event.preventDefault();
@@ -3875,6 +4149,7 @@ function handleComposerSubmit(event) {
     stopGeneration();
     return;
   }
+  if (DOM.input.value.trim() || state.pendingAttachments.length) countSendForHint();
   compareMode ? sendModelComparison() : sendMessage();
 }
 
@@ -4046,16 +4321,32 @@ function showLoadPercentInTitle(report) {
 }
 
 function setFaviconBusy(busy) {
+  if (busy) {
+    if (!document.title.startsWith("✍")) document.title = `✍ Writing… · ${baseDocumentTitle}`;
+  } else if (document.title.startsWith("✍")) {
+    document.title = baseDocumentTitle;
+  }
   const links = document.querySelectorAll('link[rel~="icon"]');
   links.forEach(link => {
     if (!link.dataset.original) link.dataset.original = link.href;
     link.href = busy
-      ? "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#0b0b0c"/><text x="32" y="44" font-family="sans-serif" font-size="36" font-weight="700" fill="#fff" text-anchor="middle">A</text><circle cx="52" cy="12" r="10" fill="#ef4444"/></svg>')
+      ? "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2563eb"/><text x="32" y="44" font-family="sans-serif" font-size="36" font-weight="700" fill="#fff" text-anchor="middle">A</text><circle cx="52" cy="12" r="10" fill="#7ab0ff"/></svg>')
       : link.dataset.original;
   });
 }
 
+// A finished reply in a background tab leaves a dot on the favicon until you look.
+function markFaviconDone() {
+  if (!document.hidden) return;
+  document.querySelectorAll('link[rel~="icon"]').forEach(link => {
+    if (!link.dataset.original) link.dataset.original = link.href;
+    link.href = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2563eb"/><text x="32" y="44" font-family="sans-serif" font-size="36" font-weight="700" fill="#fff" text-anchor="middle">A</text><circle cx="52" cy="12" r="11" fill="#34c77b" stroke="#fff" stroke-width="3"/></svg>');
+  });
+  document.addEventListener("visibilitychange", () => setFaviconBusy(false), { once: true });
+}
+
 function notifyReplyFinished(message) {
+  markFaviconDone();
   if (state.settings.sound) playChime();
   if (!state.settings.notify || !document.hidden || !("Notification" in window) || Notification.permission !== "granted") return;
   try {
