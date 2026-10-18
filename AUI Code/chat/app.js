@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b14";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b15";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b14";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b14";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b14";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b14";
+} from "../modules/uploads.js?v=20261018-b15";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b15";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b15";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b15";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -549,11 +549,18 @@ function setupQuickWins() {
 // --- ChatGPT-style layout polish from The Probe (category 2) ---
 
 const SETTINGS_TABS = [
-  ["accessibility", "Accessibility", ["voiceSelect", "simpleLanguageToggle", "simpleLayoutToggle", "lineFocusToggle", "readingRulerToggle", "shortcutNewChatInput"]],
-  ["general", "General", ["enterToSendToggle", "counterSelect", "composerStyleSelect", "spellcheckToggle", "voiceAutoSendToggle", "typingSoundToggle", "timestampsToggle", "autoScrollToggle", "notifyToggle", "soundToggle", "wifiOnlyToggle", "batterySaverToggle", "coolModeToggle", "oneHandToggle", "voiceFirstToggle"]],
-  ["appearance", "Appearance", ["themeSelect", "themeSwatches", "accentSwatches", "fontSelect", "fontWeightInput", "lineHeightSelect", "contentWidthSelect", "bubbleSelect", "bubbleColorInput", "iconWeightSelect", "fontScaleInput", "densitySelect", "seasonalToggle", "effectsToggle"]],
-  ["personal", "Personalization", ["answerLengthSelect", "onlineLookupsToggle", "speedSelect", "perfBtn", "backgroundDownloadToggle", "unloadIdleToggle", "customInstructionsInput", "aiTitlesToggle", "memoryToggle", "markdownToggle", "voiceOutputToggle", "speechRateInput"]],
-  ["data", "Data controls", ["preloadModelBtn", "deleteModelsBtn", "exportAllBtn", "storageMeter", "autoArchiveToggle", "archivedChatsList", "trashList", "resetSettingsBtn"]]
+  ["accessibility", "Accessibility", ["simpleLanguageToggle", "simpleLayoutToggle", "lineFocusToggle", "readingRulerToggle"]],
+  ["general", "General", ["profileSelect", "languageSelect", "startupSelect", "enterToSendToggle", "counterSelect", "composerStyleSelect", "spellcheckToggle", "typingSoundToggle", "timestampsToggle", "clockSelect", "autoScrollToggle", "scrollSensitivitySelect", "streamPaceSelect", "showSpeedToggle", "exportSettingsBtn"]],
+  ["notifications", "Notifications", ["notifyToggle", "soundToggle", "soundPackSelect", "notifyDownloadToggle", "notifyTimerToggle", "quietHoursSelect"]],
+  ["appearance", "Appearance", ["themeSelect", "themeSwatches", "accentSwatches", "fontSelect", "fontWeightInput", "lineHeightSelect", "contentWidthSelect", "bubbleSelect", "bubbleColorInput", "iconWeightSelect", "fontScaleInput", "densitySelect", "codeThemeSelect", "showModelBadgeToggle", "compactSidebarToggle", "seasonalToggle", "effectsToggle"]],
+  ["personal", "Personalization", ["userNameInput", "assistantNameInput", "assistantAvatarSelect", "answerLengthSelect", "emojiLevelSelect", "humorInput", "formalityInput", "customInstructionsInput", "aiTitlesToggle", "markdownToggle", "onlineLookupsToggle"]],
+  ["model", "Model", ["speedSelect", "perfBtn", "preloadModelBtn", "deleteModelsBtn", "backgroundDownloadToggle", "unloadIdleToggle", "wifiOnlyToggle", "batterySaverToggle"]],
+  ["voice", "Voice", ["voiceSelect", "voiceOutputToggle", "speechRateInput", "voiceAutoSendToggle", "voiceFirstToggle"]],
+  ["memory", "Memory", ["memoryToggle", "manageMemoryBtn"]],
+  ["keyboard", "Keyboard", ["shortcutNewChatInput", "keyboardListBtn"]],
+  ["labs", "Labs", ["labsIntro", "coolModeToggle", "oneHandToggle"]],
+  ["data", "Data controls", ["exportAllBtn", "storageMeter", "autoArchiveToggle", "archivedChatsList", "trashList", "resetSettingsBtn"]],
+  ["about", "About", ["aboutInfo"]]
 ];
 
 // Group the long settings list into ChatGPT-style tabs with a left-hand nav.
@@ -2049,7 +2056,7 @@ function stopVoiceMeter() {
 
 let typingAudio = null;
 function playTypingClick() {
-  if (!state.settings.typingSound) return;
+  if (!state.settings.typingSound || inQuietHours()) return;
   try {
     typingAudio ||= new AudioContext();
     const oscillator = typingAudio.createOscillator();
@@ -2528,10 +2535,11 @@ async function showDefinition(event) {
 // cached work on that prefix (new memories would otherwise change it every turn).
 const systemPromptSnapshots = new Map();
 function getChatSystemPrompt(chat) {
-  const key = `${chat?.id}|${state.settings.customInstructions || ""}|${state.settings.memory}|${Math.floor(Date.now() / 900_000)}`;
+  const key = `${chat?.id}|${state.settings.customInstructions || ""}|${state.settings.memory}|${Math.floor(Date.now() / 900_000)}|${chat?.style || ""}|${chat?.instructions || ""}`;
   const cached = systemPromptSnapshots.get(chat?.id);
   if (cached?.key === key) return cached.prompt;
-  const prompt = buildSlmSystemPrompt();
+  const addition = chatPromptAddition(chat);
+  const prompt = addition ? `${buildSlmSystemPrompt()}\n${addition}` : buildSlmSystemPrompt();
   systemPromptSnapshots.set(chat?.id, { key, prompt });
   return prompt;
 }
@@ -2878,7 +2886,7 @@ function startFocusTimer(minutes = 25) {
       playChime();
       toast(`${minutes}-minute timer finished. Take a break!`);
       try {
-        if ("Notification" in window && Notification.permission === "granted") new Notification("AUI timer", { body: "Time's up. Take a break!" });
+        if (state.settings.notifyTimer !== false && !inQuietHours() && "Notification" in window && Notification.permission === "granted") new Notification("AUI timer", { body: "Time's up. Take a break!" });
       } catch {}
     }
   };
@@ -3585,6 +3593,518 @@ function setupMobile() {
   updateAppBadge();
 }
 
+// --- Settings & personalization from The Probe (category 12) ---
+
+// Simple settings: [control id, setting key, kind, default]. Each saves the moment it changes.
+const PERSONAL_SETTINGS = [
+  ["userNameInput", "userName", "text", ""],
+  ["assistantNameInput", "assistantName", "text", ""],
+  ["assistantAvatarSelect", "assistantAvatar", "select", ""],
+  ["emojiLevelSelect", "emojiLevel", "select", "some"],
+  ["humorInput", "humor", "range", 1],
+  ["formalityInput", "formality", "range", 1],
+  ["languageSelect", "uiLanguage", "select", "en"],
+  ["clockSelect", "clock", "select", "auto"],
+  ["soundPackSelect", "soundPack", "select", "chime"],
+  ["notifyDownloadToggle", "notifyDownload", "check", false],
+  ["notifyTimerToggle", "notifyTimer", "check", true],
+  ["scrollSensitivitySelect", "scrollSensitivity", "select", "high"],
+  ["streamPaceSelect", "streamPace", "select", "live"],
+  ["codeThemeSelect", "codeTheme", "select", "navy"],
+  ["showSpeedToggle", "showSpeed", "check", true],
+  ["showModelBadgeToggle", "showModelBadge", "check", true],
+  ["compactSidebarToggle", "compactSidebar", "check", false],
+  ["startupSelect", "startup", "select", "last"],
+  ["quietHoursSelect", "quietHours", "select", "off"]
+];
+const PROMPT_SETTING_KEYS = ["userName", "assistantName", "emojiLevel", "humor", "formality"];
+
+function personalSetting(key) {
+  const entry = PERSONAL_SETTINGS.find(item => item[1] === key);
+  return state.settings[key] ?? entry?.[3];
+}
+
+// 552/553/557/558/559: who you are, who AUI is, and how it talks.
+function personalityPrompt() {
+  const parts = [];
+  const name = String(state.settings.userName || "").trim().slice(0, 40);
+  const assistant = String(state.settings.assistantName || "").trim().slice(0, 40);
+  if (assistant) parts.push(`Your name is ${assistant}.`);
+  if (name) parts.push(`The user's name is ${name}; use it now and then, not in every reply.`);
+  parts.push({ none: "Never use emoji.", some: "Use an emoji only when it really fits.", lots: "Use plenty of fitting emoji." }[personalSetting("emojiLevel")] || "");
+  parts.push(["Be serious and straightforward; no jokes.", "", "Be playful and add a light joke when it fits.", "Be wildly funny and a little unhinged, but still correct and helpful."][Number(personalSetting("humor"))] || "");
+  parts.push(["Write casually, like a friend.", "", "Write in a formal, professional tone."][Number(personalSetting("formality"))] || "");
+  return parts.filter(Boolean).join(" ");
+}
+
+function assistantIdentity() {
+  return {
+    avatar: state.settings.assistantAvatar || "A",
+    name: String(state.settings.assistantName || "").trim().slice(0, 40) || "AUI"
+  };
+}
+
+function refreshGreeting() {
+  const title = byId("landingTitle");
+  if (title) title.innerHTML = `${getGreeting()}${greetingName()}. What can I help with?`;
+}
+
+function greetingName() {
+  const name = String(state.settings.userName || "").trim().slice(0, 40);
+  return name ? `, ${escapeHtml(name)}` : "";
+}
+
+// 600: no sounds or notifications during quiet hours.
+function inQuietHours(date = new Date()) {
+  const range = personalSetting("quietHours");
+  if (!range || range === "off") return false;
+  const [start, end] = range.split("-").map(Number);
+  const hour = date.getHours();
+  return start > end ? hour >= start || hour < end : hour >= start && hour < end;
+}
+
+// 564: different finish sounds.
+const SOUND_PACKS = {
+  chime: { type: "sine", from: 880, to: 1320, length: 0.4 },
+  bell: { type: "triangle", from: 660, to: 660, length: 0.9 },
+  pop: { type: "square", from: 520, to: 260, length: 0.12 },
+  marimba: { type: "sine", from: 523, to: 784, length: 0.25 }
+};
+
+function clockOptions() {
+  const clock = personalSetting("clock");
+  return clock === "12" ? { hour12: true } : clock === "24" ? { hour12: false } : {};
+}
+
+// 566: how quickly scrolling up pauses auto-scroll.
+function pausesOnSmallScroll() {
+  return personalSetting("scrollSensitivity") !== "low";
+}
+
+// 561: Hebrew for the main screen and settings, laid out right to left.
+const HEBREW_TEXT = [
+  ["#newChatBtn", "New chat", "צ'אט חדש"],
+  ["#settingsBtn", "Settings", "הגדרות"],
+  ["#memoryBtn", "Memory", "זיכרון"],
+  ["#settingsTitle", "Settings", "הגדרות"],
+  ["#settings-tab-general", "General", "כללי"],
+  ["#settings-tab-notifications", "Notifications", "התראות"],
+  ["#settings-tab-appearance", "Appearance", "מראה"],
+  ["#settings-tab-personal", "Personalization", "התאמה אישית"],
+  ["#settings-tab-model", "Model", "מודל"],
+  ["#settings-tab-voice", "Voice", "קול"],
+  ["#settings-tab-memory", "Memory", "זיכרון"],
+  ["#settings-tab-keyboard", "Keyboard", "מקלדת"],
+  ["#settings-tab-accessibility", "Accessibility", "נגישות"],
+  ["#settings-tab-labs", "Labs", "ניסויים"],
+  ["#settings-tab-data", "Data controls", "נתונים"],
+  ["#settings-tab-about", "About", "אודות"]
+];
+function applyLanguage() {
+  if (personalSetting("uiLanguage") !== "he") return;
+  document.documentElement.lang = "he";
+  document.documentElement.dir = "rtl";
+  HEBREW_TEXT.forEach(([selector, english, hebrew]) => {
+    const root = document.querySelector(selector);
+    if (!root) return;
+    // Replace only the label text, leaving icons and shortcut hints in place.
+    const target = [root, ...root.querySelectorAll("*")].find(node => node.childElementCount === 0 && node.textContent.trim() === english);
+    if (target) target.textContent = hebrew;
+  });
+  DOM.input.placeholder = "שאלו את AUI כל דבר";
+  DOM.chatSearchInput.placeholder = "חיפוש בצ'אטים";
+}
+
+function applyPersonalPrefs() {
+  const root = document.documentElement;
+  root.dataset.codeTheme = personalSetting("codeTheme");
+  root.dataset.hideModelBadge = String(personalSetting("showModelBadge") === false);
+  root.dataset.compactSidebar = String(Boolean(personalSetting("compactSidebar")));
+}
+
+function syncPersonalControls() {
+  PERSONAL_SETTINGS.forEach(([id, key, kind]) => {
+    const input = byId(id);
+    if (!input) return;
+    const value = personalSetting(key);
+    if (kind === "check") input.checked = Boolean(value);
+    else input.value = String(value ?? "");
+  });
+  renderProfileSelect();
+}
+
+// 572: separate settings for each person using this browser.
+const PROFILES_KEY = "aui.profiles";
+function readProfiles() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PROFILES_KEY) || "null");
+    if (saved?.list && saved.current) return saved;
+  } catch {}
+  return { current: "Default", list: {} };
+}
+function writeProfiles(profiles) {
+  try { localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); } catch {}
+}
+function renderProfileSelect() {
+  const select = byId("profileSelect");
+  if (!select) return;
+  const profiles = readProfiles();
+  const names = [...new Set([profiles.current, ...Object.keys(profiles.list)])];
+  select.innerHTML = names.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
+  select.value = profiles.current;
+}
+function switchProfile(name) {
+  const profiles = readProfiles();
+  if (name === profiles.current) return;
+  profiles.list[profiles.current] = { ...state.settings };
+  state.settings = { ...defaultState.settings, ...(profiles.list[name] || {}) };
+  profiles.current = name;
+  writeProfiles(profiles);
+  persist();
+  location.reload();
+}
+async function saveNewProfile() {
+  const name = (await askForText({ eyebrow: "Profiles", title: "New profile", label: "Name", value: "", submitLabel: "Create" }))?.trim().slice(0, 30);
+  if (!name) return;
+  const profiles = readProfiles();
+  profiles.list[profiles.current] = { ...state.settings };
+  profiles.list[name] = { ...state.settings };
+  profiles.current = name;
+  writeProfiles(profiles);
+  renderProfileSelect();
+  toast(`Profile “${name}” created from your current settings`);
+}
+
+// 573: move settings between browsers.
+function exportSettings() {
+  downloadFile("aui-settings.json", JSON.stringify({ app: "AUI", kind: "settings", version: APP_VERSION, settings: state.settings }, null, 2), "application/json");
+}
+async function importSettings(file) {
+  try {
+    const data = JSON.parse(await file.text());
+    if (data?.kind !== "settings" || typeof data.settings !== "object") throw new Error();
+    state.settings = { ...defaultState.settings, ...data.settings };
+    persist();
+    toast("Settings imported. Reloading…");
+    setTimeout(() => location.reload(), 600);
+  } catch {
+    toast("That file isn't an AUI settings file.", "error");
+  }
+}
+
+// 551: type to find a setting.
+function setupSettingsSearch() {
+  const layout = document.querySelector("#settingsDialog .settingsLayout");
+  if (!layout || byId("settingsSearchInput")) return;
+  const search = element("input", "settingsSearch");
+  search.id = "settingsSearchInput";
+  search.type = "search";
+  search.placeholder = "Search settings";
+  search.setAttribute("aria-label", "Search settings");
+  const empty = element("p", "settingsSearchEmpty");
+  empty.textContent = "No settings match.";
+  empty.hidden = true;
+  layout.before(search);
+  layout.querySelector(".settingsPanels")?.append(empty);
+  search.addEventListener("input", () => {
+    const query = search.value.trim().toLowerCase();
+    const panels = [...document.querySelectorAll("#settingsDialog .settingsPanel")];
+    layout.classList.toggle("searching", Boolean(query));
+    if (!query) {
+      panels.forEach(panel => panel.querySelectorAll(".settingRow").forEach(row => { row.hidden = false; }));
+      empty.hidden = true;
+      selectSettingsTab(document.querySelector('.settingsTab[aria-selected="true"]')?.id.replace("settings-tab-", "") || SETTINGS_TABS[0][0]);
+      return;
+    }
+    let matches = 0;
+    panels.forEach(panel => {
+      let panelMatches = 0;
+      panel.querySelectorAll(".settingRow").forEach(row => {
+        const hit = row.textContent.toLowerCase().includes(query);
+        row.hidden = !hit;
+        if (hit) panelMatches += 1;
+      });
+      panel.hidden = panelMatches === 0;
+      matches += panelMatches;
+    });
+    empty.hidden = matches > 0;
+  });
+}
+
+// 595: put one section back to how it ships.
+function setupSectionResets() {
+  document.querySelectorAll("#settingsDialog .settingsPanel").forEach(panel => {
+    if (panel.querySelector(".sectionReset") || panel.id === "settings-panel-about" || panel.id === "settings-panel-data") return;
+    const button = element("button", "linkBtn sectionReset");
+    button.type = "button";
+    button.textContent = "Reset this section";
+    button.addEventListener("click", async () => {
+      const confirmed = await askForConfirmation({ eyebrow: "Settings", title: "Reset this section?", message: "Only the settings on this tab go back to their defaults.", submitLabel: "Reset", cancelLabel: "Cancel" });
+      if (!confirmed) return;
+      panel.querySelectorAll("input[id], select[id], textarea[id]").forEach(control => {
+        let changed = false;
+        if (control.type === "checkbox") {
+          changed = control.checked !== control.defaultChecked;
+          control.checked = control.defaultChecked;
+        } else if (control.tagName === "SELECT") {
+          const fallback = [...control.options].find(option => option.defaultSelected);
+          if (fallback && control.value !== fallback.value) {
+            control.value = fallback.value;
+            changed = true;
+          }
+        } else if (control.type !== "file") {
+          changed = control.value !== control.defaultValue;
+          control.value = control.defaultValue;
+        }
+        if (changed) control.dispatchEvent(new Event(control.type === "range" ? "input" : "change", { bubbles: true }));
+        if (changed && control.type === "range") control.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      toast("Section reset");
+    });
+    panel.append(button);
+  });
+}
+
+// 580: destructive actions sit apart, in red.
+function setupDangerZone() {
+  const panel = byId("settings-panel-data");
+  if (!panel || panel.querySelector(".dangerZone")) return;
+  const zone = element("section", "dangerZone");
+  zone.innerHTML = '<h3>Danger zone</h3><div class="settingRow"><span><strong>Delete all chats</strong><small>Permanently deletes every chat in this browser</small></span><span class="inlineControls" id="dangerDeleteSlot"></span></div>';
+  // Move the existing button (and its handler) here, away from backup and restore.
+  const deleteAll = byId("deleteAllChatsBtn");
+  if (deleteAll) zone.querySelector("#dangerDeleteSlot").append(deleteAll);
+  else zone.querySelector(".settingRow").remove();
+  const reset = byId("resetSettingsBtn")?.closest(".settingRow");
+  if (reset) zone.append(reset);
+  panel.append(zone);
+}
+
+// 581: a quiet "Saved" mark instead of a Save button.
+function setupSavedIndicator() {
+  const header = document.querySelector("#settingsDialog header");
+  if (!header || header.querySelector(".savedMark")) return;
+  const mark = element("span", "savedMark");
+  mark.setAttribute("role", "status");
+  header.querySelector("div")?.append(mark);
+  let timer = null;
+  DOM.settingsDialog.addEventListener("change", event => {
+    if (event.target.id === "settingsSearchInput" || event.target.type === "file") return;
+    mark.textContent = "Saved ✓";
+    mark.classList.add("visible");
+    clearTimeout(timer);
+    timer = setTimeout(() => mark.classList.remove("visible"), 1600);
+  });
+}
+
+// 596: links like chat/#settings/appearance open that tab.
+function openSettingsFromHash() {
+  const match = /^#settings(?:\/([a-z]+))?$/.exec(location.hash);
+  if (!match) return;
+  history.replaceState(null, "", location.pathname + location.search);
+  openSettings();
+  if (match[1] && byId(`settings-tab-${match[1]}`)) selectSettingsTab(match[1]);
+}
+
+// 577: after a long break, offer the chat you were in.
+const LAST_VISIT_KEY = "aui.lastVisit";
+function welcomeBack() {
+  let last = 0;
+  try {
+    last = Number(localStorage.getItem(LAST_VISIT_KEY)) || 0;
+    localStorage.setItem(LAST_VISIT_KEY, String(Date.now()));
+  } catch {}
+  const recent = [...state.chats].filter(chat => chat.messages.length && !chat.archived && !chat.lock).sort((a, b) => b.updatedAt - a.updatedAt)[0];
+  if (!last || Date.now() - last < 6 * 3_600_000 || !recent) return;
+  const name = String(state.settings.userName || "").trim();
+  toast(`Welcome back${name ? `, ${name}` : ""}. Last time you were in “${recent.title}”.`, "info", {
+    label: "Open",
+    duration: 9000,
+    onClick: () => {
+      state.currentChatId = recent.id;
+      renderChats();
+      renderMessages();
+    }
+  });
+}
+
+// 584: a short first-run setup.
+const SETUP_DONE_KEY = "aui.setupDone";
+function showFirstRunSetup() {
+  try {
+    if (localStorage.getItem(SETUP_DONE_KEY)) return;
+    localStorage.setItem(SETUP_DONE_KEY, "1");
+  } catch {
+    return;
+  }
+  if (state.chats.some(chat => chat.messages.length)) return;
+  const dialog = element("dialog", "dialog");
+  dialog.id = "setupDialog";
+  dialog.innerHTML = `<form method="dialog" class="dialogPanel compactDialog"><header><div><p class="eyebrow">Welcome</p><h2>Set up AUI</h2></div></header><div class="dialogContent setupBody">
+    <label>What should AUI call you? <input id="setupName" maxlength="40" placeholder="Optional" autocomplete="given-name"></label>
+    <fieldset><legend>Look</legend><label><input type="radio" name="setupTheme" value="system" checked> Match my device</label><label><input type="radio" name="setupTheme" value="light"> Light</label><label><input type="radio" name="setupTheme" value="dark"> Dark</label></fieldset>
+    <fieldset><legend>Model</legend><label><input type="radio" name="setupSpeed" value="fast"> Fast (small download)</label><label><input type="radio" name="setupSpeed" value="balanced" checked> Balanced</label><label><input type="radio" name="setupSpeed" value="smart"> Smart (bigger, slower)</label></fieldset>
+    <div class="setupActions"><button class="secondaryBtn" value="skip">Skip</button><button class="primaryBtn" value="save">Start chatting</button></div>
+  </div></form>`;
+  document.body.append(dialog);
+  dialog.addEventListener("close", () => {
+    if (dialog.returnValue === "save") {
+      const name = dialog.querySelector("#setupName").value.trim();
+      if (name) state.settings.userName = name;
+      state.settings.theme = dialog.querySelector('[name="setupTheme"]:checked').value;
+      const speed = dialog.querySelector('[name="setupSpeed"]:checked').value;
+      if (speed !== getSlmSpeed()) switchSpeed(speed);
+      systemPromptSnapshots.clear();
+      persist();
+      applyPreferences();
+      refreshGreeting();
+    }
+    dialog.remove();
+  });
+  dialog.showModal();
+}
+
+// 597/598/599: a style, a model and private notes for one chat.
+const BUILT_IN_STYLES = [
+  ["concise", "Concise", "Answer in as few words as possible."],
+  ["teacher", "Patient teacher", "Explain step by step, check understanding, and give a small example."],
+  ["coder", "Senior engineer", "Answer like a senior software engineer: precise, with working code and edge cases."],
+  ["friend", "Friendly chat", "Be warm and conversational, like a good friend."],
+  ["critic", "Honest critic", "Point out weaknesses and risks directly, then suggest improvements."]
+];
+function chatStyleText(chat) {
+  if (!chat?.style) return "";
+  const builtIn = BUILT_IN_STYLES.find(([id]) => id === chat.style);
+  if (builtIn) return builtIn[2];
+  return (state.settings.styles || []).find(style => style.id === chat.style)?.text || "";
+}
+function chatPromptAddition(chat) {
+  const parts = [];
+  const style = chatStyleText(chat);
+  if (style) parts.push(`Style for this chat: ${style}`);
+  if (chat?.instructions) parts.push(`Notes for this chat only: ${String(chat.instructions).slice(0, 1500)}`);
+  return parts.join("\n");
+}
+
+const SPEED_BEFORE_CHAT_KEY = "aui.speedBeforeChat";
+function applyChatSpeed(chat) {
+  let saved = "";
+  try { saved = sessionStorage.getItem(SPEED_BEFORE_CHAT_KEY) || ""; } catch {}
+  if (chat?.speed && SLM_SPEEDS[chat.speed]) {
+    if (chat.speed === getSlmSpeed()) return;
+    try { if (!saved) sessionStorage.setItem(SPEED_BEFORE_CHAT_KEY, getSlmSpeed()); } catch {}
+    setSlmSpeed(chat.speed);
+    preloadPromise = null;
+    showModelName();
+  } else if (saved && SLM_SPEEDS[saved]) {
+    try { sessionStorage.removeItem(SPEED_BEFORE_CHAT_KEY); } catch {}
+    if (saved !== getSlmSpeed()) {
+      setSlmSpeed(saved);
+      preloadPromise = null;
+      showModelName();
+    }
+  }
+}
+
+function openChatSettings(chat) {
+  if (!chat) return;
+  let dialog = byId("chatSettingsDialog");
+  if (!dialog) {
+    dialog = element("dialog", "dialog");
+    dialog.id = "chatSettingsDialog";
+    document.body.append(dialog);
+  }
+  const styles = [...BUILT_IN_STYLES.map(([id, label]) => [id, label]), ...(state.settings.styles || []).map(style => [style.id, `${style.name} (yours)`])];
+  dialog.innerHTML = `<form method="dialog" class="dialogPanel compactDialog"><header><div><p class="eyebrow">This chat only</p><h2>Chat settings</h2></div><button class="iconBtn" type="button" data-close-dialog aria-label="Close">×</button></header><div class="dialogContent setupBody">
+    <label>Style <select id="chatStyleSelect"><option value="">None</option>${styles.map(([id, label]) => `<option value="${escapeHtml(id)}">${escapeHtml(label)}</option>`).join("")}</select></label>
+    <label>Model <select id="chatSpeedSelect"><option value="">My default</option>${Object.entries(SLM_SPEEDS).map(([id, speed]) => `<option value="${id}">${escapeHtml(speed.label)}</option>`).join("")}</select></label>
+    <label>Notes the model sees in this chat <textarea id="chatInstructionsInput" rows="4" maxlength="1500" placeholder="For example: I'm planning a trip to Japan in April"></textarea></label>
+    <button class="linkBtn" type="button" id="saveStyleBtn">Save these notes as a reusable style</button>
+    <div class="setupActions"><button class="secondaryBtn" value="cancel">Cancel</button><button class="primaryBtn" value="save">Save</button></div>
+  </div></form>`;
+  dialog.querySelector("#chatStyleSelect").value = chat.style || "";
+  dialog.querySelector("#chatSpeedSelect").value = chat.speed || "";
+  dialog.querySelector("#chatInstructionsInput").value = chat.instructions || "";
+  dialog.querySelector("[data-close-dialog]").addEventListener("click", () => dialog.close());
+  dialog.querySelector("#saveStyleBtn").addEventListener("click", async () => {
+    const text = dialog.querySelector("#chatInstructionsInput").value.trim();
+    if (!text) return toast("Write some notes first.", "error");
+    const name = (await askForText({ eyebrow: "Styles", title: "Name this style", label: "Name", value: "", submitLabel: "Save" }))?.trim().slice(0, 30);
+    if (!name) return;
+    const style = { id: createId("style"), name, text: text.slice(0, 1500) };
+    state.settings.styles = [...(state.settings.styles || []), style].slice(-20);
+    persist();
+    const option = new Option(`${name} (yours)`, style.id);
+    dialog.querySelector("#chatStyleSelect").append(option);
+    dialog.querySelector("#chatStyleSelect").value = style.id;
+    toast(`Style “${name}” saved`);
+  });
+  dialog.onclose = () => {
+    if (dialog.returnValue !== "save") return;
+    chat.style = dialog.querySelector("#chatStyleSelect").value;
+    chat.speed = dialog.querySelector("#chatSpeedSelect").value;
+    chat.instructions = dialog.querySelector("#chatInstructionsInput").value.trim().slice(0, 1500);
+    systemPromptSnapshots.delete(chat.id);
+    persistChatChange();
+    renderChats();
+    toast("Chat settings saved");
+  };
+  dialog.returnValue = "";
+  dialog.showModal();
+}
+
+function setupSettingsExtras() {
+  PERSONAL_SETTINGS.forEach(([id, key, kind]) => {
+    const input = byId(id);
+    if (!input) return;
+    const save = () => {
+      const value = kind === "check" ? input.checked : kind === "range" ? Number(input.value) : input.value.trim();
+      if (state.settings[key] === value) return;
+      state.settings[key] = value;
+      if (PROMPT_SETTING_KEYS.includes(key)) systemPromptSnapshots.clear();
+      persist();
+      applyPersonalPrefs();
+      if (key === "uiLanguage") {
+        toast("Changing the language…");
+        setTimeout(() => location.reload(), 500);
+      }
+      if (key === "userName") refreshGreeting();
+      if (["userName", "assistantName", "assistantAvatar", "clock", "showSpeed"].includes(key)) {
+        // Rebuild the shown messages so their headers and footers pick up the change.
+        DOM.chatArea.dataset.chatId = "";
+        renderMessages({ preserveScroll: true });
+      }
+    };
+    input.addEventListener("change", save);
+  });
+  byId("profileSelect")?.addEventListener("change", event => switchProfile(event.target.value));
+  byId("profileSaveBtn")?.addEventListener("click", saveNewProfile);
+  byId("exportSettingsBtn")?.addEventListener("click", exportSettings);
+  byId("importSettingsBtn")?.addEventListener("click", () => byId("importSettingsInput").click());
+  byId("importSettingsInput")?.addEventListener("change", event => {
+    const file = event.target.files[0];
+    event.target.value = "";
+    if (file) importSettings(file);
+  });
+  byId("keyboardListBtn")?.addEventListener("click", () => byId("shortcutsDialog")?.showModal());
+  byId("manageMemoryBtn")?.addEventListener("click", () => {
+    DOM.settingsDialog.close();
+    openMemory();
+  });
+  setupSettingsSearch();
+  setupSectionResets();
+  setupDangerZone();
+  setupSavedIndicator();
+  syncPersonalControls();
+  applyPersonalPrefs();
+  applyLanguage();
+  if (personalSetting("startup") === "new" && getChat()?.messages.length && !location.search && !location.hash) createChat();
+  welcomeBack();
+  showFirstRunSetup();
+  setTimeout(openSettingsFromHash);
+  window.addEventListener("hashchange", openSettingsFromHash);
+}
+
 let appInitialized = false;
 
 if (document.readyState === "loading") {
@@ -3632,6 +4152,7 @@ async function init() {
   setupUpdateChecks();
   setupFileHandling();
   setupMobile();
+  setupSettingsExtras();
   setTimeout(prefillFromUrl);
   setupBackgroundDownload();
   setInterval(updateReadyBadge, 3000);
@@ -3894,6 +4415,9 @@ function normalizeChats(chats) {
     unread: Boolean(chat.unread),
     lock: typeof chat.lock === "string" ? chat.lock : "",
     aiTitled: Boolean(chat.aiTitled),
+    ...(typeof chat.style === "string" && chat.style ? { style: chat.style } : {}),
+    ...(typeof chat.instructions === "string" && chat.instructions ? { instructions: chat.instructions } : {}),
+    ...(typeof chat.speed === "string" && chat.speed ? { speed: chat.speed } : {}),
     ...(Number.isFinite(chat.pinOrder) ? { pinOrder: chat.pinOrder } : {}),
     messages: Array.isArray(chat.messages)
       ? chat.messages.map(message => ({
@@ -4408,6 +4932,7 @@ async function sendMessage(options = {}) {
   try {
     const history = options.historyOverride
       || createHistory(chat, assistantMessage.id, Boolean(options.targetMessage));
+    applyChatSpeed(chat);
     await confirmModelDownload();
     const tools = await runTools(text);
     if (tools.sources.length) assistantMessage.toolSources = tools.sources;
@@ -4532,6 +5057,7 @@ function buildSlmSystemPrompt() {
     `Today is ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}, ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} (${Intl.DateTimeFormat().resolvedOptions().timeZone}).`,
     { short: "Keep answers brief: a few sentences.", medium: "Keep answers fairly short.", long: "Give thorough, detailed answers." }[state.settings.answerLength || "medium"],
     state.settings.simpleLanguage ? "Use plain, simple words and short sentences, like for a 10-year-old." : "",
+    personalityPrompt(),
     "Answer clearly and directly."
   ];
   const custom = String(state.settings.customInstructions || "").trim();
@@ -4653,7 +5179,7 @@ function scheduleStreamingRender(message) {
     : message.content.length > 4_000
       ? 140
       : STREAM_PAINT_INTERVAL;
-  const delay = Math.max(0, interval - elapsed);
+  const delay = Math.max(0, (personalSetting("streamPace") === "calm" ? Math.max(interval, 450) : interval) - elapsed);
 
   renderTimer = setTimeout(() => {
     renderTimer = null;
@@ -4994,7 +5520,7 @@ function createEmptyState() {
   wrapper.setAttribute("aria-labelledby", "landingTitle");
   wrapper.innerHTML = `
     <div class="emptyBrand landingBot" aria-hidden="true"><svg viewBox="0 0 64 64" width="44" height="44"><rect x="12" y="18" width="40" height="32" rx="12" fill="currentColor" opacity="0.95"/><circle cx="25" cy="34" r="4" fill="var(--accent)"/><circle cx="39" cy="34" r="4" fill="var(--accent)"/><path d="M26 43q6 4 12 0" stroke="var(--accent)" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M32 18v-7" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="9" r="3.5" fill="#facc15"/></svg></div>
-    <h1 id="landingTitle">${getGreeting()}. What can I help with?</h1>
+    <h1 id="landingTitle">${getGreeting()}${greetingName()}. What can I help with?</h1>
     <p class="heroTagline">AUI · Smart. Funny. <span>Slightly unhinged.</span></p>
     <div class="suggestionGrid">
       <button type="button" data-suggestion="Help me plan a focused week with realistic priorities" aria-label="Start with: Plan my week"><strong>Plan my week</strong><span>Turn a messy list into a clear plan</span></button>
@@ -5027,7 +5553,7 @@ function createMessageElement(message, index, { animate = true } = {}) {
   const identity = element("div", "messageIdentity");
   identity.innerHTML = isUser
     ? `<span class="messageAvatar userAvatar" aria-hidden="true">Y</span><strong>You</strong>`
-    : `<span class="messageAvatar assistantAvatar" aria-hidden="true">A</span><strong>AUI</strong>`;
+    : `<span class="messageAvatar assistantAvatar" aria-hidden="true">${escapeHtml(assistantIdentity().avatar)}</span><strong>${escapeHtml(assistantIdentity().name)}</strong>`;
   header.append(identity);
 
   if (!isUser && message.comparisonLabel) {
@@ -5049,6 +5575,8 @@ function createMessageElement(message, index, { animate = true } = {}) {
   if (script) {
     body.lang = script.lang;
     body.dir = script.dir;
+  } else {
+    body.dir = "auto";
   }
   if (message.tldr && !message.tldrHidden) {
     const tldr = element("div", "tldrBox");
@@ -5120,7 +5648,7 @@ function createMessageFooter(message, index) {
   const metrics = element("span", "messageMetrics");
   if (message.role === "assistant" && message.content) {
     metrics.textContent = getReadingMetrics(message.content)
-      + (message.tokensPerSecond ? ` · ${message.tokensPerSecond} tokens/s` : "")
+      + (message.tokensPerSecond && personalSetting("showSpeed") !== false ? ` · ${message.tokensPerSecond} tokens/s` : "")
       + (message.firstTokenMs ? ` · first word in ${(message.firstTokenMs / 1000).toFixed(1)} s` : "")
       + (message.durationMs ? ` · answered in ${(message.durationMs / 1000).toFixed(1)} s` : "");
   }
@@ -5242,7 +5770,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b14");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b15");
   return markdownModulePromise;
 }
 
@@ -5668,6 +6196,7 @@ function createChatItem(chat) {
     <button type="button" data-chat-action="archive">${chat.archived ? "Unarchive" : "Archive"}</button>
     <button type="button" data-chat-action="export">Export as Markdown</button>
     <button type="button" data-chat-action="newtab">Open in new tab</button>
+    <button type="button" data-chat-action="chatsettings">Chat settings</button>
     <button type="button" data-chat-action="handoff">Continue on another device</button>
     <button type="button" class="dangerAction" data-chat-action="delete">Delete</button>`;
 
@@ -5744,6 +6273,9 @@ async function handleChatListAction(event) {
           renderMessages();
         }
       } : null);
+      break;
+    case "chatsettings":
+      openChatSettings(chat);
       break;
     case "handoff":
       showHandoffQr(chat);
@@ -6418,6 +6950,7 @@ function openSettings() {
   byId("onlineLookupsToggle").checked = Boolean(state.settings.onlineLookups);
   byId("unloadIdleToggle").checked = state.settings.unloadWhenIdle !== false;
   syncMobileToggles();
+  syncPersonalControls();
   byId("customInstructionsInput").value = state.settings.customInstructions || "";
   if (!DOM.settingsDialog.open) DOM.settingsDialog.showModal();
 }
@@ -7629,7 +8162,7 @@ function handleChatScroll() {
   const movedUp = scrollTop < lastChatScrollTop - 1;
   const reachedBottom = distance <= 8;
 
-  if (movedUp) {
+  if (movedUp && pausesOnSmallScroll()) {
     userPausedScroll = true;
   } else if (reachedBottom) {
     userPausedScroll = false;
@@ -7755,7 +8288,7 @@ function markFaviconDone() {
 function notifyReplyFinished(message) {
   markFaviconDone();
   if (state.settings.sound) playChime();
-  if (!state.settings.notify || !document.hidden || !("Notification" in window) || Notification.permission !== "granted") return;
+  if (!state.settings.notify || inQuietHours() || !document.hidden || !("Notification" in window) || Notification.permission !== "granted") return;
   try {
     const note = new Notification("AUI replied", { body: stripMarkdown(message.content).slice(0, 140), icon: "/icons/icon-192.png" });
     note.onclick = () => { window.focus(); note.close(); };
@@ -7763,19 +8296,21 @@ function notifyReplyFinished(message) {
 }
 
 function playChime() {
+  if (inQuietHours()) return;
+  const pack = SOUND_PACKS[personalSetting("soundPack")] || SOUND_PACKS.chime;
   try {
     const context = new (window.AudioContext || window.webkitAudioContext)();
     const oscillator = context.createOscillator();
     const gain = context.createGain();
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(880, context.currentTime);
-    oscillator.frequency.exponentialRampToValueAtTime(1320, context.currentTime + 0.12);
+    oscillator.type = pack.type;
+    oscillator.frequency.setValueAtTime(pack.from, context.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(pack.to, context.currentTime + Math.min(0.12, pack.length / 2));
     gain.gain.setValueAtTime(0.0001, context.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.12, context.currentTime + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.35);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + pack.length - 0.05);
     oscillator.connect(gain).connect(context.destination);
     oscillator.start();
-    oscillator.stop(context.currentTime + 0.4);
+    oscillator.stop(context.currentTime + pack.length);
     oscillator.onended = () => context.close();
   } catch {}
 }
@@ -7793,6 +8328,9 @@ function preloadModel() {
   }).then(() => {
     document.title = baseDocumentTitle;
     buttons().forEach(button => { button.textContent = "Model ready ✓"; });
+    if (state.settings.notifyDownload && document.hidden && !inQuietHours() && "Notification" in window && Notification.permission === "granted") {
+      try { new Notification("AUI model downloaded", { body: "Replies will start right away now." }); } catch {}
+    }
     setTopProgress(1);
     burstParticles(document.querySelector("#preloadModelBtn:not([hidden])") || document.querySelector("[data-preload-model]"), 22);
     toast("The model is ready. Replies will start right away.");
@@ -7828,7 +8366,7 @@ function showModelName() {
 }
 
 function handleChatWheel(event) {
-  if (event.deltaY < 0) userPausedScroll = true;
+  if (event.deltaY < 0 && pausesOnSmallScroll()) userPausedScroll = true;
 }
 
 function handleChatTouchStart(event) {
@@ -7837,7 +8375,7 @@ function handleChatTouchStart(event) {
 
 function handleChatTouchMove(event) {
   const nextY = event.touches[0]?.clientY;
-  if (touchScrollY !== null && typeof nextY === "number" && nextY > touchScrollY + 1) {
+  if (pausesOnSmallScroll() && touchScrollY !== null && typeof nextY === "number" && nextY > touchScrollY + 1) {
     userPausedScroll = true;
   }
   touchScrollY = typeof nextY === "number" ? nextY : touchScrollY;
@@ -8349,7 +8887,7 @@ function stripMarkdown(text) {
 }
 
 function formatTime(timestamp) {
-  return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(timestamp);
+  return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", ...clockOptions() }).format(timestamp);
 }
 
 function formatRelativeTime(timestamp) {

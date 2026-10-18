@@ -30,7 +30,7 @@
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css" integrity="sha384-wH75j6z1lH97ZOpMOInqhgKzFkAInZPPSPlZpYKYTOqsaizPvhQZmAtLcPKXpLyH" crossorigin="anonymous" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="/style.css?v=20261018-b14">
+  <link rel="stylesheet" href="/style.css?v=20261018-b15">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -241,6 +241,31 @@
         <label class="settingRow"><span><strong>Spell check</strong><small>Underline misspelled words while you type</small></span><input id="spellcheckToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow"><span><strong>Send after dictation</strong><small>Send automatically when voice input stops</small></span><input id="voiceAutoSendToggle" type="checkbox" role="switch"></label>
         <label class="settingRow"><span><strong>Typing sounds</strong><small>Soft clicks as you type</small></span><input id="typingSoundToggle" type="checkbox" role="switch"></label>
+        <div class="settingRow"><span><strong>Profile</strong><small>Separate settings for each person using this browser</small></span><span class="inlineControls"><select id="profileSelect"></select><button class="secondaryBtn" id="profileSaveBtn" type="button">New profile</button></span></div>
+        <label class="settingRow"><span><strong>Language</strong><small>Language of AUI's buttons and menus</small></span><select id="languageSelect"><option value="en" selected>English</option><option value="he">עברית (Hebrew)</option></select></label>
+        <label class="settingRow"><span><strong>When AUI opens</strong><small>Show your last chat or start a fresh one</small></span><select id="startupSelect"><option value="last" selected>Last chat</option><option value="new">New chat</option></select></label>
+        <label class="settingRow"><span><strong>Clock</strong><small>How times are shown</small></span><select id="clockSelect"><option value="auto" selected>Like my device</option><option value="12">12-hour</option><option value="24">24-hour</option></select></label>
+        <label class="settingRow"><span><strong>Pause auto-scroll</strong><small>When scrolling up stops the reply from pulling you down</small></span><select id="scrollSensitivitySelect"><option value="high" selected>As soon as I scroll up</option><option value="low">Only after a big scroll</option></select></label>
+        <label class="settingRow"><span><strong>Text updates</strong><small>How often the reply on screen updates while AUI writes</small></span><select id="streamPaceSelect"><option value="live" selected>Live</option><option value="calm">Calm (fewer updates, easier to read)</option></select></label>
+        <label class="settingRow"><span><strong>Show writing speed</strong><small>Tokens per second under each reply</small></span><input id="showSpeedToggle" type="checkbox" role="switch" checked></label>
+        <div class="settingRow"><span><strong>Move your settings</strong><small>Save them to a file or load them in another browser</small></span><span class="inlineControls"><button class="secondaryBtn" id="exportSettingsBtn" type="button">Export</button><button class="secondaryBtn" id="importSettingsBtn" type="button">Import</button><input id="importSettingsInput" type="file" accept=".json,application/json" hidden></span></div>
+        <label class="settingRow"><span><strong>Finish sound</strong><small>Which sound plays when a reply finishes</small></span><select id="soundPackSelect"><option value="chime" selected>Chime</option><option value="bell">Bell</option><option value="pop">Pop</option><option value="marimba">Marimba</option></select></label>
+        <label class="settingRow"><span><strong>Model downloaded</strong><small>Notify me when the model finishes downloading in the background</small></span><input id="notifyDownloadToggle" type="checkbox" role="switch"></label>
+        <label class="settingRow"><span><strong>Timer finished</strong><small>Notify me when a /timer ends</small></span><input id="notifyTimerToggle" type="checkbox" role="switch" checked></label>
+        <label class="settingRow"><span><strong>Quiet hours</strong><small>No sounds or notifications at night</small></span><select id="quietHoursSelect"><option value="off" selected>Off</option><option value="22-7">10 PM to 7 AM</option><option value="23-8">11 PM to 8 AM</option><option value="21-6">9 PM to 6 AM</option></select></label>
+        <label class="settingRow"><span><strong>Code colors</strong><small>Color scheme for code blocks</small></span><select id="codeThemeSelect"><option value="navy" selected>Navy</option><option value="github">GitHub light</option><option value="monokai">Monokai</option></select></label>
+        <label class="settingRow"><span><strong>Show model name</strong><small>The model label at the top of the chat</small></span><input id="showModelBadgeToggle" type="checkbox" role="switch" checked></label>
+        <label class="settingRow"><span><strong>Compact chat list</strong><small>Smaller rows in the sidebar</small></span><input id="compactSidebarToggle" type="checkbox" role="switch"></label>
+        <label class="settingRow"><span><strong>Your name</strong><small>AUI greets you and can use your name</small></span><input id="userNameInput" type="text" maxlength="40" autocomplete="given-name" placeholder="Optional"></label>
+        <label class="settingRow"><span><strong>Assistant's name</strong><small>Call AUI something else</small></span><input id="assistantNameInput" type="text" maxlength="40" placeholder="AUI"></label>
+        <label class="settingRow"><span><strong>Assistant's icon</strong><small>Shown next to its replies</small></span><select id="assistantAvatarSelect"><option value="" selected>A</option><option value="🤖">🤖 Robot</option><option value="🦉">🦉 Owl</option><option value="🐙">🐙 Octopus</option><option value="✨">✨ Sparkles</option><option value="🧠">🧠 Brain</option><option value="🐱">🐱 Cat</option></select></label>
+        <label class="settingRow"><span><strong>Emoji</strong><small>How many emoji AUI uses</small></span><select id="emojiLevelSelect"><option value="some" selected>Some</option><option value="none">None</option><option value="lots">Lots</option></select></label>
+        <label class="settingRow"><span><strong>Humor</strong><small>From serious to unhinged</small></span><input id="humorInput" type="range" min="0" max="3" step="1" value="1" aria-valuetext="Humor level"></label>
+        <label class="settingRow"><span><strong>Formality</strong><small>From casual to formal</small></span><input id="formalityInput" type="range" min="0" max="2" step="1" value="1" aria-valuetext="Formality level"></label>
+        <div class="settingRow"><span><strong>Saved memories</strong><small>See, edit and delete what AUI remembers</small></span><button class="secondaryBtn" id="manageMemoryBtn" type="button">Manage</button></div>
+        <div class="settingRow"><span><strong>All shortcuts</strong><small>Every keyboard shortcut in one list</small></span><button class="secondaryBtn" id="keyboardListBtn" type="button">Show</button></div>
+        <div class="settingRow settingRowStack"><span id="labsIntro"><strong>Labs</strong><small>Early features. They work, but may change or go away.</small></span></div>
+        <div class="settingRow settingRowStack"><span id="aboutInfo"><strong>About AUI</strong><small>A private AI chat that runs in your browser. Made with WebLLM (Apache 2.0), marked (MIT), DOMPurify (Apache 2.0 / MPL 2.0), highlight.js (BSD 3-Clause), KaTeX (MIT), Mermaid (MIT) and html-to-image (MIT). Models: Llama 3.2 (Llama 3.2 Community License), Qwen 2.5 (Apache 2.0), SmolLM2 (Apache 2.0), Phi 3.5 (MIT). <a href="../changelog.html" target="_blank" rel="noopener">What's new</a> · <a href="../accessibility.html" target="_blank" rel="noopener">Accessibility</a> · <a href="https://github.com/usernam69/AUI" target="_blank" rel="noopener">Source code</a></small></span></div>
         <label class="settingRow"><span><strong>Enter sends</strong><small>Off: Ctrl + Enter sends, Enter adds a line</small></span><input id="enterToSendToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow rangeRow"><span><strong>Text size</strong><small id="fontScaleValue">100%</small></span><input id="fontScaleInput" type="range" min="0.9" max="1.5" step="0.05" value="1"></label>
         <label class="settingRow"><span><strong>Density</strong><small>Space between messages</small></span><select id="densitySelect"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
@@ -421,6 +446,6 @@
       navigator.serviceWorker.register("/chat/sw.js").catch(() => {});
     }
   </script>
-  <script type="module" src="/chat/app.js?v=20261018-b14"></script>
+  <script type="module" src="/chat/app.js?v=20261018-b15"></script>
 </body>
 </html>
