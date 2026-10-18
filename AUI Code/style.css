@@ -3796,3 +3796,47 @@
   #profileDashboard .achievement { display: inline-block; }
   .avatar, .profileAvatarPreview { color: #fff; }
 }
+
+@layer components {
+  /* Skills */
+  .skillStrip { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px 0; }
+  .skillChip { border: 1px solid var(--accent-border); background: var(--accent-soft); color: var(--text); border-radius: var(--radius-full); padding: 2px 10px; font-size: 13px; }
+  .skillChip:hover { border-color: var(--accent); }
+  .skillGroup { margin: 18px 0 8px; font-size: 14px; color: var(--text-secondary); display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .skillGroup small { color: var(--muted); font-weight: 400; }
+  .skillCard { display: flex; gap: 12px; justify-content: space-between; align-items: center; flex-wrap: wrap; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); margin-bottom: 8px; }
+  .skillText { min-width: 200px; flex: 1 1 240px; }
+  .skillText h3 { font-size: 15px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .skillText code { font-size: 12px; color: var(--muted); }
+  .skillText p { color: var(--text-secondary); font-size: 13px; }
+  .skillActions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .skillActions [aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+  .setupBody textarea[name="instructions"] { min-height: 160px; resize: vertical; }
+
+  /* Plans and the demo checkout */
+  .planNotice { border: 1px solid var(--accent-border); background: var(--accent-soft); border-radius: var(--radius-md); padding: 10px 12px; font-size: 13px; margin-bottom: 14px; }
+  .planGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  .planCard { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; background: var(--surface); }
+  .planCard.isCurrent { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .planCard h3 { font-size: 17px; }
+  .planPrice { font-size: 28px; font-weight: 650; }
+  .planPrice small { font-size: 13px; font-weight: 400; color: var(--muted); }
+  .planBlurb { color: var(--text-secondary); font-size: 13px; }
+  .planCard ul { list-style: none; padding: 0; display: grid; gap: 6px; font-size: 13px; flex: 1; }
+  .planCard li::before { content: "✓ "; color: var(--success); }
+  .checkoutForm label { display: grid; gap: 4px; font-size: 14px; }
+  .checkoutForm input { padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-elevated); font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+  .checkoutForm input[aria-invalid="true"] { border-color: var(--danger); }
+  .cardField { position: relative; display: block; }
+  .cardField input { width: 100%; padding-right: 76px; }
+  .cardBrandMark { position: absolute; right: 10px; top: 50%; translate: 0 -50%; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--accent); }
+  .cardRow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .fieldError { color: var(--danger); min-height: 1.2em; }
+  .googleBtn { display: inline-flex; gap: 10px; align-items: center; justify-content: center; }
+  .oauthRow:has(.googleBtn:only-child) { grid-template-columns: 1fr; }
+}
+
+@layer components {
+  #plansDialog, #skillsDialog { width: min(96vw, 940px); }
+  .planCard .primaryBtn, .planCard .secondaryBtn { margin-top: auto; }
+}

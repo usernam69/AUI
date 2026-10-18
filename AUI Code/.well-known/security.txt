@@ -1,0 +1,5 @@
+Contact: mailto:supportaton@gmail.com
+Expires: 2027-10-18T00:00:00.000Z
+Preferred-Languages: en, he
+Policy: https://usernam69.github.io/AUI/security.html
+Canonical: https://usernam69.github.io/AUI/.well-known/security.txt

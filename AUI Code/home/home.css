@@ -1,0 +1,121 @@
+:root {
+  --ground: #f5f8ff;
+  --ink: #0a1430;
+  --ink-soft: #3b4a6b;
+  --blue: #1d4ed8;
+  --blue-hover: #1a43bd;
+  --navy: #0b1b45;
+  --sky: #dbe8ff;
+  --on-navy: #f2f6ff;
+  --on-navy-soft: #b9c7e8;
+  --margin: clamp(16px, 4vw, 48px);
+  --font: Lexend, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #0a1226;
+    --ink: #eef3ff;
+    --ink-soft: #aebbdc;
+    --blue: #5b8cff;
+    --blue-hover: #7aa2ff;
+    --navy: #06102e;
+    --sky: #12213f;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body { background: var(--ground); color: var(--ink); font: 400 18px/1.6 var(--font); -webkit-font-smoothing: antialiased; }
+img { display: block; max-width: 100%; height: auto; }
+a { color: inherit; }
+:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+
+.skip { position: absolute; left: -999px; top: 8px; background: var(--ink); color: var(--ground); padding: 8px 14px; z-index: 10; }
+.skip:focus { left: 8px; }
+
+/* Bar: wordmark, a few links, one action. */
+.bar { display: flex; align-items: center; gap: 24px; padding: 18px var(--margin); position: sticky; top: 0; background: var(--ground); z-index: 5; }
+.wordmark { font-weight: 600; font-size: 24px; letter-spacing: -0.02em; text-decoration: none; margin-right: auto; }
+.bar nav { display: flex; gap: 28px; font-size: 16px; }
+.bar nav a { text-decoration: none; color: var(--ink-soft); }
+.bar nav a:hover { color: var(--ink); }
+.barActions { display: flex; gap: 20px; align-items: center; }
+.textLink { font-size: 16px; text-decoration: none; }
+.textLink:hover { text-decoration: underline; }
+
+.button { display: inline-flex; align-items: center; justify-content: center; gap: 10px; background: var(--blue); color: #fff; border: 2px solid var(--blue); border-radius: 999px; padding: 10px 22px; font: 500 16px/1.2 var(--font); text-decoration: none; cursor: pointer; transition: background 140ms, transform 140ms; }
+.button:hover { background: var(--blue-hover); border-color: var(--blue-hover); }
+.button:active { transform: translateY(1px); }
+.button.big { padding: 16px 30px; font-size: 18px; }
+.button.outline { background: transparent; color: var(--ink); border-color: var(--ink); }
+.button.outline:hover { background: var(--sky); }
+.button.light { background: var(--on-navy); color: var(--navy); border-color: var(--on-navy); }
+.button.light:hover { background: #fff; }
+.button[hidden] { display: none; }
+
+h1, h2, h3 { font-weight: 500; letter-spacing: -0.035em; line-height: 1.02; }
+h1 { font-size: clamp(44px, 9.4vw, 148px); max-width: 13ch; }
+h2 { font-size: clamp(36px, 6.4vw, 96px); max-width: 16ch; }
+h3 { font-size: 28px; letter-spacing: -0.02em; }
+.lead { font-size: clamp(19px, 2vw, 26px); line-height: 1.45; max-width: 46ch; }
+.note { color: var(--ink-soft); font-size: 15px; max-width: 60ch; }
+.actions { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+
+section { padding: clamp(72px, 12vw, 190px) var(--margin) 0; }
+.hero { display: grid; gap: 28px; justify-items: start; padding-top: clamp(40px, 7vw, 110px); }
+.hero .shot { margin-top: clamp(24px, 5vw, 72px); width: 100%; }
+.shot { width: 100%; background: var(--sky); }
+
+.field { margin-top: clamp(72px, 12vw, 190px); padding-bottom: clamp(72px, 12vw, 190px); display: grid; gap: 36px; justify-items: start; }
+.navy { background: var(--navy); color: var(--on-navy); }
+.sky { background: var(--sky); }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(24px, 4vw, 64px); max-width: 1200px; }
+.facts p { color: var(--on-navy-soft); font-size: 18px; }
+.facts strong { display: block; color: var(--on-navy); font-size: 24px; font-weight: 500; letter-spacing: -0.02em; margin-bottom: 8px; }
+
+.split { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(28px, 5vw, 80px); align-items: center; }
+.split.reverse { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+.copy { display: grid; gap: 22px; justify-items: start; }
+.copy p { max-width: 44ch; }
+.split .shot { border-radius: 0; }
+
+.plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(16px, 2.4vw, 32px); width: 100%; }
+.plans article { background: var(--ground); padding: clamp(20px, 3vw, 40px); display: grid; gap: 14px; align-content: start; }
+.price { font-size: clamp(44px, 5vw, 72px); font-weight: 500; letter-spacing: -0.04em; line-height: 1; }
+.price span { font-size: 17px; font-weight: 400; color: var(--ink-soft); letter-spacing: 0; }
+.plans ul { list-style: none; padding: 0; display: grid; gap: 8px; }
+.plans li::before { content: "✓  "; color: var(--blue); font-weight: 600; }
+
+.close { display: grid; gap: 28px; justify-items: start; padding-bottom: clamp(72px, 12vw, 190px); }
+
+footer { background: var(--navy); color: var(--on-navy); padding: clamp(40px, 6vw, 80px) var(--margin) 32px; overflow: hidden; }
+.giant { font-size: clamp(120px, 34vw, 520px); font-weight: 600; letter-spacing: -0.06em; line-height: 0.8; margin-bottom: 40px; }
+footer nav { display: flex; flex-wrap: wrap; gap: 12px 28px; font-size: 16px; }
+footer a { color: var(--on-navy-soft); text-decoration: none; }
+footer a:hover { color: #fff; text-decoration: underline; }
+
+/* Entrances: content is visible without script; the script adds .reveal and .in. */
+.motion .rise { opacity: 0; transform: translateY(24px); transition: opacity 600ms cubic-bezier(.2,.8,.2,1), transform 600ms cubic-bezier(.2,.8,.2,1); transition-delay: var(--delay, 0ms); }
+.motion .rise.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .motion .rise { opacity: 1; transform: none; transition: none; }
+  .button { transition: none; }
+}
+
+@media (max-width: 900px) {
+  .bar nav { display: none; }
+  .facts, .plans { grid-template-columns: 1fr; }
+  .split, .split.reverse { grid-template-columns: 1fr; }
+  .split .shot { order: 2; }
+  body { font-size: 17px; }
+}
+@media (max-width: 480px) {
+  .barActions { gap: 12px; }
+  .button { padding: 9px 16px; }
+  .button.big { padding: 14px 22px; font-size: 17px; }
+  .actions .button { width: 100%; }
+}

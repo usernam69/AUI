@@ -1,4 +1,21 @@
+import { isSealed, deriveKey, sealWithKey, openWithKey, saltOf, newSalt } from "./vault.js";
+
 const STORAGE_KEY = "aui";
+
+// Passphrase lock (The Probe, 764). While the data is locked nothing is written, so the
+// encrypted copy can never be replaced by an empty state; once unlocked, every save is encrypted.
+let vaultKey = null;
+let vaultSalt = null;
+let vaultLocked = false;
+let vaultWrites = Promise.resolve();
+
+export function isVaultLocked() {
+  return vaultLocked;
+}
+
+export function isVaultEnabled() {
+  return Boolean(vaultKey) || vaultLocked;
+}
 const MAX_ATTACHMENT_DATA_LENGTH = 1_200_000;
 
 export function loadStoredState(defaultState) {
@@ -7,6 +24,10 @@ export function loadStoredState(defaultState) {
 
   try {
     const value = JSON.parse(saved);
+    if (isSealed(value)) {
+      vaultLocked = true;
+      return { ...defaultState, settings: { ...defaultState.settings, ...(value.settings || {}) }, vaultLocked: true };
+    }
     return {
       ...defaultState,
       ...value,
@@ -34,6 +55,19 @@ function stateReplacer(key, value) {
 }
 
 export function saveStoredState(state) {
+  if (vaultLocked) return vaultWrites;
+  if (vaultKey) {
+    const text = JSON.stringify(state, stateReplacer);
+    const key = vaultKey;
+    const salt = vaultSalt;
+    // Only the theme stays readable, so the unlock screen matches the app.
+    const visible = { theme: state.settings?.theme || "system" };
+    vaultWrites = vaultWrites
+      .then(() => sealWithKey(key, salt, text))
+      .then(envelope => localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...envelope, settings: visible })))
+      .catch(error => console.warn("AUI could not save encrypted data:", error));
+    return vaultWrites;
+  }
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state, stateReplacer));
   } catch (error) {
@@ -101,4 +135,53 @@ function createUuid() {
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
   const hex = [...bytes].map(byte => byte.toString(16).padStart(2, "0"));
   return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+}
+
+// Unlock with the passphrase; throws when it's wrong. Returns the saved state like loadStoredState.
+export async function unlockVault(passphrase, defaultState) {
+  const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+  if (!isSealed(value)) throw new Error("Nothing is locked.");
+  const salt = saltOf(value);
+  const key = await deriveKey(passphrase, salt);
+  const data = JSON.parse(await openWithKey(key, value));
+  vaultKey = key;
+  vaultSalt = salt;
+  vaultLocked = false;
+  return {
+    ...defaultState,
+    ...data,
+    settings: { ...defaultState.settings, ...(data.settings || {}) },
+    chats: Array.isArray(data.chats) ? data.chats : [],
+    memory: Array.isArray(data.memory) ? data.memory : [],
+    user: null,
+    loggedIn: false,
+    loading: false
+  };
+}
+
+export async function enableVault(passphrase, state) {
+  vaultSalt = newSalt();
+  vaultKey = await deriveKey(passphrase, vaultSalt);
+  vaultLocked = false;
+  return saveStoredState(state);
+}
+
+export async function disableVault(state) {
+  await vaultWrites;
+  vaultKey = null;
+  vaultSalt = null;
+  vaultLocked = false;
+  return saveStoredState(state);
+}
+
+export function flushVault() {
+  return vaultWrites;
+}
+
+// "Forgot passphrase": the encrypted data can't be recovered, so it is removed.
+export function eraseLockedData() {
+  localStorage.removeItem(STORAGE_KEY);
+  vaultKey = null;
+  vaultSalt = null;
+  vaultLocked = false;
 }

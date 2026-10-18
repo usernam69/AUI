@@ -1,5 +1,5 @@
-const CACHE_NAME = "aui-t20261018-b18";
-const ASSET_VERSION = "20261018-b18";
+const CACHE_NAME = "aui-t20261018-b19";
+const ASSET_VERSION = "20261018-b19";
 const versioned = path => `${path}?v=${ASSET_VERSION}`;
 
 // The worker lives in <base>chat/, so resolve everything from there. That keeps it
@@ -7,7 +7,7 @@ const versioned = path => `${path}?v=${ASSET_VERSION}`;
 const BASE = new URL("../", self.registration.scope).pathname;
 const at = path => `${BASE}${path}`;
 
-const PRECACHE_PAGES = [at("chat"), at("about"), at("help.html"), at("changelog.html"), at("accessibility.html")];
+const PRECACHE_PAGES = [at("chat"), at("about"), at("help.html"), at("changelog.html"), at("accessibility.html"), at("privacy.html")];
 const RUNTIME_CACHE = "aui-runtime";
 const RUNTIME_HOSTS = ["esm.sh", "cdn.jsdelivr.net", "fonts.googleapis.com", "fonts.gstatic.com"];
 const PRECACHE_ASSETS = [
@@ -22,7 +22,17 @@ const PRECACHE_ASSETS = [
   at(versioned("modules/slm.js")),
   at("modules/slm-worker.js"),
   at(versioned("modules/rag.js")),
-  at(versioned("modules/files.js"))
+  at(versioned("modules/files.js")),
+  at(versioned("modules/vault.js")),
+  at(versioned("modules/luhn.js")),
+  at(versioned("modules/plans.js")),
+  at(versioned("modules/skills.js")),
+  at("modules/vendor/marked-16.1.2.mjs"),
+  at("modules/vendor/dompurify-3.2.6.mjs"),
+  at("modules/vendor/highlight-11.11.1-common.mjs"),
+  at("modules/vendor/katex-0.16.22.mjs"),
+  at("modules/vendor/katex/katex.min.css"),
+  at("modules/vendor/highlight-github-dark-11.11.1.min.css")
 ];
 
 self.addEventListener("install", event => {

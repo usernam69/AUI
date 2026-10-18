@@ -386,13 +386,119 @@ await test("service worker updates keep the downloaded model and runtime caches"
   await finished;
   assert.deepEqual(deleted, ["aui-t20250101-old"]);
 });
-await test("root page redirects to the chat and the workflow rewrites the worker path", () => {
+await test("root page redirects to the chat and the worker is registered next to the app", () => {
   const index = readFileSync(join(root, "index.html"), "utf8");
-  assert.ok(/location\.replace\("chat\/"/.test(index) && !index.includes("app.js"));
+  assert.ok(!/<script>/.test(index) && !/\son[a-z]+="/i.test(index) && !/\sstyle="/i.test(index), "the home page has no inline script, handler or style (its CSP forbids them)");
+  assert.ok(index.includes("Content-Security-Policy") && index.includes('href="/chat/"'));
+  const homeJs = readFileSync(join(root, "home/home.js"), "utf8");
+  assert.ok(/location\.replace\("\/chat\/"/.test(homeJs), "sign-in and invite links that land on the home page are passed on to the chat")
   const chatPage = readFileSync(join(root, "chat/index.html"), "utf8");
-  assert.ok(chatPage.includes('register("/chat/sw.js")'));
-  const workflow = readFileSync(join(root, "..", ".github/workflows/pages.yml"), "utf8");
-  assert.ok(workflow.includes('register("/AUI/chat/sw.js"'), "Pages workflow must rewrite the inline worker registration");
+  assert.ok(!/<script>(?![\s\S]*?src=)/.test(chatPage.replace(/<script type="module" src=[^>]*><\/script>/g, "")), "the chat page has no inline scripts (the CSP forbids them)");
+  assert.ok(!/\son[a-z]+="/i.test(chatPage), "the chat page has no inline event handlers");
+  const app = readFileSync(join(root, "chat/app.js"), "utf8");
+  assert.ok(app.includes('navigator.serviceWorker.register(new URL("sw.js", import.meta.url))'), "the worker path follows the app, so it works under /AUI/ too");
+});
+
+// --- card check, plans and skills
+await test("Luhn check, card brands and expiry", async () => {
+  const { luhnValid, cardBrand, formatCardNumber, formatExpiry, checkCard, expiryProblem } = await load("modules/luhn.js");
+  for (const good of ["4242424242424242", "4111 1111 1111 1111", "5555555555554444", "2223003122003222", "378282246310005", "6011111111111117", "3530111333300000", "30569309025904"]) assert.ok(luhnValid(good), good);
+  for (const bad of ["4242424242424241", "1234567812345678", "0000000000000000", "", "abcd", "4242"]) assert.ok(!luhnValid(bad), bad);
+  assert.equal(cardBrand("4242424242424242").id, "visa");
+  assert.equal(cardBrand("5555555555554444").id, "mastercard");
+  assert.equal(cardBrand("378282246310005").id, "amex");
+  assert.equal(formatCardNumber("378282246310005"), "3782 822463 10005");
+  assert.equal(formatCardNumber("4242424242424242"), "4242 4242 4242 4242");
+  assert.equal(formatExpiry("1229"), "12/29");
+  assert.equal(formatExpiry("3"), "3");
+  assert.equal(formatExpiry("35"), "03/5");
+  const now = new Date(2026, 9, 18);
+  assert.equal(expiryProblem("10/26", now), "", "good through the end of the month");
+  assert.ok(expiryProblem("09/26", now), "last month is expired");
+  assert.ok(expiryProblem("13/30", now) && expiryProblem("12/60", now) && expiryProblem("", now));
+  assert.ok(checkCard({ number: "4242 4242 4242 4242", expiry: "12/30", cvc: "123" }, now).ok);
+  assert.equal(checkCard({ number: "4242 4242 4242 4242", expiry: "12/30", cvc: "123" }, now).last4, "4242");
+  assert.ok(checkCard({ number: "378282246310005", expiry: "12/30", cvc: "1234" }, now).ok, "Amex has a 4-digit code");
+  assert.ok(checkCard({ number: "378282246310005", expiry: "12/30", cvc: "123" }, now).errors.cvc);
+  assert.ok(checkCard({ number: "4242 4242 4242 4241", expiry: "12/30", cvc: "123" }, now).errors.number);
+  assert.ok(checkCard({ number: "4242 4242 4242", expiry: "12/30", cvc: "123" }, now).errors.number, "Visa length");
+});
+
+await test("plans keep the brand and last four digits only", async () => {
+  const { PLANS, planById, customSkillLimit, planRecord } = await load("modules/plans.js");
+  assert.equal(PLANS.length, 3);
+  assert.equal(planById("nonsense").id, "free");
+  assert.equal(customSkillLimit("free"), 3);
+  assert.equal(customSkillLimit("pro"), Infinity);
+  const record = planRecord("plus", { brand: "visa", last4: "4242", number: "4242424242424242" });
+  assert.deepEqual(record.planCard, { brand: "visa", last4: "4242" });
+  assert.ok(!JSON.stringify(record).includes("4242424242424242"));
+  assert.deepEqual(planRecord("free", { last4: "1" }), { plan: "free", planCard: null, planSince: null });
+});
+
+await test("skills: validation, SKILL.md round trip and prompt", async () => {
+  const skills = await load("modules/skills.js");
+  const { normalizeSkill, toSkillFile, parseSkillFile, skillsPrompt, skillsKey, BUILTIN_SKILLS, MAX_INSTRUCTIONS } = skills;
+  assert.ok(BUILTIN_SKILLS.length >= 10 && new Set(BUILTIN_SKILLS.map(skill => skill.id)).size === BUILTIN_SKILLS.length);
+  assert.ok(BUILTIN_SKILLS.every(skill => skill.instructions.length < MAX_INSTRUCTIONS));
+  assert.ok(normalizeSkill({ name: "", instructions: "x" }).error);
+  assert.ok(normalizeSkill({ name: "A", instructions: "" }).error);
+  assert.ok(normalizeSkill({ name: "A", instructions: "x".repeat(MAX_INSTRUCTIONS + 1) }).error);
+  assert.ok(normalizeSkill({ name: "Summarize", instructions: "x" }).error, "built-in command is taken");
+  const made = normalizeSkill({ name: "  Pirate   Talk ", instructions: "Talk like a pirate.", description: "Arr" }).skill;
+  assert.equal(made.command, "pirate-talk");
+  assert.ok(normalizeSkill({ name: "Pirate Talk", instructions: "x" }, [made]).error, "duplicate custom command");
+  assert.ok(!normalizeSkill({ id: made.id, name: "Pirate Talk", instructions: "x" }, [made]).error, "editing keeps its own command");
+  const file = toSkillFile(made);
+  assert.deepEqual(parseSkillFile(file), { name: "Pirate Talk", description: "Arr", instructions: "Talk like a pirate." });
+  assert.equal(parseSkillFile("just some text").instructions, "just some text");
+  const settings = { skills: [made], skillsOn: ["summarize"] };
+  const prompt = skillsPrompt(settings, { skills: [made.id, "missing"] });
+  assert.ok(prompt.includes("Summarizer") && prompt.includes("pirate"));
+  assert.equal(skillsPrompt({}, {}), "");
+  assert.notEqual(skillsKey(settings, {}), skillsKey({ ...settings, skills: [{ ...made, instructions: "Talk like a robot." }] }, { skills: [made.id] }));
+  const huge = { skills: Array.from({ length: 5 }, (_, i) => ({ id: `s${i}`, name: `S${i}`, instructions: "y".repeat(1100) })), skillsOn: ["s0", "s1", "s2", "s3", "s4"] };
+  assert.ok(skillsPrompt(huge, {}).length < 2000, "the prompt budget caps the skills");
+});
+
+await test("content security policy is strict where it matters", () => {
+  const chatPage = readFileSync(join(root, "chat/index.html"), "utf8");
+  const csp = /http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(chatPage)?.[1] || "";
+  const directive = name => (csp.split(";").map(part => part.trim()).find(part => part.startsWith(`${name} `)) || "");
+  assert.match(directive("object-src"), /'none'/);
+  assert.match(directive("base-uri"), /'self'/);
+  assert.ok(!/'unsafe-inline'/.test(directive("script-src")), "no inline scripts");
+  assert.ok(!/\*/.test(directive("script-src")), "scripts only from named hosts");
+  for (const page of ["beta/index.html", "beta/admin/index.html"]) {
+    assert.ok(readFileSync(join(root, page), "utf8").includes('http-equiv="Content-Security-Policy"'), `${page} has a CSP`);
+  }
+});
+
+await test("vault encrypts, refuses a wrong passphrase, and locked storage is never overwritten", async () => {
+  const vault = await import(pathToFileURL(join(root, "modules/vault.js")).href);
+  const sealed = await vault.seal(JSON.stringify({ secret: "tea" }), "correct horse");
+  assert.ok(vault.isSealed(sealed));
+  assert.ok(!sealed.data.includes("tea"));
+  assert.equal(JSON.parse(await vault.open(sealed, "correct horse")).secret, "tea");
+  await assert.rejects(() => vault.open(sealed, "wrong horse"));
+  const store = new Map();
+  globalThis.localStorage = { getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key) };
+  const storage = await import(`${pathToFileURL(join(root, "modules/storage.js")).href}?vault-test`);
+  const defaults = { settings: { theme: "system" }, chats: [], memory: [] };
+  const state = { settings: { theme: "dark" }, chats: [{ id: "c1", title: "Secret plans", messages: [] }], memory: [] };
+  await storage.enableVault("correct horse", state);
+  assert.ok(!store.get("aui").includes("Secret plans"), "saved data is encrypted");
+  assert.equal(JSON.parse(store.get("aui")).settings.theme, "dark", "only the theme stays readable");
+  const encrypted = store.get("aui");
+  const locked = (await import(`${pathToFileURL(join(root, "modules/storage.js")).href}?vault-test-2`));
+  const loaded = locked.loadStoredState(defaults);
+  assert.equal(loaded.vaultLocked, true);
+  await locked.saveStoredState({ ...defaults, chats: [] });
+  assert.equal(store.get("aui"), encrypted, "an empty state never replaces locked data");
+  await assert.rejects(() => locked.unlockVault("nope", defaults));
+  const unlocked = await locked.unlockVault("correct horse", defaults);
+  assert.equal(unlocked.chats[0].title, "Secret plans");
+  delete globalThis.localStorage;
 });
 
 console.log(`\n${passed} test groups passed`);

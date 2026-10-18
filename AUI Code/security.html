@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'">
+  <meta name="theme-color" content="#161b26">
+  <meta name="description" content="How to report a security problem in AUI, and who has helped.">
+  <title>AUI security</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <script>document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";</script>
+  <style>
+    body { overflow: auto; padding: 40px 16px 80px; }
+    main { max-width: 760px; margin: 0 auto; line-height: 1.7; }
+    h1 { font-size: 30px; margin-bottom: 4px; }
+    h2 { margin-top: 32px; font-size: 20px; }
+    a { color: var(--accent); }
+    .back { display: inline-block; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="/chat">← Back to AUI</a>
+    <h1>Security</h1>
+    <h2>Report a problem</h2>
+    <p>Found a security problem? Email <a href="mailto:supportaton@gmail.com?subject=AUI%20security%20report">supportaton@gmail.com</a> with the steps to reproduce it. Please don't open a public issue for security problems. You'll get a reply within a week, and a fix as soon as one is ready.</p>
+    <p>In scope: the AUI website, the Beta pages and the account and sync features. Out of scope: denial-of-service, spam, and problems in browsers or third-party services.</p>
+
+    <h2>Thank you</h2>
+    <p>People who report a real problem responsibly are thanked here (with their permission).</p>
+    <ul><li>No reports yet. Be the first!</li></ul>
+
+    <h2>How AUI protects you</h2>
+    <ul>
+      <li>The AI runs in your browser, so your chats aren't sent to an AI company.</li>
+      <li>A Content Security Policy only lets scripts load from AUI and two pinned library hosts; model replies are sanitized before they're shown.</li>
+      <li>Code you run from a reply runs in a sandboxed frame with no access to AUI or your data.</li>
+      <li>Chats can be encrypted with a passphrase on your device. Accounts can use two-factor sign-in.</li>
+      <li>Database rows are protected by row-level security, so each account can only read its own data.</li>
+    </ul>
+    <p><a href="/privacy.html">Privacy</a></p>
+  </main>
+</body>
+</html>

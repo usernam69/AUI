@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://usernam69.github.io/AUI/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
   <url><loc>https://usernam69.github.io/AUI/chat/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
   <url><loc>https://usernam69.github.io/AUI/about/</loc><changefreq>monthly</changefreq></url>
   <url><loc>https://usernam69.github.io/AUI/beta/</loc><changefreq>monthly</changefreq></url>
   <url><loc>https://usernam69.github.io/AUI/help.html</loc><changefreq>monthly</changefreq></url>
   <url><loc>https://usernam69.github.io/AUI/accessibility.html</loc><changefreq>monthly</changefreq></url>
+  <url><loc>https://usernam69.github.io/AUI/privacy.html</loc><changefreq>monthly</changefreq></url>
+  <url><loc>https://usernam69.github.io/AUI/security.html</loc><changefreq>monthly</changefreq></url>
   <url><loc>https://usernam69.github.io/AUI/changelog.html</loc><changefreq>weekly</changefreq></url>
   <url><loc>https://usernam69.github.io/AUI/status.html</loc><changefreq>monthly</changefreq></url>
 </urlset>

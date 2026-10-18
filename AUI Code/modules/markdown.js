@@ -1,7 +1,8 @@
-import { marked } from "https://esm.sh/marked@16.1.2";
-import DOMPurify from "https://esm.sh/dompurify@3.2.6";
-import hljs from "https://esm.sh/highlight.js@11.11.1/lib/common";
-import katex from "https://esm.sh/katex@0.16.22";
+// Self-hosted copies (see vendor/README.md): no third-party requests to format a reply.
+import { marked } from "./vendor/marked-16.1.2.mjs";
+import DOMPurify from "./vendor/dompurify-3.2.6.mjs";
+import hljs from "./vendor/highlight-11.11.1-common.mjs";
+import katex from "./vendor/katex-0.16.22.mjs";
 
 marked.setOptions({
   gfm: true,

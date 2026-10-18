@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- 756: GitHub Pages can't send headers, so the Content Security Policy is set here.
+       'unsafe-eval' stays because the in-browser AI runtimes may compile code at run time. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://esm.sh https://cdn.jsdelivr.net 'wasm-unsafe-eval' 'unsafe-eval'; worker-src 'self' blob: https://cdn.jsdelivr.net; connect-src 'self' https: wss://cxulgeojkjnskdyoktkj.supabase.co blob: data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://esm.sh https://cdn.jsdelivr.net; font-src 'self' data: https://esm.sh https://cdn.jsdelivr.net; frame-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'; manifest-src 'self'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="theme-color" content="#161b26">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
   <meta name="description" content="Welcome to AUI! This is an AI website.">
   <meta property="og:type" content="website">
   <meta property="og:title" content="AUI">
@@ -28,9 +31,7 @@
   <link rel="shortcut icon" href="/favicon-t-20260728.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css" integrity="sha384-wH75j6z1lH97ZOpMOInqhgKzFkAInZPPSPlZpYKYTOqsaizPvhQZmAtLcPKXpLyH" crossorigin="anonymous" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="/style.css?v=20261018-b18">
+  <link rel="stylesheet" href="/style.css?v=20261018-b19">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -124,6 +125,7 @@
         </div>
 
         <form class="composer" id="composer">
+          <div class="skillStrip" id="skillStrip" aria-label="Skills in use" hidden></div>
           <div class="attachmentTray" id="attachmentTray" aria-label="Attachments" hidden></div>
 
           <div class="composerInputRow">
@@ -152,6 +154,7 @@
           <div class="composerToolbar">
             <div class="composerTools">
               <button class="toolBtn ripple" id="toolsBtn" type="button" aria-label="Open attachment menu" aria-expanded="false" title="Attachments and tools (type / for commands)">＋</button>
+              <button class="toolBtn ripple" id="skillsBtn" type="button" aria-label="Skills" title="Skills (type / to switch)">✧</button>
               <button class="toolBtn ripple" id="searchBtn" type="button" aria-pressed="false" aria-label="Search the web" title="Search the web">⌕</button>
               <button class="toolBtn ripple compareToggleBtn" id="compareBtn" type="button" aria-pressed="false" aria-label="Compare two AI models" title="Compare two AI models">⇄</button>
               <button class="toolBtn ripple imageGenerateBtn" id="imageGenerateBtn" type="button" aria-label="Generate an image" title="Generate an image">✦</button>
@@ -268,6 +271,17 @@
         <div class="settingRow"><span><strong>All shortcuts</strong><small>Every keyboard shortcut in one list</small></span><button class="secondaryBtn" id="keyboardListBtn" type="button">Show</button></div>
         <div class="settingRow settingRowStack"><span id="labsIntro"><strong>Labs</strong><small>Early features. They work, but may change or go away.</small></span></div>
         <div class="settingRow settingRowStack"><span id="aboutInfo"><strong>About AUI</strong><small>A private AI chat that runs in your browser. Made with WebLLM (Apache 2.0), marked (MIT), DOMPurify (Apache 2.0 / MPL 2.0), highlight.js (BSD 3-Clause), KaTeX (MIT), Mermaid (MIT) and html-to-image (MIT). Models: Llama 3.2 (Llama 3.2 Community License), Qwen 2.5 (Apache 2.0), SmolLM2 (Apache 2.0), Phi 3.5 (MIT). <a href="../changelog.html" target="_blank" rel="noopener">What's new</a> · <a href="../accessibility.html" target="_blank" rel="noopener">Accessibility</a> · <a href="https://github.com/usernam69/AUI" target="_blank" rel="noopener">Source code</a></small></span></div>
+        <div class="settingRow settingRowStack"><span id="privacyInfo"><strong>Your privacy</strong><small>The AI runs on this device. Chats stay in this browser unless you sign in to sync them. <a href="../privacy.html" target="_blank" rel="noopener noreferrer">Read the privacy page</a></small></span></div>
+        <div class="settingRow"><span><strong>Passphrase lock</strong><small>Encrypt chats, memories and settings stored in this browser</small></span><button class="secondaryBtn" id="passphraseBtn" type="button">Set a passphrase</button></div>
+        <label class="settingRow"><span><strong>Lock after</strong><small>Ask for the passphrase again after this much time without use</small></span><select id="autoLockSelect"><option value="0" selected>Never</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="60">1 hour</option></select></label>
+        <label class="settingRow"><span><strong>Clear on close</strong><small>Delete chats when you come back after closing the browser</small></span><input id="clearOnCloseToggle" type="checkbox" role="switch"></label>
+        <label class="settingRow"><span><strong>Delete old chats</strong><small>Move chats you haven't touched to Trash (pinned and favorite chats stay)</small></span><select id="retentionSelect"><option value="0" selected>Never</option><option value="30">After 30 days</option><option value="90">After 90 days</option><option value="365">After a year</option></select></label>
+        <label class="settingRow"><span><strong>Offline-only mode</strong><small>Only the model download servers may be contacted; lookups and sync stop</small></span><input id="offlineOnlyToggle" type="checkbox" role="switch"></label>
+        <label class="settingRow"><span><strong>Family filter</strong><small>Ask for child-friendly answers and hide strong language</small></span><input id="familyFilterToggle" type="checkbox" role="switch"></label>
+        <label class="settingRow"><span><strong>Kids mode</strong><small>Family filter, simple words and no online lookups, all at once</small></span><input id="kidsModeToggle" type="checkbox" role="switch"></label>
+        <label class="settingRow"><span><strong>Count my visit</strong><small>Adds you to the visitor counter, with a new random ID each day</small></span><input id="countVisitToggle" type="checkbox" role="switch" checked></label>
+        <div class="settingRow"><span><strong>Network activity</strong><small>See every site this tab has contacted</small></span><button class="secondaryBtn" id="networkPanelBtn" type="button">Show</button></div>
+        <div class="settingRow"><span><strong>Password-protected backup</strong><small>Download your chats as an encrypted file</small></span><button class="secondaryBtn" id="exportLockedBtn" type="button">Download</button></div>
         <label class="settingRow"><span><strong>Enter sends</strong><small>Off: Ctrl + Enter sends, Enter adds a line</small></span><input id="enterToSendToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow rangeRow"><span><strong>Text size</strong><small id="fontScaleValue">100%</small></span><input id="fontScaleInput" type="range" min="0.9" max="1.5" step="0.05" value="1"></label>
         <label class="settingRow"><span><strong>Density</strong><small>Space between messages</small></span><select id="densitySelect"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
@@ -443,11 +457,6 @@
   <div class="toastRegion" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
   <div class="srOnly" id="announcer" aria-live="polite" aria-atomic="true"></div>
 
-  <script>
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/chat/sw.js").catch(() => {});
-    }
-  </script>
-  <script type="module" src="/chat/app.js?v=20261018-b18"></script>
+  <script type="module" src="/chat/app.js?v=20261018-b19"></script>
 </body>
 </html>

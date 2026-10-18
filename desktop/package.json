@@ -1,0 +1,28 @@
+{
+  "name": "aui-desktop",
+  "productName": "AUI",
+  "version": "1.0.0",
+  "description": "AUI in its own window. A free AI assistant that runs privately on your device.",
+  "main": "main.js",
+  "author": "AUI",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "io.github.usernam69.aui",
+    "productName": "AUI",
+    "files": ["main.js", "offline.html", "package.json"],
+    "directories": { "buildResources": "build", "output": "dist" },
+    "win": { "target": ["nsis"] },
+    "mac": { "target": ["dmg"], "category": "public.app-category.productivity" },
+    "linux": { "target": ["AppImage"], "category": "Utility" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
+  }
+}

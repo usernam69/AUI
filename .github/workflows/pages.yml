@@ -34,6 +34,13 @@ jobs:
           node-version: 22
       - name: Run tests
         run: node tests/run.mjs
+      - name: Security checks (secrets, links, CSP)
+        run: node scripts/security-check.mjs
+      - name: Render known XSS payloads in a real browser
+        run: |
+          npm i --no-save playwright
+          npx playwright install --with-deps chromium
+          node scripts/xss-check.mjs
       - uses: actions/configure-pages@v5
       - name: Build static site
         run: |

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'">
+  <meta name="theme-color" content="#161b26">
+  <meta name="description" content="What AUI stores, where it goes, and how to control it, in plain language.">
+  <title>AUI privacy</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <script>document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";</script>
+  <style>
+    body { overflow: auto; padding: 40px 16px 80px; }
+    main { max-width: 760px; margin: 0 auto; line-height: 1.7; }
+    h1 { font-size: 30px; margin-bottom: 4px; }
+    h2 { margin-top: 32px; font-size: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
+    td, th { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    a { color: var(--accent); }
+    .back { display: inline-block; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="/chat">← Back to AUI</a>
+    <h1>Privacy</h1>
+    <p style="color:var(--text-secondary)">Short version: the AI runs on your device, your chats stay in your browser, and there are no ads, trackers or analytics.</p>
+
+    <h2>Where your chats go</h2>
+    <ul>
+      <li><strong>Nowhere, by default.</strong> AUI's model runs inside your browser. What you type, the files you attach and the replies never leave your device.</li>
+      <li><strong>Your account, if you sign in.</strong> Signed-in chats, memories and settings sync to your own row in AUI's database (Supabase), which only your account can read. You can switch chat or memory sync off in your profile.</li>
+      <li><strong>Online lookups, only if you turn them on.</strong> The weather, dictionary and Wikipedia lookups send just the place, word or topic to those services.</li>
+    </ul>
+
+    <h2>What is stored on your device</h2>
+    <p>Chats, memories, settings, knowledge files and the downloaded model, all in your browser's own storage. Settings, Privacy can encrypt them with a passphrase, delete old chats automatically, or clear chats when you close the browser. Settings, Model deletes the downloaded model.</p>
+
+    <h2>No tracking</h2>
+    <p>AUI has no analytics, ads or third-party trackers. The visitor counter on the sidebar sends a random ID that changes every day, so no lasting ID about you is stored. It's off when your browser sends Do Not Track or Global Privacy Control, and you can turn it off in Settings, Privacy.</p>
+
+    <h2>Other sites AUI contacts</h2>
+    <table>
+      <tr><th>Site</th><th>Why</th><th>When</th></tr>
+      <tr><td>huggingface.co (and its file CDN)</td><td>The AI model's files</td><td>Once, on the first reply with each model size</td></tr>
+      <tr><td>raw.githubusercontent.com</td><td>The model's compiled runtime</td><td>With the model download</td></tr>
+      <tr><td>cxulgeojkjnskdyoktkj.supabase.co</td><td>Accounts, sync, Beta requests, the visitor counter</td><td>If you sign in or count your visit</td></tr>
+      <tr><td>esm.sh, cdn.jsdelivr.net</td><td>Optional tools: diagrams, the account library, PDF, OCR, image and audio models</td><td>Only when you use those tools</td></tr>
+      <tr><td>api.open-meteo.com, api.dictionaryapi.dev, en.wikipedia.org</td><td>Online lookups</td><td>Only if you turn lookups on</td></tr>
+    </table>
+    <p>Fonts and the formatting libraries are served from AUI itself. Settings, Privacy, Network activity lists every site this tab has contacted, and Offline-only mode blocks everything except the model download.</p>
+
+    <h2>Your rights</h2>
+    <p>Your profile can download all your data, sign you out on every device, or delete your account. For anything else email <a href="mailto:supportaton@gmail.com">supportaton@gmail.com</a>.</p>
+    <p><a href="/security.html">Security</a> · <a href="/accessibility.html">Accessibility</a></p>
+  </main>
+</body>
+</html>
