@@ -1742,8 +1742,12 @@ async function handleChatAction(event) {
 
   switch (button.dataset.messageAction) {
     case "copy":
-      await copyText(message.content);
-      toast("Copied to clipboard");
+      try {
+        await copyText(message.content);
+        toast("Copied to clipboard");
+      } catch {
+        toast("Couldn’t copy the message. Please select it manually.", "error");
+      }
       break;
     case "download":
       downloadMessage(message);

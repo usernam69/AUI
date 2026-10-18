@@ -100,6 +100,11 @@ export function loadSlm(onProgress) {
   return enginePromise;
 }
 
+function discardEngine(engine) {
+  enginePromise = null;
+  Promise.resolve(engine.unload?.()).catch(() => {});
+}
+
 function whenAborted(signal) {
   return new Promise((_, reject) => {
     if (!signal) return;
@@ -132,6 +137,10 @@ export async function* streamSlm(messages, { onProgress, signal } = {}) {
       if (token) yield token;
     }
     if (signal?.aborted) throw abortError();
+  } catch (error) {
+    // A failed engine (e.g. a lost GPU device) stays broken, so build a fresh one next time.
+    if (error?.name !== "AbortError") discardEngine(loaded);
+    throw error;
   } finally {
     signal?.removeEventListener("abort", onAbort);
   }

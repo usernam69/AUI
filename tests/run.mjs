@@ -162,6 +162,27 @@ await test("a failed model download gives a friendly error", async () => {
   const slm = await import(pathToFileURL(file).href);
   await assert.rejects(async () => { for await (const t of slm.streamSlm([], {})) {} }, /Couldn't download the AUI model/);
 });
+await test("a failed generation rebuilds the engine instead of reusing a dead one", async () => {
+  setGpu({ gpu: {} });
+  const flaky = join(sandbox, "flaky-webllm.mjs");
+  writeFileSync(flaky, `
+globalThis.__engines = 0; globalThis.__unloaded = 0;
+export async function CreateMLCEngine() {
+  const n = ++globalThis.__engines;
+  return { interruptGenerate() {}, unload: async () => { globalThis.__unloaded += 1; }, chat: { completions: { async create() {
+    if (n === 1) throw new Error("Device was lost");
+    return (async function* () { yield { choices: [{ delta: { content: "ok" } }] }; })();
+  } } } };
+}`);
+  const file = join(sandbox, "slm-flaky.mjs");
+  writeFileSync(file, readFileSync(join(root, "modules/slm.js"), "utf8").replace(/const ENGINE_SOURCES = \[[\s\S]*?\];/,
+    `const ENGINE_SOURCES = [${JSON.stringify(pathToFileURL(flaky).href)}];`));
+  const slm = await import(pathToFileURL(file).href);
+  assert.match((await collect(slm, {})).error, /Error/);
+  assert.deepEqual((await collect(slm, {})).out, ["ok"], "the next message works without a page reload");
+  assert.equal(globalThis.__engines, 2);
+  assert.equal(globalThis.__unloaded, 1, "the dead engine is released");
+});
 await test("no WebGPU gives a clear error", async () => {
   setGpu({});
   const slm = await freshSlm("nogpu");
