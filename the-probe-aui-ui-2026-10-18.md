@@ -1094,3 +1094,9 @@ Built: 401, 402 (formatting libraries are now cached for offline use), 404, 405,
 Bug fixed along the way: the service worker deleted every other cache on each update, including the downloaded model, so every site update forced a full model re-download. It now only removes its own old caches (covered by a new test).
 Already in AUI: 403, 408, 414, 415 (Wikipedia lookups, 359), 417, 418, 420, 421, 422, 425, 431, 435, 437, 441, 443 (the build has nothing to cache), 449.
 Skipped: 407 (needs a domain and DNS access), 409 and 445 (need the GitHub environment setting changed by the repo owner), 410 (Pages hosts one site per repo, so branch previews would replace the live site), 416 (in-browser image models are 1 to 2 GB and very slow), 419 (would bring back a server), 424 (robots.txt only works at the domain root, outside this repo), 450 (the workflow's link rewriting is tested and now link-checked; a second mechanism adds risk).
+
+### Batch 11 - category 10 (accessibility)
+Built: 451, 456, 457 (axe scan: 5 issues fixed, now 0 violations), 460, 462, 463 (Lexend), 464, 466, 469, 470, 471, 472, 473, 474 (no sideways scrolling at 320 px), 477, 480, 481, 482, 483, 486, 489, 492, 493, 495, 497, 498.
+Already in AUI: 452, 453, 454, 455, 458, 459, 461, 465, 467, 468, 475, 478, 479, 484, 487, 488, 490, 491, 494, 496, 499.
+Skipped: 476 (needs an image model the browser doesn't have), 485 (needs manual NVDA and VoiceOver testing), 500 (moved to a later batch with the CI work).
+Bug fixed: batch 8 broke the Markdown module (a literal line break inside a string), so replies showed as plain text. The syntax test missed it because "node --check" passes typeless ES modules; the test now checks modules properly.

@@ -18,8 +18,16 @@ const walk = dir => readdirSync(dir).flatMap(name => {
   return statSync(full).isDirectory() ? (name === "node_modules" ? [] : walk(full)) : [full];
 });
 await test("all JavaScript files parse", () => {
-  for (const file of walk(root).filter(f => f.endsWith(".js") && !f.includes("/vendor/"))) {
-    execFileSync(process.execPath, ["--check", file]);
+  // "node --check file.js" can pass ES modules with syntax errors when the file has no
+  // module type, so modules are checked through stdin with an explicit module type.
+  for (const file of walk(root).filter(f => f.endsWith(".js") && !/[\\/]vendor[\\/]/.test(f))) {
+    const source = readFileSync(file, "utf8");
+    const isModule = /^\s*(import|export)\s/m.test(source);
+    try {
+      execFileSync(process.execPath, isModule ? ["--input-type=module", "--check"] : ["--check", file], { input: isModule ? source : undefined, stdio: ["pipe", "pipe", "pipe"] });
+    } catch (error) {
+      throw new Error(`${file} does not parse:\n${error.stderr?.toString().split("\n").slice(0, 4).join("\n")}`);
+    }
   }
 });
 

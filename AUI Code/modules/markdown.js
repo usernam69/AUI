@@ -16,14 +16,10 @@ const SANITIZE = { USE_PROFILES: { html: true }, ADD_ATTR: ["target", "rel", "ar
 
 // Index of the last blank line that is not inside a code fence, or -1.
 function stableSplit(text) {
-  let index = text.lastIndexOf("
-
-");
+  let index = text.lastIndexOf("\n\n");
   while (index > 0) {
     if ((text.slice(0, index).match(/^```/gm) || []).length % 2 === 0) return index;
-    index = text.lastIndexOf("
-
-", index - 1);
+    index = text.lastIndexOf("\n\n", index - 1);
   }
   return -1;
 }
@@ -133,8 +129,8 @@ function guessLanguage(source) {
   if (/^\s*(def|class) \w+.*:\s*$/m.test(source) || /^\s*(import \w+|from \w+ import)/m.test(source)) return "python";
   if (/^\s*[{[]/.test(source) && /"\s*:/.test(source)) return "json";
   if (/^\s*<(!doctype|html|div|body|head)/i.test(source)) return "xml";
-  if (/(const|let|function|=>|console\.log)/.test(source)) return "javascript";
-  if (/^\s*(SELECT|INSERT|UPDATE|CREATE TABLE)/im.test(source)) return "sql";
+  if (/\b(const|let|function|=>|console\.log)\b/.test(source)) return "javascript";
+  if (/^\s*(SELECT|INSERT|UPDATE|CREATE TABLE)\b/im.test(source)) return "sql";
   if (/^#!\/bin\/(ba)?sh|^\s*(sudo |npm |git |cd |echo )/m.test(source)) return "bash";
   return "";
 }
@@ -264,6 +260,9 @@ function enhanceRendered(container) {
     const actions = block.querySelector(".codeHeaderActions");
     if (!actions || actions.querySelector("[data-code-lines]")) return;
     const language = (block.dataset.language || block.querySelector(".codeHeader > span")?.textContent || "").toLowerCase();
+    const lines = (block.querySelector("code")?.textContent || "").replace(/\n$/, "").split("\n").length;
+    block.setAttribute("role", "region");
+    block.setAttribute("aria-label", `${language || "Code"} code, ${lines} line${lines === 1 ? "" : "s"}`);
     actions.insertAdjacentHTML("afterbegin", '<button type="button" data-code-lines aria-pressed="false" aria-label="Show line numbers">#</button><button type="button" data-code-download aria-label="Download code">Download</button>');
     if (["html", "xml", "svg", "javascript", "js", "css"].includes(language)) {
       actions.insertAdjacentHTML("afterbegin", '<button type="button" data-code-run aria-label="Run this code in a sandbox">Run</button>');
@@ -328,6 +327,10 @@ function renderCharts(container) {
     const figure = document.createElement("figure");
     figure.className = "miniChart";
     figure.innerHTML = `${spec.title ? `<figcaption>${escapeText(spec.title)}</figcaption>` : ""}<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeText(spec.title || "Chart")}"><line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="var(--border-strong)"/>${marks}${axis}</svg>`;
+    const table = document.createElement("table");
+    table.className = "srOnly";
+    table.innerHTML = `<caption>${escapeText(spec.title || "Chart data")}</caption><tr><th>Label</th><th>Value</th></tr>${values.map((value, index) => `<tr><td>${escapeText(labels[index] || "")}</td><td>${value}</td></tr>`).join("")}`;
+    figure.append(table);
     host.after(figure);
     host.classList.add("hasRendering");
   });

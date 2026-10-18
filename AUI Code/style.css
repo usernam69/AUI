@@ -3480,3 +3480,43 @@
   .factNote::before { content: "ⓘ "; }
   .focusTimer { margin-left: 8px; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 13px; }
 }
+
+/* Accessibility from The Probe (category 10) */
+@layer tokens {
+  /* Solid fills that carry white text need a darker accent to reach 4.5:1 contrast. */
+  :root { --accent-strong: #2563eb; }
+  :root[data-theme="light"] { --accent-strong: #1d4ed8; }
+  :root[data-accent="purple"] { --accent-strong: #6d28d9; }
+  :root[data-accent="teal"] { --accent-strong: #0f766e; }
+  :root[data-accent="green"] { --accent-strong: #15803d; }
+  :root[data-accent="orange"] { --accent-strong: #c2410c; }
+  :root[data-accent="red"] { --accent-strong: #b91c1c; }
+}
+@layer components {
+  .sendBtn, .primaryBtn, .scrollBottomBtn, .selectionAskBtn, .topAvatarBtn, .tagChip[aria-pressed="true"],
+  .sidebarBottom a[href="/beta"] .navHint, .sidebarBottom a[href$="/beta"] .navHint { background: var(--accent-strong); color: #fff; }
+  .sendBtn:not(:disabled):hover { background: color-mix(in srgb, var(--accent-strong) 85%, #000); }
+  .sendBtn:disabled { background: var(--surface-active); color: var(--muted); }
+  .showMoreBtn { color: var(--text); }
+  :root[data-font="lexend"] body { font-family: "Lexend", var(--font-sans); }
+  .chatGroupList { display: grid; }
+  .pauseViewBtn { display: block; margin: 0 auto 6px; padding: 4px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-elevated); color: var(--text-secondary); font-size: 12px; }
+  .pauseViewBtn[hidden] { display: none; }
+  .pauseViewBtn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+  .readingRuler { position: fixed; left: 0; right: 0; height: 28px; z-index: 9990; pointer-events: none; display: none; background: color-mix(in srgb, var(--accent) 12%, transparent); border-block: 1px solid var(--accent-border); }
+  :root[data-ruler="true"] .readingRuler { display: block; }
+  :root[data-line-focus="true"] .assistantMessage .messageContent > * { opacity: 0.35; transition: opacity 150ms; }
+  :root[data-line-focus="true"] .assistantMessage .messageContent > *:hover,
+  :root[data-line-focus="true"] .assistantMessage .messageContent > *:focus-within { opacity: 1; }
+  :root[data-simple-layout="true"] :is(.followUps, .messageMetrics, .sidebarTools, .tagFilterBar, #emojiBtn, #previewBtn, #improveBtn, .contextMeter, #temporaryChatBtn, #shareChatBtn, .exploreBtn, .toolSources, .factNote) { display: none !important; }
+  .shortcutInputs { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; }
+  .shortcutInputs input { width: 2.4em; padding: 3px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); text-align: center; text-transform: uppercase; }
+}
+@media (pointer: coarse) {
+  .miniBtn, .followUpChip, .tagChip, .feedbackBtn, .promptPreset, .showMoreBtn, .versionNav .messageAction { min-height: 44px; min-width: 44px; }
+}
+@media (forced-colors: active) {
+  .userMessage .messageContent, .composer, .followUpChip, .tagChip, .miniBtn, .accentSwatch, .themeSwatch, .chatItem.active { border: 1px solid CanvasText; }
+  .chatItem.isUnread .chatSelectBtn span::after { background: Highlight; }
+  .readingRuler { background: transparent; border-color: Highlight; }
+}

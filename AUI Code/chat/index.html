@@ -30,10 +30,12 @@
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css" integrity="sha384-wH75j6z1lH97ZOpMOInqhgKzFkAInZPPSPlZpYKYTOqsaizPvhQZmAtLcPKXpLyH" crossorigin="anonymous" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="/style.css?v=20261018-b10">
+  <link rel="stylesheet" href="/style.css?v=20261018-b11">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
+  <a class="skipLink" href="#chatArea">Skip to the conversation</a>
+  <a class="skipLink" href="#chatSearchInput">Skip to chat list</a>
 
   <div class="app isEmpty" id="app">
     <aside class="sidebar" id="sidebar" aria-label="Conversation history">
@@ -61,7 +63,7 @@
         <kbd>⌘ /</kbd>
       </label>
 
-      <div class="chatList" id="chatList" role="list"></div>
+      <div class="chatList" id="chatList"></div>
       <div class="chatListSentinel" id="chatListSentinel" aria-hidden="true"></div>
 
       <nav class="sidebarBottom" aria-label="AUI">
@@ -84,6 +86,7 @@
     <div class="sidebarBackdrop" id="sidebarBackdrop" hidden></div>
 
     <main class="main" id="main">
+      <h1 class="srOnly">AUI chat</h1>
       <header class="topBar">
         <div class="topBarStart">
           <button class="iconBtn menuBtn" id="menuBtn" type="button" aria-label="Open sidebar">☰</button>
@@ -108,7 +111,7 @@
       </header>
 
       <section class="chatViewport" id="chatViewport">
-        <div class="chatArea" id="chatArea" role="log" aria-label="Conversation" aria-live="off"></div>
+        <div class="chatArea" id="chatArea" tabindex="-1" role="log" aria-label="Conversation" aria-live="off"></div>
         <button class="scrollBottomBtn" id="scrollBottomBtn" type="button" aria-label="Scroll to latest message" hidden>
           <span aria-hidden="true">↓</span>
           <span>Latest</span>
@@ -218,7 +221,7 @@
           <button type="button" class="accentSwatch" data-accent-choice="red" style="--c:#ef4444" aria-label="Red"></button>
           <select id="accentSelect" hidden><option>blue</option><option>purple</option><option>teal</option><option>green</option><option>orange</option><option>red</option></select>
         </div></div>
-        <label class="settingRow"><span><strong>Font</strong><small>Readable is designed for easier reading</small></span><select id="fontSelect"><option value="system">System</option><option value="serif">Serif</option><option value="mono">Monospace</option><option value="readable">Readable (Atkinson Hyperlegible)</option></select></label>
+        <label class="settingRow"><span><strong>Font</strong><small>Readable is designed for easier reading</small></span><select id="fontSelect"><option value="system">System</option><option value="serif">Serif</option><option value="mono">Monospace</option><option value="readable">Readable (Atkinson Hyperlegible)</option><option value="lexend">Lexend (designed for easier reading)</option></select></label>
         <label class="settingRow rangeRow"><span><strong>Font weight</strong><small>Lighter or bolder reply text</small></span><input id="fontWeightInput" type="range" min="300" max="600" step="100" value="400"></label>
         <label class="settingRow"><span><strong>Line spacing</strong><small>Space between lines in replies</small></span><select id="lineHeightSelect"><option value="tight">Tight</option><option value="comfortable">Comfortable</option><option value="relaxed">Relaxed</option></select></label>
         <label class="settingRow"><span><strong>Content width</strong><small>How wide the conversation column is</small></span><select id="contentWidthSelect"><option value="narrow">Narrow</option><option value="normal">Normal</option><option value="wide">Wide</option></select></label>
@@ -227,13 +230,19 @@
         <label class="settingRow"><span><strong>Icons</strong><small>Line thickness of icons</small></span><select id="iconWeightSelect"><option value="regular">Regular</option><option value="bold">Bold</option></select></label>
         <label class="settingRow"><span><strong>Seasonal touches</strong><small>Snow in December, leaves in autumn</small></span><input id="seasonalToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow"><span><strong>Celebrations</strong><small>Small sparkles for milestones</small></span><input id="effectsToggle" type="checkbox" role="switch" checked></label>
+        <label class="settingRow"><span><strong>Reading voice</strong><small>Voice used when AUI reads aloud</small></span><select id="voiceSelect"><option value="">Default voice</option></select></label>
+        <label class="settingRow"><span><strong>Simple language</strong><small>Ask AUI to use plain words and short sentences</small></span><input id="simpleLanguageToggle" type="checkbox" role="switch"></label>
+        <label class="settingRow"><span><strong>Simple layout</strong><small>Hide extra buttons and stats to reduce clutter</small></span><input id="simpleLayoutToggle" type="checkbox" role="switch"></label>
+        <label class="settingRow"><span><strong>Focus on one paragraph</strong><small>Dim the rest of a reply while you read</small></span><input id="lineFocusToggle" type="checkbox" role="switch"></label>
+        <label class="settingRow"><span><strong>Reading ruler</strong><small>A band that follows your pointer to help track lines</small></span><input id="readingRulerToggle" type="checkbox" role="switch"></label>
+        <div class="settingRow"><span><strong>Shortcut keys</strong><small>Letter used with Ctrl/⌘ for new chat, search and settings</small></span><span class="shortcutInputs"><label>New chat <input id="shortcutNewChatInput" maxlength="1" size="2"></label><label>Search <input id="shortcutSearchInput" maxlength="1" size="2"></label><label>Settings <input id="shortcutSettingsInput" maxlength="1" size="2"></label></span></div>
         <label class="settingRow"><span><strong>Composer counter</strong><small>What the counter under the message box shows</small></span><select id="counterSelect"><option value="words">Words</option><option value="characters">Characters</option><option value="tokens">Estimated tokens</option></select></label>
         <label class="settingRow"><span><strong>Message box style</strong><small>Rounded pill or a flat box</small></span><select id="composerStyleSelect"><option value="pill">Pill</option><option value="flat">Flat</option></select></label>
         <label class="settingRow"><span><strong>Spell check</strong><small>Underline misspelled words while you type</small></span><input id="spellcheckToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow"><span><strong>Send after dictation</strong><small>Send automatically when voice input stops</small></span><input id="voiceAutoSendToggle" type="checkbox" role="switch"></label>
         <label class="settingRow"><span><strong>Typing sounds</strong><small>Soft clicks as you type</small></span><input id="typingSoundToggle" type="checkbox" role="switch"></label>
         <label class="settingRow"><span><strong>Enter sends</strong><small>Off: Ctrl + Enter sends, Enter adds a line</small></span><input id="enterToSendToggle" type="checkbox" role="switch" checked></label>
-        <label class="settingRow rangeRow"><span><strong>Text size</strong><small id="fontScaleValue">100%</small></span><input id="fontScaleInput" type="range" min="0.9" max="1.3" step="0.05" value="1"></label>
+        <label class="settingRow rangeRow"><span><strong>Text size</strong><small id="fontScaleValue">100%</small></span><input id="fontScaleInput" type="range" min="0.9" max="1.5" step="0.05" value="1"></label>
         <label class="settingRow"><span><strong>Density</strong><small>Space between messages</small></span><select id="densitySelect"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
         <label class="settingRow"><span><strong>Notify when done</strong><small>Browser notification if AUI finishes in a background tab</small></span><input id="notifyToggle" type="checkbox" role="switch"></label>
         <label class="settingRow"><span><strong>Finish sound</strong><small>Soft chime when a reply finishes</small></span><input id="soundToggle" type="checkbox" role="switch"></label>
@@ -407,6 +416,6 @@
       navigator.serviceWorker.register("/chat/sw.js").catch(() => {});
     }
   </script>
-  <script type="module" src="/chat/app.js?v=20261018-b10"></script>
+  <script type="module" src="/chat/app.js?v=20261018-b11"></script>
 </body>
 </html>

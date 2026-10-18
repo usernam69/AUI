@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b10";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b11";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b10";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b10";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b10";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b10";
+} from "../modules/uploads.js?v=20261018-b11";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b11";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b11";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b11";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -333,8 +333,18 @@ function getGreeting(date = new Date()) {
 // Delayed custom tooltips: native titles appear instantly-ish and can't be styled.
 function setupTooltips() {
   const tip = element("div", "uiTooltip");
-  tip.setAttribute("role", "tooltip");
+  tip.setAttribute("aria-hidden", "true");
   document.body.append(tip);
+  document.addEventListener("focusin", event => {
+    const target = event.target.closest?.(".composerToolbar [title], .topBar [title], .composerToolbar [data-tip], .topBar [data-tip]");
+    if (!target || !target.matches(":focus-visible")) return;
+    tip.textContent = target.getAttribute("title") || target.dataset.tip;
+    const box = target.getBoundingClientRect();
+    tip.style.left = `${Math.round(box.left + box.width / 2)}px`;
+    tip.style.top = `${Math.round(box.top - 8)}px`;
+    tip.classList.add("visible");
+  });
+  document.addEventListener("focusout", () => tip.classList.remove("visible"));
   let timer = null;
   const hide = () => {
     clearTimeout(timer);
@@ -413,8 +423,21 @@ function setupSelectionAsk() {
   button.textContent = "Ask AUI";
   button.hidden = true;
   document.body.append(button);
+  const readButton = element("button", "selectionAskBtn selectionReadBtn");
+  readButton.type = "button";
+  readButton.textContent = "Read aloud";
+  readButton.hidden = true;
+  document.body.append(readButton);
+  readButton.addEventListener("click", () => {
+    readSelectionAloud(quoted);
+    readButton.hidden = true;
+    button.hidden = true;
+  });
   let quoted = "";
-  const hide = () => { button.hidden = true; };
+  const hide = () => {
+    button.hidden = true;
+    document.querySelectorAll(".selectionReadBtn").forEach(item => { item.hidden = true; });
+  };
   DOM.chatArea.addEventListener("mouseup", () => {
     setTimeout(() => {
       const selection = window.getSelection();
@@ -423,12 +446,15 @@ function setupSelectionAsk() {
       if (!text || !inReply || text.length > 2000) return hide();
       quoted = text;
       const box = selection.getRangeAt(0).getBoundingClientRect();
-      button.style.left = `${Math.round(box.left + box.width / 2)}px`;
+      button.style.left = `${Math.round(box.left + box.width / 2) - 52}px`;
       button.style.top = `${Math.round(box.top - 10)}px`;
       button.hidden = false;
+      readButton.style.left = `${Math.round(box.left + box.width / 2) + 52}px`;
+      readButton.style.top = `${Math.round(box.top - 10)}px`;
+      readButton.hidden = false;
     });
   });
-  document.addEventListener("pointerdown", event => { if (event.target !== button) hide(); });
+  document.addEventListener("pointerdown", event => { if (!event.target.closest?.(".selectionAskBtn")) hide(); });
   DOM.chatViewport.addEventListener("scroll", hide, { passive: true });
   button.addEventListener("click", () => {
     const quote = quoted.split("\n").map(line => `> ${line}`).join("\n");
@@ -523,6 +549,7 @@ function setupQuickWins() {
 // --- ChatGPT-style layout polish from The Probe (category 2) ---
 
 const SETTINGS_TABS = [
+  ["accessibility", "Accessibility", ["voiceSelect", "simpleLanguageToggle", "simpleLayoutToggle", "lineFocusToggle", "readingRulerToggle", "shortcutNewChatInput"]],
   ["general", "General", ["enterToSendToggle", "counterSelect", "composerStyleSelect", "spellcheckToggle", "voiceAutoSendToggle", "typingSoundToggle", "timestampsToggle", "autoScrollToggle", "notifyToggle", "soundToggle"]],
   ["appearance", "Appearance", ["themeSelect", "themeSwatches", "accentSwatches", "fontSelect", "fontWeightInput", "lineHeightSelect", "contentWidthSelect", "bubbleSelect", "bubbleColorInput", "iconWeightSelect", "fontScaleInput", "densitySelect", "seasonalToggle", "effectsToggle"]],
   ["personal", "Personalization", ["answerLengthSelect", "onlineLookupsToggle", "speedSelect", "perfBtn", "backgroundDownloadToggle", "unloadIdleToggle", "customInstructionsInput", "aiTitlesToggle", "memoryToggle", "markdownToggle", "voiceOutputToggle", "speechRateInput"]],
@@ -807,13 +834,18 @@ function applyAppearance() {
   root.dataset.iconWeight = appearanceSetting("iconWeight");
   root.dataset.effects = String(appearanceSetting("effects"));
   root.dataset.composerStyle = state.settings.composerStyle || "pill";
+  applyAccessibilityPrefs();
   root.style.setProperty("--chat-weight", String(Number(appearanceSetting("fontWeight")) || 400));
   if (appearanceSetting("bubble") === "custom") root.style.setProperty("--bubble-custom", appearanceSetting("bubbleColor"));
-  if (appearanceSetting("font") === "readable" && !readableFontLoaded) {
+  const fontUrl = {
+    readable: "https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap",
+    lexend: "https://fonts.googleapis.com/css2?family=Lexend:wght@300..600&display=swap"
+  }[appearanceSetting("font")];
+  if (fontUrl && !document.querySelector(`link[href="${fontUrl}"]`)) {
     readableFontLoaded = true;
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap";
+    link.href = fontUrl;
     document.head.append(link);
   }
   applySeasonalEffects();
@@ -1037,6 +1069,7 @@ function decorateChatItem(item, chat, query) {
   if (chat.color) item.style.setProperty("--chat-color", chat.color);
   item.classList.toggle("hasColor", Boolean(chat.color));
   item.classList.toggle("isUnread", Boolean(chat.unread) && chat.id !== state.currentChatId);
+  if (chat.unread && chat.id !== state.currentChatId) open?.setAttribute("aria-label", `${chat.title}, new reply`);
   item.classList.toggle("isLocked", Boolean(chat.lock));
   if (open && !chat.lock) {
     const firstUser = chat.messages.find(message => message.role === "user");
@@ -1550,11 +1583,15 @@ function setupSidebarResize() {
   handle.setAttribute("role", "separator");
   handle.setAttribute("aria-orientation", "vertical");
   handle.setAttribute("aria-label", "Resize sidebar");
+  handle.setAttribute("aria-valuemin", "220");
+  handle.setAttribute("aria-valuemax", "420");
+  handle.setAttribute("aria-valuenow", String(Math.round(DOM.sidebar.getBoundingClientRect().width) || 260));
   handle.tabIndex = 0;
   DOM.sidebar.append(handle);
   const setWidth = width => {
     const clamped = Math.max(220, Math.min(420, Math.round(width)));
     document.documentElement.style.setProperty("--sidebar-width", `${clamped}px`);
+    handle.setAttribute("aria-valuenow", String(clamped));
     try { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(clamped)); } catch {}
   };
   handle.addEventListener("pointerdown", event => {
@@ -2411,7 +2448,7 @@ function speakWithHighlight(message, button, article) {
     nodes.push({ node: walker.currentNode, start: text.length });
     text += walker.currentNode.nodeValue;
   }
-  const utterance = new SpeechSynthesisUtterance(text);
+  const utterance = pickVoice(new SpeechSynthesisUtterance(text));
   utterance.rate = Number(state.settings.speechRate) || 1;
   utterance.onboundary = event => {
     if (event.name && event.name !== "word") return;
@@ -2938,6 +2975,93 @@ async function deleteDownloadedModels() {
   renderStorageMeter();
 }
 
+// --- Accessibility from The Probe (category 10) ---
+
+function shortcutKey(name) {
+  const defaults = { newChat: "k", search: "/", settings: "," };
+  const value = String(state.settings[`shortcut_${name}`] || defaults[name]).toLowerCase();
+  return value.length === 1 ? value : defaults[name];
+}
+
+// Mark messages in right-to-left scripts so screen readers and layout use the right language.
+function detectLanguage(text) {
+  const sample = String(text || "").slice(0, 400);
+  const hebrew = (sample.match(/[֐-׿]/g) || []).length;
+  const arabic = (sample.match(/[؀-ۿ]/g) || []).length;
+  const latin = (sample.match(/[A-Za-z]/g) || []).length;
+  if (hebrew > latin) return { lang: "he", dir: "rtl" };
+  if (arabic > latin) return { lang: "ar", dir: "rtl" };
+  return null;
+}
+
+let streamViewPaused = false;
+function setStreamViewPaused(paused) {
+  streamViewPaused = paused;
+  const button = byId("pauseViewBtn");
+  if (button) {
+    button.textContent = paused ? "Resume" : "Pause";
+    button.setAttribute("aria-pressed", String(paused));
+  }
+  if (!paused) {
+    const streaming = getChat()?.messages.find(message => message.status === "streaming");
+    if (streaming) scheduleStreamingRender(streaming);
+  }
+}
+
+function updatePauseButton() {
+  let button = byId("pauseViewBtn");
+  if (!button) {
+    button = element("button", "pauseViewBtn");
+    button.id = "pauseViewBtn";
+    button.type = "button";
+    button.title = "Pause the text on screen while AUI keeps writing";
+    button.addEventListener("click", () => setStreamViewPaused(!streamViewPaused));
+    byId("composerDock").prepend(button);
+  }
+  button.hidden = !state.loading;
+  if (!state.loading && streamViewPaused) setStreamViewPaused(false);
+}
+
+function setupReadingAids() {
+  const ruler = element("div", "readingRuler");
+  ruler.setAttribute("aria-hidden", "true");
+  document.body.append(ruler);
+  document.addEventListener("pointermove", event => {
+    if (document.documentElement.dataset.ruler === "true") ruler.style.top = `${event.clientY - 14}px`;
+  }, { passive: true });
+}
+
+function applyAccessibilityPrefs() {
+  const root = document.documentElement;
+  root.dataset.ruler = String(Boolean(state.settings.readingRuler));
+  root.dataset.lineFocus = String(Boolean(state.settings.lineFocus));
+  root.dataset.simpleLayout = String(Boolean(state.settings.simpleLayout));
+}
+
+function populateVoices() {
+  const select = byId("voiceSelect");
+  if (!select || !("speechSynthesis" in window)) return;
+  const voices = speechSynthesis.getVoices();
+  const current = state.settings.voiceName || "";
+  select.innerHTML = `<option value="">Default voice</option>${voices.map(voice => `<option value="${escapeHtml(voice.name)}">${escapeHtml(voice.name)} (${escapeHtml(voice.lang)})</option>`).join("")}`;
+  select.value = voices.some(voice => voice.name === current) ? current : "";
+}
+
+function pickVoice(utterance) {
+  const name = state.settings.voiceName;
+  const voice = name && speechSynthesis.getVoices().find(item => item.name === name);
+  if (voice) utterance.voice = voice;
+  return utterance;
+}
+
+function readSelectionAloud(text) {
+  if (!("speechSynthesis" in window)) return toast("Reading aloud isn't supported in this browser.", "error");
+  speechSynthesis.cancel();
+  const utterance = pickVoice(new SpeechSynthesisUtterance(text));
+  utterance.rate = Number(state.settings.speechRate) || 1;
+  speechSynthesis.speak(utterance);
+}
+
 let appInitialized = false;
 
 if (document.readyState === "loading") {
@@ -2979,6 +3103,8 @@ async function init() {
   setupComposerExtras();
   DOM.chatArea.addEventListener("dblclick", showDefinition);
   setupIdleUnload();
+  setupReadingAids();
+  if ("speechSynthesis" in window) speechSynthesis.addEventListener?.("voiceschanged", populateVoices);
   setupInstallPrompt();
   setupUpdateChecks();
   setupFileHandling();
@@ -3409,7 +3535,7 @@ function bindEvents() {
   byId("speedSelect").addEventListener("change", saveSettingsFromDialog);
   byId("perfBtn").addEventListener("click", openPerformancePanel);
   byId("deleteModelsBtn").addEventListener("click", deleteDownloadedModels);
-  ["counterSelect", "composerStyleSelect", "spellcheckToggle", "voiceAutoSendToggle", "typingSoundToggle", "backgroundDownloadToggle", "unloadIdleToggle", "answerLengthSelect", "onlineLookupsToggle"].forEach(id => byId(id).addEventListener("change", saveSettingsFromDialog));
+  ["counterSelect", "composerStyleSelect", "spellcheckToggle", "voiceAutoSendToggle", "typingSoundToggle", "backgroundDownloadToggle", "unloadIdleToggle", "answerLengthSelect", "onlineLookupsToggle", "voiceSelect", "simpleLanguageToggle", "simpleLayoutToggle", "lineFocusToggle", "readingRulerToggle", "shortcutNewChatInput", "shortcutSearchInput", "shortcutSettingsInput"].forEach(id => byId(id).addEventListener("change", saveSettingsFromDialog));
   byId("customInstructionsInput").addEventListener("change", saveSettingsFromDialog);
   byId("autoScrollToggle").addEventListener("change", saveSettingsFromDialog);
   byId("memoryToggle").addEventListener("change", saveSettingsFromDialog);
@@ -3744,6 +3870,7 @@ async function sendMessage(options = {}) {
 
   checkpointMessages({ immediate: true });
   renderMessages({ focusMessageId: assistantMessage.id });
+  updatePauseButton();
   announce(`Generating with ${MODEL_NAMES[requestModel] || requestModel}`);
 
   let loadingShown = false;
@@ -3849,6 +3976,8 @@ async function sendMessage(options = {}) {
     renderMessages({ focusMessageId: assistantMessage.id, preserveScroll: userPausedScroll });
     renderFollowUps();
     updateContextMeter();
+    updatePauseButton();
+    if (assistantMessage.status === "complete") announce("AUI finished replying");
     if (messageQueue.length) setTimeout(sendQueuedMessage, 400);
     if (assistantMessage.status === "complete") {
       notifyReplyFinished(assistantMessage);
@@ -3874,6 +4003,7 @@ function buildSlmSystemPrompt() {
       + "You can't browse the web or see images; use any verified information the user's message includes.",
     `Today is ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}, ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} (${Intl.DateTimeFormat().resolvedOptions().timeZone}).`,
     { short: "Keep answers brief: a few sentences.", medium: "Keep answers fairly short.", long: "Give thorough, detailed answers." }[state.settings.answerLength || "medium"],
+    state.settings.simpleLanguage ? "Use plain, simple words and short sentences, like for a 10-year-old." : "",
     "Answer clearly and directly."
   ];
   const custom = String(state.settings.customInstructions || "").trim();
@@ -3988,7 +4118,7 @@ function stopGeneration() {
 }
 
 function scheduleStreamingRender(message) {
-  if (renderFrame || renderTimer) return;
+  if (streamViewPaused || renderFrame || renderTimer) return;
   const elapsed = performance.now() - lastStreamingPaint;
   const interval = message.content.length > 12_000
     ? 220
@@ -4387,6 +4517,11 @@ function createMessageElement(message, index, { animate = true } = {}) {
   }
 
   const body = element("div", "messageContent");
+  const script = detectLanguage(message.content);
+  if (script) {
+    body.lang = script.lang;
+    body.dir = script.dir;
+  }
   if (message.tldr && !message.tldrHidden) {
     const tldr = element("div", "tldrBox");
     tldr.innerHTML = `<strong>TL;DR</strong> ${escapeHtml(message.tldr)}`;
@@ -4578,7 +4713,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b10");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b11");
   return markdownModulePromise;
 }
 
@@ -4840,7 +4975,7 @@ function toggleSpeech(message, button) {
     return;
   }
   if (speakWithHighlight(message, button, button.closest("[data-message-id]"))) return;
-  const utterance = new SpeechSynthesisUtterance(stripMarkdown(message.content));
+  const utterance = pickVoice(new SpeechSynthesisUtterance(stripMarkdown(message.content)));
   utterance.rate = Number(state.settings.speechRate) || 1;
   utterance.onend = utterance.onerror = () => { button.textContent = "Read"; };
   button.textContent = "Stop";
@@ -4958,8 +5093,12 @@ function createChatGroup(label, chats) {
   const group = element("section", "chatGroup");
   const heading = element("h2", "chatGroupTitle");
   heading.textContent = label;
-  group.append(heading);
-  chats.forEach(chat => group.append(createChatItem(chat)));
+  heading.id = `chat-group-${slugify(label) || "group"}-${Math.random().toString(36).slice(2, 7)}`;
+  group.setAttribute("aria-labelledby", heading.id);
+  const list = element("div", "chatGroupList");
+  list.setAttribute("role", "list");
+  chats.forEach(chat => list.append(createChatItem(chat)));
+  group.append(heading, list);
   return group;
 }
 
@@ -5059,7 +5198,17 @@ async function handleChatListAction(event) {
       persistChatChange();
       renderChats();
       renderMessages();
-      toast(chat.archived ? "Chat archived. Find it in Settings, Data controls." : "Chat unarchived");
+      toast(chat.archived ? "Chat archived" : "Chat unarchived", "success", chat.archived ? {
+        label: "Undo",
+        duration: 8000,
+        onClick: () => {
+          chat.archived = false;
+          state.currentChatId = chat.id;
+          persistChatChange();
+          renderChats();
+          renderMessages();
+        }
+      } : null);
       break;
     case "export":
       exportChatMarkdown(chat);
@@ -5720,6 +5869,14 @@ function openSettings() {
   byId("typingSoundToggle").checked = Boolean(state.settings.typingSound);
   byId("backgroundDownloadToggle").checked = Boolean(state.settings.backgroundDownload);
   byId("answerLengthSelect").value = state.settings.answerLength || "medium";
+  populateVoices();
+  byId("simpleLanguageToggle").checked = Boolean(state.settings.simpleLanguage);
+  byId("simpleLayoutToggle").checked = Boolean(state.settings.simpleLayout);
+  byId("lineFocusToggle").checked = Boolean(state.settings.lineFocus);
+  byId("readingRulerToggle").checked = Boolean(state.settings.readingRuler);
+  byId("shortcutNewChatInput").value = shortcutKey("newChat").toUpperCase();
+  byId("shortcutSearchInput").value = shortcutKey("search");
+  byId("shortcutSettingsInput").value = shortcutKey("settings");
   byId("onlineLookupsToggle").checked = Boolean(state.settings.onlineLookups);
   byId("unloadIdleToggle").checked = state.settings.unloadWhenIdle !== false;
   byId("customInstructionsInput").value = state.settings.customInstructions || "";
@@ -5751,6 +5908,18 @@ function saveSettingsFromDialog() {
   if (state.settings.answerLength !== byId("answerLengthSelect").value) systemPromptSnapshots.clear();
   state.settings.answerLength = byId("answerLengthSelect").value;
   state.settings.onlineLookups = byId("onlineLookupsToggle").checked;
+  state.settings.voiceName = byId("voiceSelect").value;
+  if (Boolean(state.settings.simpleLanguage) !== byId("simpleLanguageToggle").checked) systemPromptSnapshots.clear();
+  state.settings.simpleLanguage = byId("simpleLanguageToggle").checked;
+  state.settings.simpleLayout = byId("simpleLayoutToggle").checked;
+  state.settings.lineFocus = byId("lineFocusToggle").checked;
+  state.settings.readingRuler = byId("readingRulerToggle").checked;
+  ["NewChat", "Search", "Settings"].forEach(name => {
+    const value = byId(`shortcut${name}Input`).value.trim().toLowerCase();
+    const key = `shortcut_${name[0].toLowerCase()}${name.slice(1)}`;
+    if (value.length === 1) state.settings[key] = value;
+  });
+  applyAccessibilityPrefs();
   state.settings.unloadWhenIdle = byId("unloadIdleToggle").checked;
   DOM.input.spellcheck = state.settings.spellcheck;
   updateComposerState();
@@ -6850,16 +7019,16 @@ function handleGlobalShortcut(event) {
   }
 
   const command = event.metaKey || event.ctrlKey;
-  if (command && event.key.toLowerCase() === "k") {
+  if (command && event.key.toLowerCase() === shortcutKey("newChat")) {
     event.preventDefault();
     createChat();
   }
-  if (command && event.key === "/") {
+  if (command && event.key.toLowerCase() === shortcutKey("search")) {
     event.preventDefault();
     openMobileSidebar();
     DOM.chatSearchInput.focus();
   }
-  if (command && event.key === ",") {
+  if (command && event.key.toLowerCase() === shortcutKey("settings")) {
     event.preventDefault();
     openSettings();
     return;
@@ -7352,6 +7521,7 @@ function addRipple(event) {
 
 function toast(message, type = "success", action = null) {
   const item = element("div", `toast ${type}`);
+  if (type === "error") item.setAttribute("role", "alert");
   item.textContent = message;
   const dismiss = () => {
     item.classList.remove("visible");
