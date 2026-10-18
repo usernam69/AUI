@@ -30,7 +30,7 @@ jobs:
           mkdir -p ../_site
           cp -r . ../_site
           cd ../_site
-          rm -rf api supabase scripts package.json pnpm-lock.yaml vercel.json
+          rm -rf supabase scripts package.json pnpm-lock.yaml
           # Project pages are served from /AUI/, so prefix root-absolute links
           find . -name '*.html' -exec sed -i -E 's#(src|href|content)="/([^/"][^"]*)?"#\1="/AUI/\2"#g' {} +
           # The service worker is registered from an inline script in chat/index.html
