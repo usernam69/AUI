@@ -2772,13 +2772,6 @@
     }
 
     .charCount,
-    #modeSelect {
-      display: none;
-    }
-
-    .selectWrap:has(#modeSelect) {
-      display: none;
-    }
 
     .modelSelectWrap select {
       max-width: 108px;
@@ -3207,4 +3200,105 @@
 }
 @layer components {
   .newChatBtn, .exploreBtn { font-size: 14px; }
+}
+
+/* Appearance from The Probe (category 3) */
+@layer tokens {
+  :root {
+    --info: #4f8cff;
+    --warning: #f5a524;
+    --radius-dialog: 20px;
+  }
+  :root[data-accent="purple"] { --accent: #8b5cf6; --accent-hover: #7c4dee; --accent-soft: rgb(139 92 246 / 0.14); --accent-border: rgb(139 92 246 / 0.35); --bubble: linear-gradient(135deg, #8b5cf6, #6d3fe0); }
+  :root[data-accent="teal"] { --accent: #14b8a6; --accent-hover: #0f9f8f; --accent-soft: rgb(20 184 166 / 0.14); --accent-border: rgb(20 184 166 / 0.35); --bubble: linear-gradient(135deg, #14b8a6, #0d8f82); }
+  :root[data-accent="green"] { --accent: #22c55e; --accent-hover: #16a34a; --accent-soft: rgb(34 197 94 / 0.14); --accent-border: rgb(34 197 94 / 0.35); --bubble: linear-gradient(135deg, #22c55e, #15803d); }
+  :root[data-accent="orange"] { --accent: #f97316; --accent-hover: #ea580c; --accent-soft: rgb(249 115 22 / 0.14); --accent-border: rgb(249 115 22 / 0.35); --bubble: linear-gradient(135deg, #f97316, #d4560a); }
+  :root[data-accent="red"] { --accent: #ef4444; --accent-hover: #dc2626; --accent-soft: rgb(239 68 68 / 0.14); --accent-border: rgb(239 68 68 / 0.35); --bubble: linear-gradient(135deg, #ef4444, #c62828); }
+  :root[data-theme="light"][data-accent="green"] { --accent: #15803d; }
+  :root[data-theme="light"][data-accent="orange"] { --accent: #c2410c; }
+  :root[data-theme="light"][data-accent="teal"] { --accent: #0f766e; }
+
+  :root[data-palette="ocean"] { --bg: #0c1f24; --bg-elevated: #10282f; --sidebar: #081619; --surface: #143640; --surface-raised: #143640; --surface-hover: #11303a; --surface-active: #1a4250; --border: #1d4552; --border-strong: #275a6a; --text: #e3f4f7; --text-secondary: #a3c9d1; --muted: #78a1aa; }
+  :root[data-palette="midnight"] { --bg: #0a0d18; --bg-elevated: #0f1322; --sidebar: #06080f; --surface: #151b30; --surface-raised: #151b30; --surface-hover: #121829; --surface-active: #1c2440; --border: #1d2540; --border-strong: #2a3458; --text: #e6e9f5; --text-secondary: #a4abc7; --muted: #767ea0; }
+  :root[data-palette="oled"] { --bg: #000; --bg-elevated: #070707; --sidebar: #000; --surface: #111; --surface-raised: #111; --surface-hover: #0c0c0c; --surface-active: #1a1a1a; --border: #1f1f1f; --border-strong: #2e2e2e; --text: #f2f2f2; --text-secondary: #b8b8b8; --muted: #8a8a8a; }
+  :root[data-palette="sky"] { --bg: #eef6ff; --bg-elevated: #fff; --sidebar: #e2efff; --surface: #d9eaff; --surface-raised: #d9eaff; --surface-hover: #cfe3fd; --surface-active: #c1dafb; --border: #c9dcf5; --border-strong: #adc6ea; --text: #0b1b33; --text-secondary: #3f5677; --muted: #5f7392; }
+  :root[data-palette="sepia"] { --bg: #f4ecd8; --bg-elevated: #faf4e6; --sidebar: #ece1c6; --surface: #e8dcc0; --surface-raised: #e8dcc0; --surface-hover: #e2d4b4; --surface-active: #d8c8a4; --border: #d9c9a6; --border-strong: #c6b28a; --text: #3b2f20; --text-secondary: #5f4f3a; --muted: #7a6a52; }
+}
+
+@layer components {
+  :root[data-font="serif"] body { font-family: Georgia, "Iowan Old Style", "Times New Roman", serif; }
+  :root[data-font="mono"] body { font-family: var(--font-mono); }
+  :root[data-font="readable"] body { font-family: "Atkinson Hyperlegible", var(--font-sans); }
+  .assistantMessage .messageContent { font-weight: var(--chat-weight, 400); }
+  :root[data-line-height="tight"] .assistantMessage .messageContent { line-height: 1.5; }
+  :root[data-line-height="relaxed"] .assistantMessage .messageContent { line-height: 2; }
+  :root[data-content-width="narrow"] { --content-width: 640px; }
+  :root[data-content-width="wide"] { --content-width: 980px; }
+  :root[data-bubble="flat"] { --bubble: var(--surface); --bubble-text: var(--text); }
+  :root[data-bubble="custom"] { --bubble: var(--bubble-custom, #2f6df0); --bubble-text: #fff; }
+  :root[data-icon-weight="bold"] .uiIcon { stroke-width: 2.6; }
+
+  .brandMark, .emptyBrand { background-size: 200% 200%; animation: logoShift 8s ease-in-out infinite; }
+  @keyframes logoShift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+  .landingBot { width: 64px; height: 64px; color: #fff; }
+  .landingBot svg { display: block; }
+  .sidebar { background: linear-gradient(180deg, color-mix(in srgb, var(--sidebar) 92%, var(--accent)) 0%, var(--sidebar) 40%); }
+  .app.isEmpty .chatViewport {
+    background-image: radial-gradient(circle at 20% 30%, color-mix(in srgb, var(--accent) 30%, transparent) 0 1px, transparent 1.5px),
+      radial-gradient(circle at 70% 60%, color-mix(in srgb, var(--text) 18%, transparent) 0 1px, transparent 1.5px),
+      radial-gradient(circle at 40% 80%, color-mix(in srgb, var(--accent) 22%, transparent) 0 1px, transparent 1.5px);
+    background-size: 140px 140px, 190px 190px, 230px 230px;
+  }
+  #messageInput { caret-color: var(--accent); }
+  *:hover::-webkit-scrollbar-thumb { background-color: color-mix(in srgb, var(--accent) 45%, var(--border-strong)); }
+  .dialogPanel { border-radius: var(--radius-dialog); }
+  .toast.warning { border-color: var(--warning); }
+  .toast.info { border-color: var(--info); }
+
+  .sendBtn.justSent .uiIcon { animation: sendFly 420ms var(--ease-out); }
+  @keyframes sendFly { 0% { transform: none; } 45% { transform: translateY(-14px); opacity: 0; } 46% { transform: translateY(12px); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  .particle { position: fixed; z-index: 10001; width: 7px; height: 7px; border-radius: 50%; pointer-events: none; animation: particleOut 850ms var(--ease-out) forwards; }
+  @keyframes particleOut { from { transform: translate(-50%, -50%) scale(1); opacity: 1; } to { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.3); opacity: 0; } }
+  .topProgress { position: fixed; z-index: 10002; top: 0; left: 0; width: 100%; height: 3px; background: var(--accent); transform-origin: left; transform: scaleX(0); opacity: 0; transition: transform 300ms linear, opacity 300ms; pointer-events: none; }
+  .topProgress.visible { opacity: 1; }
+
+  .seasonalLayer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+  .app:not(.isEmpty) .seasonalLayer { display: none; }
+  .seasonalLayer span { position: absolute; top: -24px; font-size: 14px; opacity: 0.55; animation: fall linear infinite; }
+  @keyframes fall { to { transform: translateY(110vh) rotate(260deg); } }
+  .chatViewport { position: relative; }
+
+  .swatchRow { display: flex; flex-wrap: wrap; gap: 8px; }
+  .themeSwatch { padding: 18px 10px 6px; min-width: 72px; border: 2px solid var(--border); border-radius: 12px; background: linear-gradient(180deg, var(--a) 55%, var(--b) 55%); color: transparent; font-size: 11px; font-weight: 600; position: relative; }
+  .themeSwatch::after { content: attr(data-theme-choice); position: absolute; left: 0; right: 0; bottom: -18px; color: var(--muted); text-transform: capitalize; }
+  .swatchRow:has(.themeSwatch) { padding-bottom: 18px; row-gap: 26px; }
+  .themeSwatch[aria-pressed="true"], .accentSwatch[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+  .accentSwatch { width: 26px; height: 26px; border: 2px solid transparent; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 2px var(--bg); }
+
+  /* Navy-tinted code colors */
+  .codeBlock pre, .codeBlock code.hljs { background: #0e1422; }
+  .hljs-keyword, .hljs-built_in { color: #7ab0ff; }
+  .hljs-string { color: #9ee6a8; }
+  .hljs-number, .hljs-literal { color: #f5b971; }
+  .hljs-comment { color: #6c7a96; font-style: italic; }
+  .hljs-title, .hljs-title.function_ { color: #c4a7ff; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brandMark, .emptyBrand, .seasonalLayer span, .particle { animation: none !important; }
+}
+
+/* Contrast audit (#138): muted text and blue links reach WCAG AA 4.5:1 on page and card colors */
+@layer tokens {
+  :root, :root[data-theme="dark"] { --muted: #8993a7; }
+  :root[data-theme="light"] { --muted: #606b7d; }
+  :root[data-palette="ocean"] { --muted: #79a2ab; }
+  :root[data-palette="midnight"] { --muted: #7d84a5; }
+  :root[data-palette="sky"] { --muted: #556887; }
+  :root[data-palette="sepia"] { --muted: #6d5e48; }
+  :root:is([data-accent="blue"], :not([data-accent])) { --accent: #548fff; }
+  :root[data-theme="light"]:is([data-accent="blue"], :not([data-accent])) { --accent: #2461e5; }
+  :root[data-palette="ocean"]:is([data-accent="blue"], :not([data-accent])) { --accent: #629afe; }
+  :root[data-palette="sky"]:is([data-accent="blue"], :not([data-accent])) { --accent: #235ede; }
+  :root[data-palette="sepia"]:is([data-accent="blue"], :not([data-accent])) { --accent: #2959c4; }
 }

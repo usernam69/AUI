@@ -1057,3 +1057,8 @@ Already in AUI: 1, 2, 3, 7, 13, 14, 15, 20, 22, 30, 31, 43.
 Built: 52, 54, 56, 57, 61, 64, 65, 68, 71, 74, 76, 77, 78, 79, 80, 83, 84, 85, 86, 87, 88, 89, 92, 93, 95, 96, 97, 98, 99, 100.
 Already in AUI: 51, 53, 55, 58, 59, 60, 62, 63, 66, 67, 69, 70, 72, 73, 75, 81, 82, 90, 94.
 Not applicable: 91 (web search is off on GitHub Pages).
+
+### Batch 4 - category 3 (blue theme & visual design)
+Built: 101, 102, 104, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116 (Atkinson Hyperlegible as the readable font), 117, 118, 119, 120, 121, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 136, 138, 140, 143, 144, 145, 148, 149, 150.
+Already in AUI: 103, 105, 122, 133, 134, 135, 139, 141, 147.
+Skipped: 137 (conflicts with 81, always-dark code blocks), 142 (splitting the stylesheet adds requests and slows loading), 146 (chats load instantly from the browser, so there is no wait to cover).

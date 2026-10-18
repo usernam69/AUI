@@ -1,10 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <style>
-    .aui-letter { fill: #ffffff; }
-    @media (prefers-color-scheme: dark) {
-      .aui-letter { fill: #111111; }
-    }
-  </style>
-  <rect x="2" y="2" width="60" height="60" rx="16" fill="#f43f46"/>
-  <path class="aui-letter" fill-rule="evenodd" d="M28 17h8l11 30h-7.6l-2-5.6H26.6l-2 5.6H17zm4 10.5l-3.1 8.9h6.2z"/>
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f8cff"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs>
+  <rect x="2" y="2" width="60" height="60" rx="18" fill="url(#g)"/>
+  <path fill="#fff" fill-rule="evenodd" d="M28 16h8l11.5 31h-7.8l-2.1-5.8H26.4l-2.1 5.8H16.5zm4 10.8l-3.2 9.1h6.4z"/>
+  <circle cx="47" cy="17" r="4" fill="#facc15"/>
 </svg>

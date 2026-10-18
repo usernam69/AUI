@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AUI design tokens</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    body { overflow: auto; padding: 32px 16px; }
+    main { max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 28px; margin-bottom: 4px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 24px; }
+    .token { border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: var(--surface); }
+    .token i { display: block; height: 56px; border-bottom: 1px solid var(--border); }
+    .token div { padding: 8px 10px; font-size: 12px; }
+    .token code { display: block; color: var(--muted); }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+    .controls button { padding: 6px 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>AUI design tokens</h1>
+    <p style="color:var(--text-secondary)">Every color the chat uses, for the theme shown. Switch below.</p>
+    <div class="controls" id="controls"></div>
+    <div class="grid" id="grid"></div>
+  </main>
+  <script>
+    const names = ["bg","bg-elevated","sidebar","surface","surface-hover","surface-active","border","border-strong","text","text-secondary","muted","accent","accent-hover","accent-soft","accent-border","danger","success","info","warning","code-bg"];
+    const themes = { Dark: ["dark",""], Light: ["light",""], Ocean: ["dark","ocean"], Midnight: ["dark","midnight"], OLED: ["dark","oled"], Sky: ["light","sky"], Sepia: ["light","sepia"] };
+    const controls = document.getElementById("controls");
+    const grid = document.getElementById("grid");
+    function render() {
+      const style = getComputedStyle(document.documentElement);
+      grid.replaceChildren(...names.map(name => {
+        const value = style.getPropertyValue("--" + name).trim();
+        const card = document.createElement("div");
+        card.className = "token";
+        card.innerHTML = `<i style="background:var(--${name})"></i><div><strong>--${name}</strong><code>${value}</code></div>`;
+        return card;
+      }));
+    }
+    Object.entries(themes).forEach(([label, [theme, palette]]) => {
+      const button = document.createElement("button");
+      button.textContent = label;
+      button.onclick = () => { document.documentElement.dataset.theme = theme; document.documentElement.dataset.palette = palette; render(); };
+      controls.append(button);
+    });
+    document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    render();
+  </script>
+</body>
+</html>

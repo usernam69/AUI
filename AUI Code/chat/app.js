@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b3";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b4";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b3";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS } from "../modules/slm.js?v=20261018-b3";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b3";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b3";
+} from "../modules/uploads.js?v=20261018-b4";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS } from "../modules/slm.js?v=20261018-b4";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b4";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b4";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -519,7 +519,8 @@ function setupQuickWins() {
 // --- ChatGPT-style layout polish from The Probe (category 2) ---
 
 const SETTINGS_TABS = [
-  ["general", "General", ["themeSelect", "enterToSendToggle", "fontScaleInput", "densitySelect", "timestampsToggle", "autoScrollToggle", "notifyToggle", "soundToggle"]],
+  ["general", "General", ["enterToSendToggle", "timestampsToggle", "autoScrollToggle", "notifyToggle", "soundToggle"]],
+  ["appearance", "Appearance", ["themeSelect", "themeSwatches", "accentSwatches", "fontSelect", "fontWeightInput", "lineHeightSelect", "contentWidthSelect", "bubbleSelect", "bubbleColorInput", "iconWeightSelect", "fontScaleInput", "densitySelect", "seasonalToggle", "effectsToggle"]],
   ["personal", "Personalization", ["speedSelect", "customInstructionsInput", "memoryToggle", "markdownToggle", "voiceOutputToggle", "speechRateInput"]],
   ["data", "Data controls", ["preloadModelBtn", "exportAllBtn", "archivedChatsList", "resetSettingsBtn"]]
 ];
@@ -734,6 +735,187 @@ function syncTopAvatar() {
   if (avatar && source) avatar.innerHTML = source.innerHTML;
 }
 
+// --- Appearance from The Probe (category 3) ---
+
+const APPEARANCE_DEFAULTS = {
+  accent: "blue",
+  font: "system",
+  fontWeight: 400,
+  lineHeight: "comfortable",
+  contentWidth: "normal",
+  bubble: "gradient",
+  bubbleColor: "#2f6df0",
+  iconWeight: "regular",
+  seasonal: true,
+  effects: true
+};
+const ACCENTS = ["blue", "purple", "teal", "green", "orange", "red"];
+const PALETTES = { ocean: "dark", midnight: "dark", oled: "dark", sky: "light", sepia: "light" };
+
+function appearanceSetting(key) {
+  const value = state.settings[key];
+  return value === undefined || value === null || value === "" ? APPEARANCE_DEFAULTS[key] : value;
+}
+
+function resolveThemeChoice(choice) {
+  if (choice === "auto-time") {
+    const hour = new Date().getHours();
+    return { theme: hour >= 7 && hour < 19 ? "light" : "dark", palette: "" };
+  }
+  if (PALETTES[choice]) return { theme: PALETTES[choice], palette: choice };
+  if (choice === "system") return { theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light", palette: "" };
+  if (choice === "contrast") return { theme: "dark", palette: "" };
+  return { theme: choice === "light" ? "light" : "dark", palette: "" };
+}
+
+let readableFontLoaded = false;
+function applyAppearance() {
+  const root = document.documentElement;
+  root.dataset.accent = ACCENTS.includes(appearanceSetting("accent")) ? appearanceSetting("accent") : "blue";
+  root.dataset.font = appearanceSetting("font");
+  root.dataset.lineHeight = appearanceSetting("lineHeight");
+  root.dataset.contentWidth = appearanceSetting("contentWidth");
+  root.dataset.bubble = appearanceSetting("bubble");
+  root.dataset.iconWeight = appearanceSetting("iconWeight");
+  root.dataset.effects = String(appearanceSetting("effects"));
+  root.style.setProperty("--chat-weight", String(Number(appearanceSetting("fontWeight")) || 400));
+  if (appearanceSetting("bubble") === "custom") root.style.setProperty("--bubble-custom", appearanceSetting("bubbleColor"));
+  if (appearanceSetting("font") === "readable" && !readableFontLoaded) {
+    readableFontLoaded = true;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap";
+    document.head.append(link);
+  }
+  applySeasonalEffects();
+}
+
+// Light snow in December, drifting leaves in October and November. Landing screen only.
+function applySeasonalEffects() {
+  document.querySelector(".seasonalLayer")?.remove();
+  const month = new Date().getMonth();
+  const kind = month === 11 ? "snow" : (month === 9 || month === 10) ? "leaves" : "";
+  if (!kind || !appearanceSetting("seasonal") || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const layer = element("div", `seasonalLayer ${kind}`);
+  layer.setAttribute("aria-hidden", "true");
+  for (let index = 0; index < 14; index += 1) {
+    const flake = element("span");
+    flake.textContent = kind === "snow" ? "❄" : (index % 2 ? "🍂" : "🍁");
+    flake.style.left = `${(index * 7.3 + 3) % 100}%`;
+    flake.style.animationDelay = `${(index * 1.7) % 9}s`;
+    flake.style.animationDuration = `${9 + (index % 5) * 2}s`;
+    layer.append(flake);
+  }
+  DOM.chatViewport.append(layer);
+}
+
+function burstParticles(origin, count = 14) {
+  if (!appearanceSetting("effects") || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const box = origin?.getBoundingClientRect?.() || { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 };
+  for (let index = 0; index < count; index += 1) {
+    const dot = element("span", "particle");
+    const angle = (index / count) * Math.PI * 2;
+    const distance = 40 + Math.random() * 50;
+    dot.style.left = `${box.left + box.width / 2}px`;
+    dot.style.top = `${box.top + box.height / 2}px`;
+    dot.style.setProperty("--dx", `${Math.cos(angle) * distance}px`);
+    dot.style.setProperty("--dy", `${Math.sin(angle) * distance}px`);
+    dot.style.background = ["var(--accent)", "#7ab0ff", "#facc15", "#34c77b"][index % 4];
+    document.body.append(dot);
+    setTimeout(() => dot.remove(), 900);
+  }
+}
+
+const FIRST_MESSAGE_KEY = "aui.firstMessageCelebrated";
+function celebrateFirstMessage() {
+  try {
+    if (localStorage.getItem(FIRST_MESSAGE_KEY)) return;
+    localStorage.setItem(FIRST_MESSAGE_KEY, "1");
+  } catch {
+    return;
+  }
+  burstParticles(DOM.sendBtn, 18);
+}
+
+function animateSend() {
+  DOM.sendBtn.classList.remove("justSent");
+  void DOM.sendBtn.offsetWidth;
+  DOM.sendBtn.classList.add("justSent");
+}
+
+// Thin bar across the top of the window while the model downloads.
+function setTopProgress(progress) {
+  let bar = document.querySelector(".topProgress");
+  if (!bar) {
+    bar = element("div", "topProgress");
+    bar.setAttribute("aria-hidden", "true");
+    document.body.append(bar);
+  }
+  const value = Math.max(0, Math.min(1, Number(progress) || 0));
+  bar.style.transform = `scaleX(${value})`;
+  bar.classList.toggle("visible", value > 0 && value < 1);
+}
+
+function setupAppearanceControls() {
+  const fields = [
+    ["accentSelect", "accent"], ["fontSelect", "font"], ["lineHeightSelect", "lineHeight"],
+    ["contentWidthSelect", "contentWidth"], ["bubbleSelect", "bubble"], ["iconWeightSelect", "iconWeight"]
+  ];
+  const read = () => {
+    fields.forEach(([id, key]) => { if (byId(id)) state.settings[key] = byId(id).value; });
+    state.settings.fontWeight = Number(byId("fontWeightInput")?.value) || 400;
+    state.settings.bubbleColor = byId("bubbleColorInput")?.value || APPEARANCE_DEFAULTS.bubbleColor;
+    state.settings.seasonal = Boolean(byId("seasonalToggle")?.checked);
+    state.settings.effects = Boolean(byId("effectsToggle")?.checked);
+    byId("bubbleColorRow").hidden = state.settings.bubble !== "custom";
+    applyAppearance();
+    persist();
+  };
+  [...fields.map(([id]) => id), "fontWeightInput", "bubbleColorInput", "seasonalToggle", "effectsToggle"].forEach(id => {
+    byId(id)?.addEventListener("input", read);
+    byId(id)?.addEventListener("change", read);
+  });
+  byId("themeSwatches")?.addEventListener("click", event => {
+    const swatch = event.target.closest("[data-theme-choice]");
+    if (!swatch) return;
+    byId("themeSelect").value = swatch.dataset.themeChoice;
+    saveSettingsFromDialog();
+    syncThemeSwatches();
+  });
+  byId("accentSwatches")?.addEventListener("click", event => {
+    const swatch = event.target.closest("[data-accent-choice]");
+    if (!swatch) return;
+    byId("accentSelect").value = swatch.dataset.accentChoice;
+    read();
+    syncThemeSwatches();
+  });
+}
+
+function fillAppearanceControls() {
+  const set = (id, value) => { if (byId(id)) byId(id).value = value; };
+  set("accentSelect", appearanceSetting("accent"));
+  set("fontSelect", appearanceSetting("font"));
+  set("lineHeightSelect", appearanceSetting("lineHeight"));
+  set("contentWidthSelect", appearanceSetting("contentWidth"));
+  set("bubbleSelect", appearanceSetting("bubble"));
+  set("iconWeightSelect", appearanceSetting("iconWeight"));
+  set("fontWeightInput", appearanceSetting("fontWeight"));
+  set("bubbleColorInput", appearanceSetting("bubbleColor"));
+  if (byId("seasonalToggle")) byId("seasonalToggle").checked = Boolean(appearanceSetting("seasonal"));
+  if (byId("effectsToggle")) byId("effectsToggle").checked = Boolean(appearanceSetting("effects"));
+  if (byId("bubbleColorRow")) byId("bubbleColorRow").hidden = appearanceSetting("bubble") !== "custom";
+  syncThemeSwatches();
+}
+
+function syncThemeSwatches() {
+  document.querySelectorAll("[data-theme-choice]").forEach(swatch => {
+    swatch.setAttribute("aria-pressed", String(swatch.dataset.themeChoice === state.settings.theme));
+  });
+  document.querySelectorAll("[data-accent-choice]").forEach(swatch => {
+    swatch.setAttribute("aria-pressed", String(swatch.dataset.accentChoice === appearanceSetting("accent")));
+  });
+}
+
 let appInitialized = false;
 
 if (document.readyState === "loading") {
@@ -769,6 +951,7 @@ async function init() {
   hideServerOnlyTools();
   setupQuickWins();
   setupLayoutPolish();
+  setupAppearanceControls();
   applyPreferences();
   updateShortcutLabels();
   updateNetworkStatus();
@@ -1532,6 +1715,7 @@ async function sendMessage(options = {}) {
         loadingShown = true;
         modelWasLoading = true;
         showLoadPercentInTitle(report);
+        setTopProgress(report?.progress);
         assistantMessage.content = `${describeProgress(report, model)} (first time only). Stop cancels; downloaded parts are kept for next time.`;
         scheduleStreamingRender(assistantMessage);
         DOM.chatArea.querySelector(`[data-message-id="${CSS.escape(assistantMessage.id)}"]`)?.classList.add("isLoadingModel");
@@ -2069,7 +2253,7 @@ function createEmptyState() {
   const wrapper = element("div", "emptyState");
   wrapper.setAttribute("aria-labelledby", "landingTitle");
   wrapper.innerHTML = `
-    <div class="emptyBrand" aria-hidden="true">A</div>
+    <div class="emptyBrand landingBot" aria-hidden="true"><svg viewBox="0 0 64 64" width="44" height="44"><rect x="12" y="18" width="40" height="32" rx="12" fill="currentColor" opacity="0.95"/><circle cx="25" cy="34" r="4" fill="var(--accent)"/><circle cx="39" cy="34" r="4" fill="var(--accent)"/><path d="M26 43q6 4 12 0" stroke="var(--accent)" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M32 18v-7" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="9" r="3.5" fill="#facc15"/></svg></div>
     <h1 id="landingTitle">${getGreeting()}. What can I help with?</h1>
     <p class="heroTagline">AUI · Smart. Funny. <span>Slightly unhinged.</span></p>
     <div class="suggestionGrid">
@@ -2292,7 +2476,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b3");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b4");
   return markdownModulePromise;
 }
 
@@ -3346,6 +3530,7 @@ function openSettings() {
   byId("fontScaleValue").textContent = `${Math.round(state.settings.fontScale * 100)}%`;
   byId("densitySelect").value = state.settings.density;
   byId("speedSelect").value = getSlmSpeed();
+  fillAppearanceControls();
   byId("customInstructionsInput").value = state.settings.customInstructions || "";
   if (!DOM.settingsDialog.open) DOM.settingsDialog.showModal();
 }
@@ -3391,19 +3576,22 @@ function applyPreferences() {
       : "Ctrl + Enter to send · Enter for a new line · AUI can make mistakes. Check important info.";
   }
   applyTheme();
+  applyAppearance();
 }
 
 function applyTheme() {
   const choice = state.settings.theme;
-  const systemDark = matchMedia("(prefers-color-scheme: dark)").matches;
-  const theme = choice === "system" ? (systemDark ? "dark" : "light") : (choice === "contrast" ? "dark" : choice);
+  const { theme, palette } = resolveThemeChoice(choice);
   document.documentElement.dataset.theme = theme;
+  document.documentElement.dataset.palette = palette;
   document.documentElement.dataset.contrast = choice === "contrast" ? "high" : "";
-  document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? (choice === "contrast" ? "#000000" : "#161b26") : "#f7f9fd";
+  requestAnimationFrame(() => {
+    document.querySelector('meta[name="theme-color"]').content = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#161b26";
+  });
 }
 
 function cycleTheme() {
-  const order = ["system", "dark", "light", "contrast"];
+  const order = ["system", "dark", "light", "contrast", "ocean", "midnight", "oled", "sky", "sepia", "auto-time"];
   state.settings.theme = order[(order.indexOf(state.settings.theme) + 1) % order.length];
   applyTheme();
   persist();
@@ -4420,7 +4608,11 @@ function handleComposerSubmit(event) {
     stopGeneration();
     return;
   }
-  if (DOM.input.value.trim() || state.pendingAttachments.length) countSendForHint();
+  if (DOM.input.value.trim() || state.pendingAttachments.length) {
+    countSendForHint();
+    animateSend();
+    celebrateFirstMessage();
+  }
   compareMode ? sendModelComparison() : sendMessage();
 }
 
@@ -4652,10 +4844,13 @@ function preloadModel() {
   preloadPromise = loadSlm((report, model) => {
     const line = describeProgress(report, model);
     showLoadPercentInTitle(report);
+    setTopProgress(report?.progress);
     buttons().forEach(button => { button.textContent = line.replace(/^Loading the AUI model/, "Downloading"); });
   }).then(() => {
     document.title = baseDocumentTitle;
     buttons().forEach(button => { button.textContent = "Model ready ✓"; });
+    setTopProgress(1);
+    burstParticles(document.querySelector("#preloadModelBtn:not([hidden])") || document.querySelector("[data-preload-model]"), 22);
     toast("The model is ready. Replies will start right away.");
   }).catch(error => {
     document.title = baseDocumentTitle;
