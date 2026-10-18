@@ -13,7 +13,8 @@ const PRECACHE_URLS = [
   versioned("/modules/keyboard.js"),
   versioned("/modules/markdown.js"),
   versioned("/modules/uploads.js"),
-  versioned("/modules/slm.js")
+  versioned("/modules/slm.js"),
+  versioned("/modules/rag.js")
 ];
 
 self.addEventListener("install", event => {
