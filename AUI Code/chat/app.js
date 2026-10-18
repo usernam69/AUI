@@ -72,6 +72,10 @@ const MODEL_NAMES = {
 
 const FREE_MODELS = new Set([SLM_MODEL]);
 
+// Web search and image generation need server APIs the on-device model doesn't use.
+// Keep this off so messages like "how do I…" or "who is…" go to the model instead.
+const ONLINE_TOOLS_ENABLED = false;
+
 const MODEL_ALIASES = {};
 
 const RESPONSE_MODES = new Set(["Normal", "Chaos", "Safe Mode", "Coder Mode", "Creative", "Beta Lab"]);
@@ -497,7 +501,23 @@ function normalizeState() {
   state.model = MODEL_ALIASES[state.model] || state.model;
   if (!MODEL_NAMES[state.model]) state.model = defaultState.model;
   if (!RESPONSE_MODES.has(state.mode)) state.mode = defaultState.mode;
-  state.chats = (state.chats || []).map(chat => ({
+  state.chats = normalizeChats(state.chats);
+  state.chats = dedupeChatsById(state.chats);
+
+  if (!state.chats.length) {
+    const chat = makeChat();
+    state.chats = [chat];
+    state.currentChatId = chat.id;
+  }
+
+  if (!state.chats.some(chat => chat.id === state.currentChatId)) {
+    state.currentChatId = state.chats[0].id;
+  }
+}
+
+// Shared by local load and cloud merge so a half-finished reply never stays stuck as "streaming".
+function normalizeChats(chats) {
+  return (chats || []).map(chat => ({
     id: chat.id || createId("chat"),
     title: chat.title || "New chat",
     createdAt: chat.createdAt || Date.now(),
@@ -519,17 +539,6 @@ function normalizeState() {
       }))
       : []
   }));
-  state.chats = dedupeChatsById(state.chats);
-
-  if (!state.chats.length) {
-    const chat = makeChat();
-    state.chats = [chat];
-    state.currentChatId = chat.id;
-  }
-
-  if (!state.chats.some(chat => chat.id === state.currentChatId)) {
-    state.currentChatId = state.chats[0].id;
-  }
 }
 
 function bindEvents() {
@@ -768,7 +777,9 @@ async function sendMessage(options = {}) {
   const attachments = options.attachments ?? state.pendingAttachments;
   const enteredText = (options.text ?? DOM.input.value).trim();
   const text = enteredText || createAttachmentPrompt(attachments);
-  if (!text || attachments.some(attachment => attachment.status !== "ready")) return;
+  // Attachments passed in (regenerate, edit, compare) are already part of a sent message.
+  const pendingUploads = options.attachments ? [] : attachments;
+  if (!text || pendingUploads.some(attachment => attachment.status !== "ready")) return;
   const chat = getChat();
   if (!chat) return;
 
@@ -794,8 +805,9 @@ async function sendMessage(options = {}) {
   const requestModel = canUseModel(options.model || state.model)
     ? (options.model || state.model)
     : defaultState.model;
-  const searchQuery = !options.hiddenUser && !options.bypassSearch ? detectSearchIntent(text) : null;
-  const imagePrompt = !options.hiddenUser && !options.bypassSearch ? detectImageIntent(text) : null;
+  const autoTools = ONLINE_TOOLS_ENABLED && !options.hiddenUser && !options.bypassSearch;
+  const searchQuery = autoTools ? detectSearchIntent(text) : null;
+  const imagePrompt = autoTools ? detectImageIntent(text) : null;
 
   let userMessage = options.userMessage;
 
@@ -1078,8 +1090,9 @@ function buildSlmUserText(text, attachments = []) {
 }
 
 function fitSlmMessages(systemPrompt, history, userText) {
+  // Keep both ends of an over-long message: the question is often the last line.
   const user = userText.length > SLM_PROMPT_CHAR_BUDGET
-    ? userText.slice(0, SLM_PROMPT_CHAR_BUDGET)
+    ? `${userText.slice(0, 4800)}\n[…middle of the message trimmed to fit the model…]\n${userText.slice(-3000)}`
     : userText;
   let budget = SLM_PROMPT_CHAR_BUDGET - systemPrompt.length - user.length;
   const kept = [];
@@ -1763,7 +1776,7 @@ function regenerateMessage(message) {
   if (userIndex < 0) return;
   const userMessage = chat.messages[userIndex];
 
-  if (message.model === "Web search") {
+  if (ONLINE_TOOLS_ENABLED && message.model === "Web search") {
     chat.messages.splice(userIndex);
     searchMode = true;
     return sendSearchMessage(userMessage.content);
@@ -2055,6 +2068,7 @@ function closeAllChatMenus(exceptItem) {
 }
 
 function deleteChat(chatId) {
+  if (state.loading && chatId === state.currentChatId) stopGeneration();
   state.chats = state.chats.filter(chat => chat.id !== chatId);
   if (!state.chats.length) state.chats = [makeChat()];
   if (!state.chats.some(chat => chat.id === state.currentChatId)) state.currentChatId = state.chats[0].id;
@@ -3034,6 +3048,11 @@ async function saveProfile(event) {
     return;
   }
 
+  if (state.user?.id === PLACEHOLDER_OWNER_USER.id) {
+    DOM.profileError.textContent = "This is the temporary local owner profile. Log out and sign in with a real account to save profile changes.";
+    return;
+  }
+
   setProfileBusy(true);
   try {
     const supabase = await getSupabase();
@@ -3086,8 +3105,9 @@ function removeProfileImage() {
 
 async function logoutFromProfile() {
   setProfileBusy(true, "logout");
+  const wasPlaceholder = state.user?.id === PLACEHOLDER_OWNER_USER.id;
   try {
-    if (state.user?.id === PLACEHOLDER_OWNER_USER.id) {
+    if (wasPlaceholder) {
       // The placeholder has no real session, so there is nothing to sign out of.
       try { localStorage.setItem(AUTO_OWNER_KEY, "1"); } catch {}
     } else {
@@ -3099,7 +3119,7 @@ async function logoutFromProfile() {
     state.loggedIn = false;
     pendingProfileAvatar = "";
     closeDialog(DOM.profileDialog);
-    resetLocalDataAfterLogout();
+    resetLocalDataAfterLogout({ keepChats: wasPlaceholder });
     toast("Logged out");
     announce("Logged out successfully");
   } catch (error) {
@@ -3109,7 +3129,8 @@ async function logoutFromProfile() {
   }
 }
 
-function resetLocalDataAfterLogout() {
+// The placeholder owner has no cloud copy, so its chats stay on this device instead of being wiped.
+function resetLocalDataAfterLogout({ keepChats = false } = {}) {
   if (state.loading) stopGeneration();
   if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
   if (cloudRetryTimer) clearTimeout(cloudRetryTimer);
@@ -3139,8 +3160,9 @@ function resetLocalDataAfterLogout() {
     ...defaultState,
     ...preservedDailyUsage,
     settings: preservedSettings,
-    chats: [],
-    memory: [],
+    chats: keepChats ? state.chats : [],
+    memory: keepChats ? state.memory : [],
+    currentChatId: keepChats ? state.currentChatId : null,
     pendingAttachments: []
   };
   normalizeState();
@@ -4060,7 +4082,7 @@ function mergeCloudData(cloudData, { authoritative = false } = {}) {
     }).slice(-CONFIG.MAX_MEMORY);
   }
 
-  state.chats = dedupeChatsById(state.chats);
+  state.chats = dedupeChatsById(normalizeChats(state.chats));
   if (!state.chats.length) {
     const chat = makeChat();
     state.chats = [chat];

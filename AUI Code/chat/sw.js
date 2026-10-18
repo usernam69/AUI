@@ -2,25 +2,31 @@ const CACHE_NAME = "aui-t1785249083495";
 const ASSET_VERSION = "20260728-model-compare19";
 const versioned = path => `${path}?v=${ASSET_VERSION}`;
 
-const PRECACHE_URLS = [
-  "/chat",
-  versioned("/style.css"),
-  versioned("/chat/app.js"),
-  "/favicon-t-20260728.svg",
-  "/og.png",
-  "/about",
-  versioned("/modules/storage.js"),
-  versioned("/modules/keyboard.js"),
-  versioned("/modules/markdown.js"),
-  versioned("/modules/uploads.js"),
-  versioned("/modules/slm.js"),
-  versioned("/modules/rag.js")
+// The worker lives in <base>chat/, so resolve everything from there. That keeps it
+// working under a sub-path such as the /AUI/ GitHub Pages site as well as at the root.
+const BASE = new URL("../", self.registration.scope).pathname;
+const at = path => `${BASE}${path}`;
+
+const PRECACHE_PAGES = [at("chat"), at("about")];
+const PRECACHE_ASSETS = [
+  at(versioned("style.css")),
+  at(versioned("chat/app.js")),
+  at("favicon-t-20260728.svg"),
+  at("og.png"),
+  at(versioned("modules/storage.js")),
+  at(versioned("modules/keyboard.js")),
+  at(versioned("modules/markdown.js")),
+  at(versioned("modules/uploads.js")),
+  at(versioned("modules/slm.js")),
+  at(versioned("modules/rag.js"))
 ];
 
 self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(PRECACHE_URLS))
+      .then(cache => cache.addAll(PRECACHE_ASSETS)
+        // Pages may redirect (e.g. to a trailing slash); a miss here must not block install.
+        .then(() => Promise.all(PRECACHE_PAGES.map(page => cache.add(page).catch(() => {})))))
       .then(() => self.skipWaiting())
   );
 });
@@ -51,11 +57,13 @@ self.addEventListener("fetch", event => {
     event.respondWith(
       fetch(request)
         .then(response => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+          }
           return response;
         })
-        .catch(() => caches.match(request).then(cached => cached || caches.match("/chat")))
+        .catch(() => caches.match(request).then(cached => cached || caches.match(at("chat"))))
     );
     return;
   }
