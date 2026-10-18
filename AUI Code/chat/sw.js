@@ -1,5 +1,5 @@
-const CACHE_NAME = "aui-t20261018-b16";
-const ASSET_VERSION = "20261018-b16";
+const CACHE_NAME = "aui-t20261018-b17";
+const ASSET_VERSION = "20261018-b17";
 const versioned = path => `${path}?v=${ASSET_VERSION}`;
 
 // The worker lives in <base>chat/, so resolve everything from there. That keeps it
@@ -21,7 +21,8 @@ const PRECACHE_ASSETS = [
   at(versioned("modules/uploads.js")),
   at(versioned("modules/slm.js")),
   at("modules/slm-worker.js"),
-  at(versioned("modules/rag.js"))
+  at(versioned("modules/rag.js")),
+  at(versioned("modules/files.js"))
 ];
 
 self.addEventListener("install", event => {

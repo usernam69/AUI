@@ -292,6 +292,27 @@ export { selectMemories, parseRememberCommand, parseForgetCommand, memorySubject
   assert.equal(normalizeFact("I like  Tea!"), "i like tea");
 });
 
+await test("file helpers parse CSV, notebooks, receipts and diffs", async () => {
+  const files = await import(pathToFileURL(join(root, "modules/files.js")).href);
+  const rows = files.parseCsv('name,score,city\n"Ada, L.",9,"London"\nBo,7,Paris\n"Cy ""C""",10,London\n');
+  assert.deepEqual(rows[1], ["Ada, L.", "9", "London"]);
+  assert.equal(rows[3][0], 'Cy "C"');
+  const summary = files.summarizeTable(rows);
+  assert.match(summary, /3 rows, 3 columns/);
+  assert.match(summary, /score: numbers, min 7, max 10, average 8.66667, total 26/);
+  assert.match(summary, /city: text, 2 different values; most common: London \(2\)/);
+  assert.equal(files.parseCsv("a;b\n1;2")[1][1], "2");
+  const notebook = files.notebookToText(JSON.stringify({ cells: [{ cell_type: "code", source: ["print(1)"], outputs: [{ text: ["1\n"] }] }, { cell_type: "markdown", source: "# Title" }] }));
+  assert.match(notebook, /\[Cell 1, code\]\nprint\(1\)\n\[Output\]\n1/);
+  assert.match(notebook, /\[Cell 2, markdown\]\n# Title/);
+  const receipt = files.parseReceipt("Coffee 3.50\nBagel ... 2.25\nTax 0.40\nTOTAL 6.15");
+  assert.deepEqual(receipt.items.map(item => item.amount), [3.5, 2.25]);
+  assert.equal(receipt.total, 6.15);
+  const diff = files.lineDiff("a\nb\nc", "a\nB\nc");
+  assert.equal(diff.filter(row => row.type === "same").length, 2);
+  assert.equal(diff.filter(row => row.type !== "same").length, 2);
+});
+
 // --- chat page prompt helpers (extracted from chat/app.js)
 await test("prompt trimming keeps newest turns within budget", async () => {
   const source = readFileSync(join(root, "chat/app.js"), "utf8");

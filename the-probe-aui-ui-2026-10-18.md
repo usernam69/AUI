@@ -1118,3 +1118,9 @@ Already in AUI: 613 (the Memory switch), 614 (per-chat notes from 599), 623, 629
 Skipped: 617 (an embedding model would be a second download of 100 MB or more and compete with the chat model for GPU memory; keyword scoring is used instead).
 Also changed: memories now travel with each message instead of the system prompt, so the prompt stays identical and the engine keeps reusing its cached work.
 Bug fixed along the way: merging memories from a signed-in account removed duplicates by the old snippet field, which would have kept only one of the new facts.
+
+### Batch 15 - category 14 (files, images & attachments)
+Built: 651 (PDF text with pdf.js), 653 (exact column summaries for CSV and spreadsheets), 654, 655, 657, 659, 660 (recent files kept in IndexedDB), 661 (image captions with a small vision model), 662 and 663 (OCR with Tesseract), 664, 666 (HEIC to JPEG), 667 (Whisper tiny, on the CPU), 668 (key frames from videos), 669, 670, 673, 674 (pictures up to 320 px; bigger ones run out of memory in the browser), 675, 676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687 (zip files open like folders), 690, 692, 694, 695, 696, 697 (diagrams: their text and a short caption; AUI can't follow arrows), 698 (OCR; handwriting accuracy is low), 699 (printed equations through OCR), 700 (receipt splitter).
+Already in AUI: 652, 656, 658, 665, 691, 693.
+Skipped: 671 and 672 (image generation needs the image server, which isn't part of the GitHub Pages site), 688 (reading any web page needs a CORS proxy service), 689 (YouTube transcripts need a server or proxy).
+Checked in Chromium with real files: PDF text, CSV table and chart, JSON tree, notebook, zip tree, file diff, OCR on a receipt, captions, background removal, upscaling and an audio transcript.

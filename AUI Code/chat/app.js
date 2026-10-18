@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b16";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b17";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b16";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b16";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b16";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b16";
+} from "../modules/uploads.js?v=20261018-b17";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b17";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b17";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b17";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -1701,6 +1701,8 @@ const SLASH_COMMANDS = [
   ["/timer", "Start a 25-minute focus timer (or /timer 10)", () => startFocusTimer(25)],
   ["/tiny", "Use the tiny model", () => switchSpeed("tiny")],
   ["/context", "See exactly what the model reads", () => openContextViewer()],
+  ["/gallery", "All pictures from your chats", () => openImageGallery()],
+  ["/files", "Attach a file from an earlier chat", () => openRecentFiles()],
   ["/reset", "Reset what the model sees in this chat", () => resetContext()],
   ["/memory", "Open memory", () => openMemory()],
   ["/help", "Keyboard shortcuts", () => byId("shortcutsDialog")?.showModal()]
@@ -2366,12 +2368,18 @@ function openLightbox(src, alt = "") {
     dialog.id = "lightboxDialog";
     // 527: tap the picture to zoom in (then pan or pinch), anywhere else to close.
     dialog.addEventListener("click", event => {
+      if (event.target.closest("[data-image-tools]")) {
+        const source = dialog.querySelector("img")?.src;
+        dialog.close();
+        openImageTools(source);
+        return;
+      }
       if (event.target.tagName === "IMG") event.target.classList.toggle("zoomed");
       else dialog.close();
     });
     document.body.append(dialog);
   }
-  dialog.innerHTML = `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"><p>Tap the picture to zoom. Tap outside it to close.</p>`;
+  dialog.innerHTML = `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"><p>Tap the picture to zoom. Tap outside it to close.</p><button type="button" class="secondaryBtn" data-image-tools>Image tools</button>`;
   dialog.showModal();
 }
 
@@ -4776,6 +4784,572 @@ function setupMemoryFeatures() {
   if (expiry) expiry.value = String(state.settings.memoryExpiry || 0);
 }
 
+// --- Files, images & attachments from The Probe (category 14) ---
+
+let filesModulePromise = null;
+function loadFilesModule() {
+  filesModulePromise ||= import("../modules/files.js?v=20261018-b17");
+  return filesModulePromise;
+}
+
+const AUDIO_PATTERN = /\.(mp3|wav|m4a|aac|ogg|oga|flac|opus)$/i;
+const VIDEO_PATTERN = /\.(mp4|mov|m4v|mkv|avi)$/i;
+
+// Turns any supported file into one or more ready attachments (a zip or a video gives several).
+async function prepareAny(file, onProgress) {
+  const files = await loadFilesModule();
+  const name = file.name.toLowerCase();
+  if (/\.hei[cf]$/.test(name) || /image\/hei[cf]/.test(file.type)) {
+    onProgress(10);
+    return prepareAny(await files.convertHeic(file), onProgress);
+  }
+  if (/\.zip$/.test(name) || /zip/.test(file.type)) {
+    onProgress(10);
+    const inner = await files.readZip(file);
+    if (!inner.length) throw new Error(`${file.name} is empty.`);
+    return [await prepareFolder(inner, (_file, progress) => onProgress(progress))];
+  }
+  if (file.type.startsWith("audio/") || AUDIO_PATTERN.test(name)) {
+    if (file.size > 25 * 1024 * 1024) throw new Error(`${file.name} is larger than ${files.FILE_LIMITS.audio}.`);
+    onProgress(5);
+    toast("Transcribing on your device. The first time downloads a small speech model (about 40 MB).", "info");
+    const { text, seconds } = await files.transcribeAudio(file, progress => onProgress(5 + progress * 0.9));
+    return [{ id: createId("attachment"), name: file.name, size: file.size, type: file.type, extension: name.split(".").pop(), kind: "audio", extractedText: `[Transcript of ${seconds} seconds of audio]\n${text}`, status: "ready", progress: 100 }];
+  }
+  if (file.type.startsWith("video/") || VIDEO_PATTERN.test(name)) {
+    if (file.size > 200 * 1024 * 1024) throw new Error(`${file.name} is larger than ${files.FILE_LIMITS.video}.`);
+    onProgress(10);
+    const { frames } = await files.extractVideoFrames(file);
+    const prepared = await prepareFiles(frames);
+    toast(`${frames.length} frames taken from ${file.name}. Tap one to read or describe it.`);
+    return prepared;
+  }
+  const [prepared] = await prepareFiles([file], (_file, progress) => onProgress(progress));
+  if (prepared.kind === "pdf" && !prepared.extractedText) {
+    try {
+      const { text, pages } = await files.extractPdfText(file, progress => onProgress(progress));
+      prepared.pages = pages;
+      if (text) prepared.extractedText = text.slice(0, 240_000);
+      else toast(`${file.name} looks scanned. Open it and use “Read text” on a screenshot of a page.`, "info");
+    } catch {
+      toast(`Couldn't read the text in ${file.name}.`, "error");
+    }
+  }
+  if (prepared.extension === "ipynb" && prepared.extractedText) {
+    try {
+      prepared.extractedText = files.notebookToText(prepared.extractedText);
+      prepared.kind = "notebook";
+    } catch {}
+  }
+  if (prepared.extension === "csv" || prepared.kind === "spreadsheet") {
+    const firstSheet = prepared.kind === "spreadsheet" ? prepared.extractedText.split(/\n\n## Sheet: /)[0].replace(/^## Sheet: [^\n]*\n/, "") : prepared.extractedText;
+    const summary = files.summarizeTable(files.parseCsv(firstSheet));
+    if (summary) prepared.extractedText = `[Column summary, worked out exactly]\n${summary}\n\n${prepared.extractedText}`;
+  }
+  return [prepared];
+}
+
+// 678: what a file costs in the model's reading space.
+function attachmentCostLabel(attachment) {
+  if (attachment.status !== "ready") return "";
+  if (attachment.kind === "image" && !attachment.extractedText) return " · tap for image tools";
+  if (!attachment.extractedText) return "";
+  const length = attachment.extractedText.length;
+  return ` · ~${Math.ceil(length / 4).toLocaleString()} tokens${length > SLM_ATTACHMENT_CHAR_BUDGET ? ", AUI reads the most relevant parts" : ""}`;
+}
+
+// 679: remember which parts of each file were actually sent.
+const sentExcerpts = new Map();
+
+// 694/660: keep sent files in this browser so they can be attached again later.
+const FILES_DB = "aui-files";
+function filesStore(mode) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(FILES_DB, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore("files", { keyPath: "id" });
+    request.onsuccess = () => resolve(request.result.transaction("files", mode).objectStore("files"));
+    request.onerror = () => reject(request.error);
+  });
+}
+async function rememberFile(attachment) {
+  if (attachment.status !== "ready" || attachment.kind === "folder") return;
+  try {
+    const store = await filesStore("readwrite");
+    const { previewUrl, ...saved } = attachment;
+    store.put({ ...saved, savedAt: Date.now() });
+  } catch {}
+}
+async function recentFiles() {
+  try {
+    const store = await filesStore("readonly");
+    const all = await new Promise((resolve, reject) => {
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    return all.sort((a, b) => b.savedAt - a.savedAt).slice(0, 40);
+  } catch {
+    return [];
+  }
+}
+async function openRecentFiles() {
+  const files = await recentFiles();
+  const dialog = simpleDialog("recentFilesDialog", "Attach again", "Recent files", files.length
+    ? `<ul class="recentFiles">${files.map(file => `<li><button type="button" data-recent-file="${escapeHtml(file.id)}"><span>${attachmentGlyph(file)}</span><span><strong>${escapeHtml(file.name)}</strong><small>${formatFileSize(file.size || 0)} · ${formatRelativeTime(file.savedAt)}</small></span></button></li>`).join("")}</ul>`
+    : '<div class="dialogEmpty"><strong>No files yet</strong><span>Files you attach are kept here, in this browser only.</span></div>');
+  dialog.querySelectorAll("[data-recent-file]").forEach(button => button.addEventListener("click", () => {
+    const file = files.find(item => item.id === button.dataset.recentFile);
+    if (!file) return;
+    if (state.pendingAttachments.length >= 10) return toast("You can attach up to 10 files at once.", "error");
+    state.pendingAttachments.push({ ...file, id: createId("attachment"), previewUrl: file.dataUrl || file.previewUrl, status: "ready", progress: 100 });
+    renderAttachmentTray();
+    updateComposerState();
+    dialog.close();
+    toast(`${file.name} attached`);
+  }));
+}
+
+function simpleDialog(id, eyebrow, title, html, { wide = false } = {}) {
+  let dialog = byId(id);
+  if (!dialog) {
+    dialog = element("dialog", "dialog");
+    dialog.id = id;
+    document.body.append(dialog);
+    dialog.addEventListener("click", event => {
+      if (event.target === dialog || event.target.closest("[data-close-dialog]")) dialog.close();
+    });
+  }
+  dialog.innerHTML = `<div class="dialogPanel${wide ? "" : " compactDialog"}"><header><div><p class="eyebrow">${escapeHtml(eyebrow)}</p><h2>${escapeHtml(title)}</h2></div><button class="iconBtn" type="button" data-close-dialog aria-label="Close">×</button></header><div class="dialogContent">${html}</div></div>`;
+  if (!dialog.open) dialog.showModal();
+  return dialog;
+}
+
+// 655: a folder's files as a tree.
+function folderTree(text) {
+  const paths = [...String(text).matchAll(/--- File: (.+?) ---/g)].map(match => match[1]);
+  const root = {};
+  paths.forEach(path => path.split("/").reduce((node, part) => (node[part] ||= {}), root));
+  const render = node => `<ul>${Object.keys(node).sort().map(name => Object.keys(node[name]).length ? `<li><details open><summary>${escapeHtml(name)}/</summary>${render(node[name])}</details></li>` : `<li>${escapeHtml(name)}</li>`).join("")}</ul>`;
+  return paths.length ? `<div class="folderTree">${render(root)}</div>` : "";
+}
+
+// 682: JSON as a tree you can fold.
+function jsonTree(value, key = "", depth = 0, budget = { nodes: 0 }) {
+  budget.nodes += 1;
+  if (budget.nodes > 2000) return "";
+  const label = key ? `<span class="jsonKey">${escapeHtml(key)}</span>: ` : "";
+  if (value && typeof value === "object") {
+    const entries = Array.isArray(value) ? value.map((item, index) => [String(index), item]) : Object.entries(value);
+    return `<details${depth < 2 ? " open" : ""}><summary>${label}${Array.isArray(value) ? `[${entries.length}]` : `{${entries.length}}`}</summary><div class="jsonChildren">${entries.map(([childKey, child]) => jsonTree(child, childKey, depth + 1, budget)).join("")}</div></details>`;
+  }
+  return `<div>${label}<span class="jsonValue">${escapeHtml(JSON.stringify(value))}</span></div>`;
+}
+
+// 682-686/659/679/654: look inside an attachment before (or after) sending it.
+async function openAttachmentPreview(attachment) {
+  if (attachment.kind === "image") return openImageTools(attachment.previewUrl || attachment.dataUrl, attachment);
+  const files = await loadFilesModule();
+  const text = String(attachment.extractedText || "");
+  const extension = String(attachment.extension || attachment.name.split(".").pop() || "").toLowerCase();
+  let body = "";
+  let chartable = null;
+  if (attachment.kind === "folder") {
+    body = folderTree(text) || `<pre class="filePreviewText">${escapeHtml(text.slice(0, 50_000))}</pre>`;
+  } else if (extension === "json") {
+    try { body = `<div class="jsonTree">${jsonTree(JSON.parse(text))}</div>`; } catch {}
+  } else if (extension === "csv" || attachment.kind === "spreadsheet") {
+    const raw = text.replace(/^\[Column summary[^\]]*\]\n[\s\S]*?\n\n/, "").replace(/^## Sheet: [^\n]*\n/, "").split(/\n\n## Sheet: /)[0];
+    const rows = files.parseCsv(raw, 201);
+    if (rows.length) {
+      body = `<div class="tableWrap previewTable"><table><thead><tr>${rows[0].map(cell => `<th>${escapeHtml(cell)}</th>`).join("")}</tr></thead><tbody>${rows.slice(1, 201).map(row => `<tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+      const numeric = rows[0].map((_, column) => column).filter(column => rows.slice(1).every(row => !row[column] || Number.isFinite(Number(String(row[column]).replace(/[$€£,%\s]/g, "")))));
+      if (numeric.length) chartable = { rows, numeric };
+    }
+  } else if (["md", "markdown"].includes(extension) || attachment.kind === "notebook") {
+    body = '<div class="messageContent previewRendered"></div>';
+  } else if (attachment.kind === "code") {
+    body = '<div class="messageContent previewRendered"></div>';
+  }
+  if (!body) body = `<pre class="filePreviewText">${escapeHtml(text.slice(0, 50_000)) || "No readable text in this file."}</pre>`;
+  const dialog = simpleDialog("attachmentPreviewDialog", `${formatFileSize(attachment.size || 0)}${attachment.pages ? ` · ${attachment.pages} pages` : ""}`, attachment.name, `
+    <div class="previewSearch"><input type="search" placeholder="Find in this file" aria-label="Find in this file"><small></small></div>
+    <ul class="previewMatches" hidden></ul>
+    ${chartable ? `<div class="previewChart"><label>Chart a column <select>${chartable.numeric.map(column => `<option value="${column}">${escapeHtml(chartable.rows[0][column])}</option>`).join("")}</select></label><button type="button" class="secondaryBtn" data-preview-chart>Chart</button><div class="messageContent previewChartOut"></div></div>` : ""}
+    ${attachment.sentExcerpt ? `<details class="sentExcerpt"><summary>What AUI read from this file</summary><pre>${escapeHtml(attachment.sentExcerpt)}</pre></details>` : ""}
+    ${body}`, { wide: true });
+  const rendered = dialog.querySelector(".previewRendered");
+  if (rendered) {
+    const source = attachment.kind === "code" ? `\`\`\`${extension}\n${text.slice(0, 60_000)}\n\`\`\`` : attachment.kind === "notebook" ? text.slice(0, 60_000).replace(/\[Cell (\d+), code\]\n([\s\S]*?)(?=\n\n\[Cell|\n\[Output\]|$)/g, "**Cell $1**\n```python\n$2\n```") : text.slice(0, 60_000);
+    renderMessageBody(rendered, source, false);
+  }
+  const search = dialog.querySelector(".previewSearch input");
+  const count = dialog.querySelector(".previewSearch small");
+  const matches = dialog.querySelector(".previewMatches");
+  search.addEventListener("input", () => {
+    const query = search.value.trim().toLowerCase();
+    if (!query) {
+      matches.hidden = true;
+      count.textContent = "";
+      return;
+    }
+    const lines = text.split("\n").map((line, index) => [index + 1, line]).filter(([, line]) => line.toLowerCase().includes(query));
+    count.textContent = `${lines.length} matching line${lines.length === 1 ? "" : "s"}`;
+    matches.hidden = !lines.length;
+    matches.innerHTML = lines.slice(0, 100).map(([number, line]) => {
+      const start = Math.max(0, line.toLowerCase().indexOf(query) - 60);
+      const snippet = line.slice(start, start + 180);
+      const at = snippet.toLowerCase().indexOf(query);
+      return `<li><small>line ${number}</small> ${escapeHtml(snippet.slice(0, at))}<mark>${escapeHtml(snippet.slice(at, at + query.length))}</mark>${escapeHtml(snippet.slice(at + query.length))}</li>`;
+    }).join("");
+  });
+  dialog.querySelector("[data-preview-chart]")?.addEventListener("click", () => {
+    const column = Number(dialog.querySelector(".previewChart select").value);
+    const labelColumn = chartable.rows[0].findIndex((_, index) => !chartable.numeric.includes(index));
+    const rows = chartable.rows.slice(1, 31);
+    const spec = {
+      type: rows.length > 12 ? "line" : "bar",
+      title: chartable.rows[0][column],
+      labels: rows.map((row, index) => labelColumn >= 0 ? row[labelColumn] : String(index + 1)),
+      data: rows.map(row => Number(String(row[column]).replace(/[$€£,%\s]/g, "")))
+    };
+    renderMessageBody(dialog.querySelector(".previewChartOut"), `\`\`\`chart\n${JSON.stringify(spec)}\n\`\`\``, false);
+  });
+}
+
+// 681: show the differences between two attached text files.
+async function compareAttachments() {
+  const texts = state.pendingAttachments.filter(item => item.extractedText).slice(0, 2);
+  if (texts.length < 2) return;
+  const { lineDiff } = await loadFilesModule();
+  const rows = lineDiff(texts[0].extractedText, texts[1].extractedText);
+  const changed = rows.filter(row => row.type !== "same").length;
+  simpleDialog("fileDiffDialog", `${changed} changed line${changed === 1 ? "" : "s"}`, `${texts[0].name} → ${texts[1].name}`, `<pre class="fileDiff">${rows.map(row => `<span class="diff-${row.type}">${row.type === "added" ? "+ " : row.type === "removed" ? "- " : "  "}${escapeHtml(row.text)}</span>`).join("\n")}</pre>`, { wide: true });
+}
+
+function trayExtras() {
+  if (!state.pendingAttachments.length) return;
+  const footer = element("div", "trayFooter");
+  const readable = state.pendingAttachments.filter(item => item.extractedText);
+  footer.innerHTML = `<small>🔒 Files stay on your device.</small>${readable.length >= 2 ? '<button type="button" class="linkBtn" data-compare-files>Show differences</button>' : ""}`;
+  DOM.attachmentTray.append(footer);
+}
+
+// Images: AUI's chat model can't see pictures, so these tools turn them into text or new images.
+async function imageFromUrl(url) {
+  const image = new Image();
+  image.crossOrigin = "anonymous";
+  image.src = url;
+  await image.decode();
+  return image;
+}
+
+function canvasFor(image, width = image.naturalWidth, height = image.naturalHeight) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
+}
+
+// 675: classic meme text.
+async function makeMeme(url, top, bottom) {
+  const image = await imageFromUrl(url);
+  const canvas = canvasFor(image);
+  const context = canvas.getContext("2d");
+  context.drawImage(image, 0, 0);
+  const size = Math.round(canvas.width / 11);
+  context.font = `900 ${size}px Impact, "Arial Black", sans-serif`;
+  context.textAlign = "center";
+  context.fillStyle = "#fff";
+  context.strokeStyle = "#000";
+  context.lineWidth = Math.max(2, size / 9);
+  context.lineJoin = "round";
+  const draw = (text, y, baseline) => {
+    if (!text) return;
+    context.textBaseline = baseline;
+    context.strokeText(text.toUpperCase(), canvas.width / 2, y, canvas.width * 0.94);
+    context.fillText(text.toUpperCase(), canvas.width / 2, y, canvas.width * 0.94);
+  };
+  draw(top, size * 0.3, "top");
+  draw(bottom, canvas.height - size * 0.3, "bottom");
+  return canvas.toDataURL("image/jpeg", 0.9);
+}
+
+// 676: a rounded sticker with a white border and a soft shadow.
+async function makeSticker(url) {
+  const image = await imageFromUrl(url);
+  const size = 512;
+  const canvas = canvasFor(image, size, size);
+  const context = canvas.getContext("2d");
+  const pad = 26;
+  const scale = Math.min((size - pad * 2) / image.naturalWidth, (size - pad * 2) / image.naturalHeight);
+  const width = image.naturalWidth * scale;
+  const height = image.naturalHeight * scale;
+  const x = (size - width) / 2;
+  const y = (size - height) / 2;
+  const radius = Math.min(width, height) * 0.18;
+  const shape = (inset = 0) => {
+    context.beginPath();
+    context.roundRect(x - inset, y - inset, width + inset * 2, height + inset * 2, radius + inset);
+  };
+  context.shadowColor = "rgb(0 0 0 / 0.35)";
+  context.shadowBlur = 16;
+  context.shadowOffsetY = 6;
+  shape(12);
+  context.fillStyle = "#fff";
+  context.fill();
+  context.shadowColor = "transparent";
+  context.save();
+  shape();
+  context.clip();
+  context.drawImage(image, x, y, width, height);
+  context.restore();
+  return canvas.toDataURL("image/png");
+}
+
+// 664: drag to choose the part of the image to keep.
+function cropTool(url, onDone) {
+  const dialog = simpleDialog("cropDialog", "Image", "Crop", '<p class="toolHint">Drag across the picture to choose what to keep.</p><div class="cropStage"><img alt="Image to crop"><div class="cropBox" hidden></div></div><div class="setupActions"><button type="button" class="secondaryBtn" data-close-dialog>Cancel</button><button type="button" class="primaryBtn" data-crop-apply disabled>Crop</button></div>', { wide: true });
+  const image = dialog.querySelector(".cropStage img");
+  const box = dialog.querySelector(".cropBox");
+  const apply = dialog.querySelector("[data-crop-apply]");
+  image.src = url;
+  let start = null;
+  let rect = null;
+  const point = event => {
+    const bounds = image.getBoundingClientRect();
+    return { x: Math.max(0, Math.min(bounds.width, event.clientX - bounds.left)), y: Math.max(0, Math.min(bounds.height, event.clientY - bounds.top)) };
+  };
+  image.addEventListener("pointerdown", event => {
+    event.preventDefault();
+    image.setPointerCapture(event.pointerId);
+    start = point(event);
+  });
+  image.addEventListener("pointermove", event => {
+    if (!start) return;
+    const now = point(event);
+    rect = { x: Math.min(start.x, now.x), y: Math.min(start.y, now.y), width: Math.abs(now.x - start.x), height: Math.abs(now.y - start.y) };
+    Object.assign(box.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` });
+    box.hidden = false;
+  });
+  image.addEventListener("pointerup", () => {
+    start = null;
+    apply.disabled = !(rect && rect.width > 8 && rect.height > 8);
+  });
+  apply.addEventListener("click", () => {
+    const scale = image.naturalWidth / image.getBoundingClientRect().width;
+    const canvas = canvasFor(image, Math.round(rect.width * scale), Math.round(rect.height * scale));
+    canvas.getContext("2d").drawImage(image, rect.x * scale, rect.y * scale, rect.width * scale, rect.height * scale, 0, 0, canvas.width, canvas.height);
+    dialog.close();
+    onDone(canvas.toDataURL("image/jpeg", 0.9));
+  });
+}
+
+// 700: split a bill from the text on a receipt.
+async function openReceiptSplitter(text) {
+  const { parseReceipt } = await loadFilesModule();
+  const receipt = parseReceipt(text);
+  if (!receipt.items.length) return toast("No prices found on this receipt.", "error");
+  const dialog = simpleDialog("receiptDialog", "Receipt", "Split the bill", `
+    <ul class="receiptItems">${receipt.items.map(item => `<li><span>${escapeHtml(item.label)}</span><strong>${item.amount.toFixed(2)}</strong></li>`).join("")}</ul>
+    <p><strong>Total: ${receipt.total.toFixed(2)}</strong></p>
+    <label class="receiptPeople">People <input type="number" min="1" max="50" value="2"></label>
+    <label class="receiptPeople">Tip % <input type="number" min="0" max="50" value="0" data-tip></label>
+    <p class="receiptShare"></p>
+    <div class="setupActions"><button type="button" class="primaryBtn" data-receipt-send>Put in my message</button></div>`);
+  const people = dialog.querySelector(".receiptPeople input");
+  const tip = dialog.querySelector("[data-tip]");
+  const share = dialog.querySelector(".receiptShare");
+  const update = () => {
+    const count = Math.max(1, Number(people.value) || 1);
+    const withTip = receipt.total * (1 + (Number(tip.value) || 0) / 100);
+    share.textContent = `${withTip.toFixed(2)} in total, ${(withTip / count).toFixed(2)} each for ${count} ${count === 1 ? "person" : "people"}.`;
+  };
+  people.addEventListener("input", update);
+  tip.addEventListener("input", update);
+  update();
+  dialog.querySelector("[data-receipt-send]").addEventListener("click", () => {
+    DOM.input.value = `${DOM.input.value ? `${DOM.input.value}\n\n` : ""}Receipt: ${receipt.items.map(item => `${item.label} ${item.amount.toFixed(2)}`).join(", ")}. ${share.textContent}`;
+    scheduleTextareaResize();
+    updateComposerState();
+    dialog.close();
+  });
+}
+
+function attachDataUrl(dataUrl, name) {
+  if (state.pendingAttachments.length >= 10) return toast("You can attach up to 10 files at once.", "error");
+  const size = Math.round((dataUrl.length - dataUrl.indexOf(",") - 1) * 0.75);
+  state.pendingAttachments.push({ id: createId("attachment"), name, size, type: dataUrl.slice(5, dataUrl.indexOf(";")), extension: name.split(".").pop(), kind: "image", dataUrl, previewUrl: dataUrl, status: "ready", progress: 100 });
+  renderAttachmentTray();
+  updateComposerState();
+  toast(`${name} attached`);
+}
+
+// 661-663/673/674/675/676/664/696/697-700: one place for everything you can do with a picture.
+function openImageTools(url, attachment = null) {
+  if (!url) return;
+  const dialog = simpleDialog("imageToolsDialog", attachment ? "Attached image" : "Image", "Image tools", `
+    <div class="imageToolsPreview"><img alt="${escapeHtml(attachment?.name || "Image")}"></div>
+    <p class="toolHint">AUI's chat model can't see pictures. These tools run on your device and turn the picture into text it can read, or make a new picture.</p>
+    <div class="imageToolButtons">
+      <button type="button" data-image-tool="ocr">Read text</button>
+      <button type="button" data-image-tool="caption">Describe</button>
+      <button type="button" data-image-tool="prompt">Turn into a prompt</button>
+      <button type="button" data-image-tool="receipt">Split a receipt</button>
+      <button type="button" data-image-tool="crop">Crop</button>
+      <button type="button" data-image-tool="meme">Meme</button>
+      <button type="button" data-image-tool="sticker">Sticker</button>
+      <button type="button" data-image-tool="background">Remove background</button>
+      <button type="button" data-image-tool="upscale">Upscale 2×</button>
+    </div>
+    <div class="imageToolStatus" role="status"></div>
+    <div class="imageToolOutput"></div>`, { wide: true });
+  dialog.querySelector(".imageToolsPreview img").src = url;
+  const status = dialog.querySelector(".imageToolStatus");
+  const output = dialog.querySelector(".imageToolOutput");
+  const progress = label => value => { status.textContent = `${label}… ${value}%`; };
+  const addText = (label, text) => {
+    if (attachment) {
+      attachment.extractedText = `${attachment.extractedText ? `${attachment.extractedText}\n\n` : ""}[${label}]\n${text}`;
+      renderAttachmentTray();
+    }
+  };
+  const showImage = (dataUrl, name) => {
+    output.innerHTML = `<img alt="Result" src="${dataUrl}"><div class="setupActions"><a class="secondaryBtn" download="${escapeHtml(name)}" href="${dataUrl}">Download</a>${attachment ? '<button type="button" class="primaryBtn" data-use-result>Use instead</button>' : '<button type="button" class="primaryBtn" data-attach-result>Attach to my message</button>'}</div>`;
+    output.querySelector("[data-use-result]")?.addEventListener("click", () => {
+      Object.assign(attachment, { dataUrl, previewUrl: dataUrl, size: Math.round(dataUrl.length * 0.75), type: dataUrl.slice(5, dataUrl.indexOf(";")) });
+      renderAttachmentTray();
+      dialog.close();
+    });
+    output.querySelector("[data-attach-result]")?.addEventListener("click", () => {
+      attachDataUrl(dataUrl, name);
+      dialog.close();
+    });
+  };
+  dialog.querySelector(".imageToolButtons").addEventListener("click", async event => {
+    const tool = event.target.closest("[data-image-tool]")?.dataset.imageTool;
+    if (!tool) return;
+    const files = await loadFilesModule();
+    const buttons = dialog.querySelectorAll("[data-image-tool]");
+    buttons.forEach(button => { button.disabled = true; });
+    try {
+      if (tool === "ocr" || tool === "receipt") {
+        status.textContent = "Reading text… (the first time downloads about 10 MB)";
+        const text = await files.ocrImage(url, progress("Reading text"));
+        status.textContent = text ? "Done. AUI will read this text with your message." : "No text found.";
+        if (text) addText("Text in the image", text);
+        output.innerHTML = text ? `<pre class="filePreviewText">${escapeHtml(text)}</pre>` : "";
+        if (tool === "receipt" && text) openReceiptSplitter(text);
+      } else if (tool === "caption" || tool === "prompt") {
+        status.textContent = "Describing… (the first time downloads a small vision model, about 250 MB)";
+        const caption = await files.captionImage(url, progress("Downloading the vision model"));
+        status.textContent = "Done.";
+        if (tool === "caption") {
+          addText("What the image shows", caption);
+          output.innerHTML = `<p class="imageCaption">${escapeHtml(caption)}</p>`;
+        } else {
+          const prompt = `${caption}, highly detailed, natural light, sharp focus`;
+          output.innerHTML = `<pre class="filePreviewText">${escapeHtml(prompt)}</pre><button type="button" class="secondaryBtn" data-use-prompt>Put in my message</button>`;
+          output.querySelector("[data-use-prompt]").addEventListener("click", () => {
+            DOM.input.value = prompt;
+            scheduleTextareaResize();
+            updateComposerState();
+            dialog.close();
+          });
+        }
+      } else if (tool === "crop") {
+        cropTool(url, dataUrl => (attachment ? Object.assign(attachment, { dataUrl, previewUrl: dataUrl }) && renderAttachmentTray() : attachDataUrl(dataUrl, "cropped.jpg")));
+      } else if (tool === "meme") {
+        const top = await askForText({ eyebrow: "Meme", title: "Top text", label: "Top text", value: "", submitLabel: "Next" });
+        if (top === null) return;
+        const bottom = await askForText({ eyebrow: "Meme", title: "Bottom text", label: "Bottom text", value: "", submitLabel: "Make meme" });
+        showImage(await makeMeme(url, top || "", bottom || ""), "meme.jpg");
+        if (!dialog.open) dialog.showModal();
+      } else if (tool === "sticker") {
+        showImage(await makeSticker(url), "sticker.png");
+      } else if (tool === "background") {
+        status.textContent = "Removing the background… (the first time downloads a small model, about 25 MB)";
+        showImage(await files.removeBackground(url, progress("Downloading")), "no-background.png");
+        status.textContent = "Done. Works best on photos of people.";
+      } else if (tool === "upscale") {
+        status.textContent = "Upscaling… (the first time downloads a small model)";
+        showImage(await files.upscaleImage(url, progress("Downloading")), "upscaled.png");
+        status.textContent = "Done.";
+      }
+    } catch (error) {
+      status.textContent = `That didn't work: ${error.message || error}`;
+    } finally {
+      buttons.forEach(button => { button.disabled = false; });
+    }
+  });
+}
+
+// 670: every picture from your chats in one place.
+function openImageGallery() {
+  const images = [];
+  state.chats.forEach(chat => chat.messages.forEach(message => {
+    (message.attachments || []).forEach(attachment => {
+      const src = attachment.kind === "image" && (attachment.dataUrl || attachment.previewUrl);
+      if (src && !String(src).startsWith("blob:")) images.push({ src, chat, name: attachment.name });
+    });
+    if (message.generatedImage) images.push({ src: message.generatedImage, chat, name: "Generated image" });
+  }));
+  const dialog = simpleDialog("galleryDialog", `${images.length} picture${images.length === 1 ? "" : "s"}`, "Image gallery", images.length
+    ? `<div class="galleryGrid">${images.map((image, index) => `<button type="button" data-gallery="${index}" title="${escapeHtml(image.chat.title)}"><img alt="${escapeHtml(image.name)}" src="${escapeHtml(image.src)}" loading="lazy"></button>`).join("")}</div>`
+    : '<div class="dialogEmpty"><strong>No pictures yet</strong><span>Images you attach or create show up here.</span></div>', { wide: true });
+  dialog.querySelector(".galleryGrid")?.addEventListener("click", event => {
+    const index = event.target.closest("[data-gallery]")?.dataset.gallery;
+    if (index === undefined) return;
+    openImageTools(images[Number(index)].src);
+  });
+}
+
+function setupFileFeatures() {
+  // Tray: open a preview, undo a removal, compare two files.
+  DOM.attachmentTray.addEventListener("click", event => {
+    if (event.target.closest("[data-compare-files]")) return compareAttachments();
+    if (event.target.closest("[data-remove-attachment]")) return;
+    const id = event.target.closest("[data-attachment-id]")?.dataset.attachmentId;
+    const attachment = state.pendingAttachments.find(item => item.id === id && item.status === "ready");
+    if (attachment) openAttachmentPreview(attachment);
+  });
+  // Sent files and pictures open the same previews, including what AUI read.
+  DOM.chatArea.addEventListener("click", event => {
+    const chip = event.target.closest(".messageFile[data-attachment-id]");
+    if (!chip) return;
+    const message = getChat()?.messages.find(item => item.id === chip.closest("[data-message-id]")?.dataset.messageId);
+    const attachment = message?.attachments?.find(item => item.id === chip.dataset.attachmentId);
+    if (attachment) openAttachmentPreview(attachment);
+  });
+  // 669: drag pictures out of the chat to save them.
+  DOM.chatArea.addEventListener("dragstart", event => {
+    const image = event.target.closest?.(".messageContent img, .messageAttachments img, .generatedImage img");
+    if (!image || !/^(data:|https?:)/.test(image.src)) return;
+    const type = image.src.startsWith("data:") ? image.src.slice(5, image.src.indexOf(";")) : "image/png";
+    event.dataTransfer.setData("DownloadURL", `${type}:aui-image.${type.split("/")[1] || "png"}:${image.src}`);
+  });
+  const popover = byId("toolsPopover");
+  if (popover && !byId("popoverRecentFiles")) {
+    const button = element("button", "");
+    button.id = "popoverRecentFiles";
+    button.type = "button";
+    button.innerHTML = '<span aria-hidden="true">↺</span><span><strong>Recent files</strong><small>Attach a file from an earlier chat</small></span>';
+    button.addEventListener("click", () => {
+      hideToolsPopover();
+      openRecentFiles();
+    });
+    popover.append(button);
+  }
+  const more = document.querySelector(".moreLinksInner");
+  if (more && !byId("galleryBtn")) {
+    const button = element("button", "");
+    button.id = "galleryBtn";
+    button.type = "button";
+    button.innerHTML = '<span>Image gallery</span><span class="navHint">▦</span>';
+    button.addEventListener("click", openImageGallery);
+    more.prepend(button);
+  }
+}
+
 let appInitialized = false;
 
 if (document.readyState === "loading") {
@@ -4825,6 +5399,7 @@ async function init() {
   setupMobile();
   setupSettingsExtras();
   setupMemoryFeatures();
+  setupFileFeatures();
   setTimeout(prefillFromUrl);
   setupBackgroundDownload();
   setInterval(updateReadyBadge, 3000);
@@ -5622,6 +6197,10 @@ async function sendMessage(options = {}) {
       withMemoryNotes(withToolNotes(buildSlmUserText(text, attachments), tools), memories),
       getPromptBudget()
     );
+    userMessage?.attachments?.forEach(item => {
+      const excerpt = sentExcerpts.get(item.id);
+      if (excerpt) item.sentExcerpt = excerpt;
+    });
     const droppedNote = summarizeDroppedTurns(history, slmMessages.length - 2);
     if (droppedNote) {
       slmMessages[0] = { ...slmMessages[0], content: `${slmMessages[0].content}\n${droppedNote}` };
@@ -5764,6 +6343,7 @@ function buildSlmUserText(text, attachments = []) {
     }
     const full = String(attachment.extractedText);
     const body = pickRelevantText(full, text, perFile);
+    if (attachment.id) sentExcerpts.set(attachment.id, body.length < full.length ? body : "");
     const label = body.length < full.length ? "Attached file (excerpts most relevant to the question)" : "Attached file";
     return `[${label}: ${attachment.name}]\n${body}`;
   });
@@ -6430,6 +7010,10 @@ function createMessageAttachments(attachments) {
       grid.append(image);
     } else {
       const chip = element("div", "messageFile");
+      chip.dataset.attachmentId = attachment.id || "";
+      chip.tabIndex = 0;
+      chip.setAttribute("role", "button");
+      chip.title = "Open this file";
       const meta = getAttachmentMeta(attachment);
       chip.innerHTML = `<span>${attachmentGlyph(attachment)}</span><div><strong>${escapeHtml(attachment.name)}</strong><small>${meta}</small></div>`;
       grid.append(chip);
@@ -6455,7 +7039,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b16");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b17");
   return markdownModulePromise;
 }
 
@@ -7030,6 +7614,11 @@ function chatToMarkdown(chat) {
   const lines = [`# ${chat.title}`, "", `_Exported from AUI on ${new Date().toLocaleString()}_`, ""];
   chat.messages.forEach(message => {
     lines.push(`## ${message.role === "user" ? "You" : "AUI"} · ${new Date(message.timestamp).toLocaleString()}`, "", message.content, "");
+    // 695: attached files travel with the export.
+    (message.attachments || []).forEach(attachment => {
+      lines.push(`> 📎 ${attachment.name}${attachment.size ? ` (${formatFileSize(attachment.size)})` : ""}`, "");
+      if (attachment.extractedText) lines.push("<details><summary>File contents</summary>", "", "~~~", String(attachment.extractedText).slice(0, 20_000), "~~~", "", "</details>", "");
+    });
   });
   return lines.join("\n");
 }
@@ -7189,14 +7778,15 @@ async function addFiles(fileList) {
     const placeholder = placeholders[index];
 
     try {
-      const [prepared] = await prepareFiles([file], (_activeFile, progress) => {
+      const preparedList = await prepareAny(file, progress => {
         placeholder.progress = progress;
         renderAttachmentTray();
       });
       const stateIndex = state.pendingAttachments.findIndex(item => item.id === placeholder.id);
       if (stateIndex >= 0) {
-        state.pendingAttachments[stateIndex] = prepared;
-        readyCount += 1;
+        state.pendingAttachments.splice(stateIndex, 1, ...preparedList);
+        readyCount += preparedList.length;
+        preparedList.forEach(rememberFile);
       }
     } catch (error) {
       state.pendingAttachments = state.pendingAttachments.filter(item => item.id !== placeholder.id);
@@ -7212,6 +7802,14 @@ async function addFiles(fileList) {
 
   if (readyCount) {
     toast(`${readyCount} ${readyCount === 1 ? "file" : "files"} ready`);
+    if (state.pendingAttachments.some(item => item.kind === "image" && !item.extractedText)) {
+      try {
+        if (!sessionStorage.getItem("aui.imageHint")) {
+          sessionStorage.setItem("aui.imageHint", "1");
+          setTimeout(() => toast("AUI's model can't see pictures. Tap a picture to read its text or describe it.", "info", { duration: 9000 }), 1200);
+        }
+      } catch {}
+    }
     announce(`${readyCount} ${readyCount === 1 ? "file is" : "files are"} ready to send`);
   }
   if (failures.length) {
@@ -7276,6 +7874,7 @@ function createAttachmentPrompt(attachments) {
       ? "Please analyze the attached image."
       : `Please analyze the attached file: ${attachment.name}.`;
   }
+  if (attachments.length === 2 && attachments.every(attachment => attachment.extractedText)) return "Compare the two attached files. What is the same, and what is different?";
   return "Please analyze the attached files together.";
 }
 
@@ -7284,7 +7883,7 @@ function renderAttachmentTray() {
   DOM.attachmentTray.hidden = state.pendingAttachments.length === 0;
 
   state.pendingAttachments.forEach(attachment => {
-    const item = element("div", `attachmentPreview ${attachment.kind === "image" ? "imagePreview" : "filePreview"}`);
+    const item = element("div", `attachmentPreview ${attachment.kind === "image" ? "imagePreview" : "filePreview"} kind-${attachment.kind || "file"}`);
     item.dataset.attachmentId = attachment.id;
     if (attachment.kind === "image" && attachment.previewUrl) {
       const image = new Image();
@@ -7298,7 +7897,7 @@ function renderAttachmentTray() {
     }
 
     const copy = element("div", "attachmentCopy");
-    const readyMeta = getAttachmentMeta(attachment);
+    const readyMeta = getAttachmentMeta(attachment) + attachmentCostLabel(attachment);
     copy.innerHTML = `<strong>${escapeHtml(attachment.name)}</strong><small>${attachment.status === "processing" ? `Preparing ${Math.round(attachment.progress || 0)}%` : readyMeta}</small>`;
     item.append(copy);
 
@@ -7316,14 +7915,28 @@ function renderAttachmentTray() {
     }
     DOM.attachmentTray.append(item);
   });
+  trayExtras();
 }
 
 function handleAttachmentAction(event) {
   const button = event.target.closest("[data-remove-attachment]");
   if (!button) return;
-  state.pendingAttachments = state.pendingAttachments.filter(item => item.id !== button.dataset.removeAttachment);
+  // 692: removing a file can be undone.
+  const index = state.pendingAttachments.findIndex(item => item.id === button.dataset.removeAttachment);
+  const [removed] = index >= 0 ? state.pendingAttachments.splice(index, 1) : [];
   renderAttachmentTray();
   updateComposerState();
+  if (removed) {
+    toast(`Removed ${removed.name}`, "success", {
+      label: "Undo",
+      duration: 6000,
+      onClick: () => {
+        state.pendingAttachments.splice(Math.min(index, state.pendingAttachments.length), 0, removed);
+        renderAttachmentTray();
+        updateComposerState();
+      }
+    });
+  }
 }
 
 function getAttachmentMeta(attachment) {

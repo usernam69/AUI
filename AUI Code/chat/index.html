@@ -30,7 +30,7 @@
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css" integrity="sha384-wH75j6z1lH97ZOpMOInqhgKzFkAInZPPSPlZpYKYTOqsaizPvhQZmAtLcPKXpLyH" crossorigin="anonymous" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="/style.css?v=20261018-b16">
+  <link rel="stylesheet" href="/style.css?v=20261018-b17">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -187,15 +187,15 @@
   </div>
 
   <div id="toolsPopover" class="toolsPopover" popover>
-    <button id="popoverImageUpload" type="button"><span aria-hidden="true">▧</span><span><strong>Upload images</strong><small>Analyze one or more images</small></span></button>
-    <button id="popoverFileUpload" type="button"><span aria-hidden="true">⌁</span><span><strong>Attach files</strong><small>Documents, sheets, text, and code</small></span></button>
+    <button id="popoverImageUpload" type="button"><span aria-hidden="true">▧</span><span><strong>Upload images</strong><small>Photos and screenshots, up to 18 MB each</small></span></button>
+    <button id="popoverFileUpload" type="button"><span aria-hidden="true">⌁</span><span><strong>Attach files</strong><small>PDF, Word, sheets, code, zip, audio (25 MB) or video (200 MB)</small></span></button>
     <button id="popoverFolderUpload" type="button"><span aria-hidden="true">▤</span><span><strong>Attach a folder</strong><small>Analyze a project or document folder</small></span></button>
     <button id="generateImageBtn" type="button"><span aria-hidden="true">✦</span><span><strong>Create an image</strong><small>Generate with AUI</small></span></button>
     <button id="popoverWebSearch" type="button"><span aria-hidden="true">⌕</span><span><strong>Search the web</strong><small>Find current information</small></span></button>
   </div>
 
-  <input id="imageInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden>
-  <input id="fileInput" type="file" accept=".pdf,.doc,.docx,.txt,.md,.markdown,.csv,.xls,.xlsx,.json,.html,.htm,.css,.scss,.sass,.less,.js,.mjs,.cjs,.jsx,.ts,.tsx,.vue,.svelte,.astro,.py,.pyw,.java,.c,.cc,.cpp,.cxx,.h,.hpp,.cs,.go,.rs,.rb,.php,.swift,.kt,.kts,.dart,.lua,.r,.scala,.sh,.bash,.zsh,.fish,.ps1,.bat,.cmd,.sql,.graphql,.gql,.xml,.svg,.yaml,.yml,.toml,.ini,.cfg,.conf,.env,.log,.ipynb,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/json,text/plain,text/markdown,text/csv,text/html,text/css,text/javascript,application/javascript,application/xml" multiple hidden>
+  <input id="imageInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,.heic,.heif" multiple hidden>
+  <input id="fileInput" type="file" accept=".zip,.heic,.heif,.mp3,.wav,.m4a,.aac,.ogg,.flac,.mp4,.mov,.m4v,.webm,audio/*,video/*,application/zip,.pdf,.doc,.docx,.txt,.md,.markdown,.csv,.xls,.xlsx,.json,.html,.htm,.css,.scss,.sass,.less,.js,.mjs,.cjs,.jsx,.ts,.tsx,.vue,.svelte,.astro,.py,.pyw,.java,.c,.cc,.cpp,.cxx,.h,.hpp,.cs,.go,.rs,.rb,.php,.swift,.kt,.kts,.dart,.lua,.r,.scala,.sh,.bash,.zsh,.fish,.ps1,.bat,.cmd,.sql,.graphql,.gql,.xml,.svg,.yaml,.yml,.toml,.ini,.cfg,.conf,.env,.log,.ipynb,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/json,text/plain,text/markdown,text/csv,text/html,text/css,text/javascript,application/javascript,application/xml" multiple hidden>
   <input id="folderInput" type="file" webkitdirectory directory multiple hidden>
 
   <dialog class="dialog" id="settingsDialog" aria-labelledby="settingsTitle">
@@ -448,6 +448,6 @@
       navigator.serviceWorker.register("/chat/sw.js").catch(() => {});
     }
   </script>
-  <script type="module" src="/chat/app.js?v=20261018-b16"></script>
+  <script type="module" src="/chat/app.js?v=20261018-b17"></script>
 </body>
 </html>
