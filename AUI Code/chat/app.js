@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b12";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b13";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b12";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b12";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b12";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b12";
+} from "../modules/uploads.js?v=20261018-b13";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b13";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b13";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b13";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -1947,7 +1947,7 @@ function updateContextMeter() {
   if (!meter) return;
   const chat = getChat();
   const history = (chat?.messages || []).reduce((total, message) => total + message.content.length, 0);
-  const used = Math.min(1, (history + DOM.input.value.length + 900) / SLM_PROMPT_CHAR_BUDGET);
+  const used = Math.min(1, (history + DOM.input.value.length + 900) / getPromptBudget());
   meter.style.setProperty("--fill", String(used));
   meter.title = used >= 1
     ? "This chat is longer than the model can see at once; the oldest messages are left out"
@@ -1986,31 +1986,38 @@ function renderFollowUps() {
       if (!language) return;
       prompt = `Translate your last answer into ${language}.`;
     }
-    DOM.input.value = prompt;
-    sendMessage();
+    sendMessage({ text: prompt, attachments: [], keepComposer: true });
   });
   article.after(bar);
 }
 
 // Ctrl/Cmd + ↑/↓ walk through prompts you sent before.
 let promptHistoryIndex = -1;
+let promptHistoryDraft = "";
 function recallPrompt(step) {
   const sent = state.chats.flatMap(chat => chat.messages.filter(message => message.role === "user").map(message => ({ text: message.content, time: message.timestamp })))
     .sort((a, b) => b.time - a.time).map(item => item.text);
   if (!sent.length) return;
+  if (promptHistoryIndex < 0) promptHistoryDraft = DOM.input.value;
   promptHistoryIndex = Math.max(-1, Math.min(sent.length - 1, promptHistoryIndex + step));
-  DOM.input.value = promptHistoryIndex < 0 ? "" : sent[promptHistoryIndex];
+  DOM.input.value = promptHistoryIndex < 0 ? promptHistoryDraft : sent[promptHistoryIndex];
   scheduleTextareaResize();
   updateComposerState();
 }
 
 // Real microphone level bars while dictating.
 let voiceMeter = null;
+let voiceMeterRun = 0;
 async function startVoiceMeter() {
   stopVoiceMeter();
   if (!navigator.mediaDevices?.getUserMedia || !window.AudioContext) return;
+  const run = voiceMeterRun;
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (run !== voiceMeterRun) {
+      stream.getTracks().forEach(track => track.stop());
+      return;
+    }
     const context = new AudioContext();
     const analyser = context.createAnalyser();
     analyser.fftSize = 64;
@@ -2031,6 +2038,7 @@ async function startVoiceMeter() {
   } catch {}
 }
 function stopVoiceMeter() {
+  voiceMeterRun += 1;
   if (!voiceMeter) return;
   voiceMeter.stop();
   voiceMeter.stream.getTracks().forEach(track => track.stop());
@@ -2152,8 +2160,7 @@ function queueMessage() {
 }
 function sendQueuedMessage() {
   if (state.loading || !messageQueue.length) return;
-  DOM.input.value = messageQueue.shift();
-  sendMessage();
+  sendMessage({ text: messageQueue.shift(), attachments: [], keepComposer: true });
 }
 
 // --- Message rendering from The Probe (category 6) ---
@@ -2330,10 +2337,15 @@ function toggleTask(box) {
   if (!message) return;
   const index = Number(box.dataset.taskIndex);
   let seen = -1;
-  message.content = message.content.replace(/^(\s*[-*+] \[)([ xX])(\])/gm, (match, open, mark, close) => {
-    seen += 1;
-    return seen === index ? `${open}${box.checked ? "x" : " "}${close}` : match;
-  });
+  let inCode = false;
+  message.content = message.content.split("\n").map(line => {
+    if (/^\s*(```|~~~)/.test(line)) inCode = !inCode;
+    if (inCode) return line;
+    return line.replace(/^(\s*(?:[-*+]|\d+[.)]) \[)([ xX])(\])/, (match, open, mark, close) => {
+      seen += 1;
+      return seen === index ? `${open}${box.checked ? "x" : " "}${close}` : match;
+    });
+  }).join("\n");
   persist();
 }
 
@@ -2385,8 +2397,9 @@ function showVersionDiff(message) {
   const versions = message.versions || [];
   const current = message.versionIndex ?? versions.length - 1;
   if (versions.length < 2) return;
-  const before = versions[Math.max(0, current - 1)].split(/(\s+)/);
-  const after = versions[current].split(/(\s+)/);
+  const to = Math.max(1, current);
+  const before = versions[to - 1].split(/(\s+)/);
+  const after = versions[to].split(/(\s+)/);
   const rows = before.length + 1;
   const cols = after.length + 1;
   if (rows * cols > 4_000_000) return toast("These versions are too long to compare.", "error");
@@ -2421,7 +2434,7 @@ function showVersionDiff(message) {
       if (event.target === dialog || event.target.closest("[data-close-dialog]")) dialog.close();
     });
   }
-  dialog.innerHTML = `<div class="dialogPanel"><header><div><p class="eyebrow">Version ${current} → ${current + 1}</p><h2>What changed</h2></div><button class="iconBtn" type="button" data-close-dialog aria-label="Close">×</button></header><div class="dialogContent versionDiff">${html}</div></div>`;
+  dialog.innerHTML = `<div class="dialogPanel"><header><div><p class="eyebrow">Version ${to} → ${to + 1}</p><h2>What changed</h2></div><button class="iconBtn" type="button" data-close-dialog aria-label="Close">×</button></header><div class="dialogContent versionDiff">${html}</div></div>`;
   dialog.showModal();
 }
 
@@ -3745,7 +3758,7 @@ async function sendMessage(options = {}) {
     chat.messages.push(userMessage);
   }
 
-  if (!options.hiddenUser) {
+  if (!options.hiddenUser && !options.keepComposer) {
     DOM.input.value = "";
     saveDraft();
     state.pendingAttachments = [];
@@ -4743,7 +4756,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b12");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b13");
   return markdownModulePromise;
 }
 
