@@ -22,19 +22,54 @@ export function loadStoredState(defaultState) {
   }
 }
 
+function stateReplacer(key, value) {
+  if (["user", "loggedIn", "loading", "pendingAttachments"].includes(key)) return undefined;
+  if (key === "dataUrl" && typeof value === "string" && value.length > MAX_ATTACHMENT_DATA_LENGTH) return undefined;
+  if (key === "previewUrl" && typeof value === "string" && value.startsWith("blob:")) return undefined;
+  if (key === "generatedImage" && typeof value === "string" && value.startsWith("data:") && value.length > MAX_ATTACHMENT_DATA_LENGTH) return undefined;
+  return value;
+}
+
 export function saveStoredState(state) {
   try {
-    const serialized = JSON.stringify(state, (key, value) => {
-      if (["user", "loggedIn", "loading", "pendingAttachments"].includes(key)) return undefined;
-      if (key === "dataUrl" && typeof value === "string" && value.length > MAX_ATTACHMENT_DATA_LENGTH) return undefined;
-      if (key === "previewUrl" && typeof value === "string" && value.startsWith("blob:")) return undefined;
-      if (key === "generatedImage" && typeof value === "string" && value.startsWith("data:") && value.length > MAX_ATTACHMENT_DATA_LENGTH) return undefined;
-      return value;
-    });
-    localStorage.setItem(STORAGE_KEY, serialized);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state, stateReplacer));
   } catch (error) {
     console.warn("AUI could not save all local data:", error);
   }
+}
+
+// Cloud storage: one row per user in public.user_data (see supabase/chat_storage.sql).
+export function serializeForCloud(state) {
+  const { chats, memory, settings } = JSON.parse(JSON.stringify(
+    { chats: state.chats, memory: state.memory, settings: state.settings },
+    stateReplacer
+  ));
+  return { chats, memory, settings, updated_at: new Date().toISOString() };
+}
+
+export async function loadCloudData(supabase, userId) {
+  const { data, error } = await supabase
+    .from("user_data")
+    .select("chats, memory, settings, updated_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+export async function saveCloudData(supabase, userId, cloudData) {
+  const { data, error } = await supabase
+    .from("user_data")
+    .upsert(
+      { user_id: userId, chats: cloudData.chats, memory: cloudData.memory, settings: cloudData.settings },
+      { onConflict: "user_id" }
+    )
+    .select("updated_at")
+    .single();
+  if (error) throw error;
+  // Keep the server's timestamp so the background poll doesn't see our own save as a remote change.
+  if (data?.updated_at) cloudData.updated_at = data.updated_at;
+  return cloudData;
 }
 
 export function createId(prefix = "") {

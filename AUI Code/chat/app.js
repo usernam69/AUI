@@ -6,7 +6,7 @@ import {
   prepareFiles,
   prepareFolder
 } from "../modules/uploads.js?v=20260728-model-compare19";
-import { streamSlm } from "../modules/slm.js";
+import { streamSlm } from "../modules/slm.js?v=20260728-model-compare19";
 import { isMessageSubmitKey } from "../modules/keyboard.js?v=20260728-model-compare19";
 
 const CONFIG = {
@@ -534,6 +534,10 @@ function bindEvents() {
   DOM.loginBtn.addEventListener("click", handleAuth);
   DOM.searchBtn.addEventListener("click", toggleSearchMode);
   DOM.compareBtn.addEventListener("click", toggleCompareMode);
+  if (Object.keys(MODEL_NAMES).length < 2) {
+    DOM.compareBtn.hidden = true;
+    DOM.compareBar.hidden = true;
+  }
   DOM.compareCloseBtn.addEventListener("click", () => setCompareMode(false));
   DOM.compareModelSelect.addEventListener("change", validateCompareModel);
   DOM.imageGenerateBtn.addEventListener("click", generateImage);
@@ -951,18 +955,20 @@ async function sendMessage(options = {}) {
   announce(`Generating with ${MODEL_NAMES[requestModel] || requestModel}`);
 
   let loadingShown = false;
+  let sending = true;
   const priorContent = assistantMessage.content;
   try {
     const history = options.historyOverride
       || createHistory(chat, assistantMessage.id, Boolean(options.targetMessage));
-    const slmMessages = [
-      { role: "system", content: buildSlmSystemPrompt() },
-      ...history,
-      { role: "user", content: buildSlmUserText(text, attachments) }
-    ];
+    const slmMessages = fitSlmMessages(
+      buildSlmSystemPrompt(),
+      history,
+      buildSlmUserText(text, attachments)
+    );
     for await (const token of streamSlm(slmMessages, {
       signal: abortController.signal,
       onProgress: report => {
+        if (!sending) return;
         loadingShown = true;
         assistantMessage.content = `Loading the AUI model in your browser… ${Math.round((report.progress || 0) * 100)}% (first time only)`;
         scheduleStreamingRender(assistantMessage);
@@ -999,6 +1005,7 @@ async function sendMessage(options = {}) {
       announce("The response failed");
     }
   } finally {
+    sending = false;
     cancelStreamingRender();
     state.loading = false;
     abortController = null;
@@ -1011,20 +1018,57 @@ async function sendMessage(options = {}) {
 }
 
 function buildSlmSystemPrompt() {
-  const memory = state.settings.memory ? state.memory.slice(-8) : [];
   const parts = [
     "You are AUI, a helpful, concise AI assistant running privately in the user's browser.",
     `Response mode: ${state.mode}.`
   ];
-  if (memory.length) parts.push(`Things you remember about the user: ${JSON.stringify(memory)}`);
+  if (state.settings.memory && state.memory.length) {
+    const notes = state.memory.slice(-3)
+      .map(item => `- User: ${String(item.user || "").slice(0, 120)} / You: ${String(item.ai || "").slice(0, 160)}`)
+      .join("\n")
+      .slice(0, 1200);
+    parts.push(`Recent things you remember about the user:\n${notes}`);
+  }
   return parts.join("\n");
 }
 
+// The in-browser model has a ~4096-token window and replies take up to 1024,
+// so keep the prompt to roughly 8000 characters, dropping the oldest turns first.
+const SLM_PROMPT_CHAR_BUDGET = 8000;
+const SLM_ATTACHMENT_CHAR_BUDGET = 3500;
+
 function buildSlmUserText(text, attachments = []) {
-  const extra = attachments
-    .filter(attachment => attachment.extractedText)
-    .map(attachment => `[Attached file: ${attachment.name}]\n${String(attachment.extractedText).slice(0, 6000)}`);
-  return extra.length ? `${text}\n\n${extra.join("\n\n")}` : text;
+  const notes = [];
+  let remaining = SLM_ATTACHMENT_CHAR_BUDGET;
+  for (const attachment of attachments) {
+    if (!attachment.extractedText) {
+      notes.push(`[Attached ${attachment.kind || "file"}: ${attachment.name} — this model can't read its contents]`);
+      continue;
+    }
+    const body = String(attachment.extractedText).slice(0, Math.max(0, remaining));
+    remaining -= body.length;
+    notes.push(`[Attached file: ${attachment.name}]\n${body}`);
+  }
+  return notes.length ? `${text}\n\n${notes.join("\n\n")}` : text;
+}
+
+function fitSlmMessages(systemPrompt, history, userText) {
+  const user = userText.length > SLM_PROMPT_CHAR_BUDGET
+    ? userText.slice(0, SLM_PROMPT_CHAR_BUDGET)
+    : userText;
+  let budget = SLM_PROMPT_CHAR_BUDGET - systemPrompt.length - user.length;
+  const kept = [];
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    const cost = history[index].content.length;
+    if (cost > budget) break;
+    budget -= cost;
+    kept.unshift(history[index]);
+  }
+  return [
+    { role: "system", content: systemPrompt },
+    ...kept,
+    { role: "user", content: user }
+  ];
 }
 
 async function consumeEventStream(body, assistantMessage) {
@@ -1539,7 +1583,7 @@ function createMessageFooter(message, index) {
     if (message.status === "complete") {
       actions.append(actionButton("Regenerate", "regenerate"), actionButton("Continue", "continue"));
       if (getUserTier() !== "guest" && MODEL_NAMES[message.model]) {
-        actions.append(actionButton("Compare model", "compare"));
+        if (Object.keys(MODEL_NAMES).length > 1) actions.append(actionButton("Compare model", "compare"));
       }
     }
     if (message.status === "stopped") actions.append(actionButton("Continue", "continue"));
@@ -2555,6 +2599,12 @@ function handleMemoryAction(e) {
 }
 
 async function restoreSession() {
+  if (AUTO_OWNER_LOGIN && !state.user) {
+    // Set before any network call so the placeholder doesn't depend on the Supabase CDN loading.
+    state.user = PLACEHOLDER_OWNER_USER;
+    state.loggedIn = true;
+    updateAccount();
+  }
   try {
     const url = new URL(window.location.href);
     const redirect = getAuthRedirectState(url);

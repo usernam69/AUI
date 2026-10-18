@@ -329,7 +329,7 @@
 
   <script>
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/chat/sw.js");
+      navigator.serviceWorker.register("/chat/sw.js").catch(() => {});
     }
   </script>
   <script type="module" src="/chat/app.js?v=20260728-model-compare19"></script>
