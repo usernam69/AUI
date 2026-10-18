@@ -24,6 +24,8 @@ export function loadStoredState(defaultState) {
 
 // Session-only fields are stripped from the top level only: memory entries have a nested `user` field that must be kept.
 function stateReplacer(key, value) {
+  // Temporary chats live only in memory: never saved locally or synced.
+  if (key === "chats" && Array.isArray(value)) return value.filter(chat => !chat?.temporary);
   if (this && this.chats && this.settings && ["user", "loggedIn", "loading", "pendingAttachments"].includes(key)) return undefined;
   if (key === "dataUrl" && typeof value === "string" && value.length > MAX_ATTACHMENT_DATA_LENGTH) return undefined;
   if (key === "previewUrl" && typeof value === "string" && value.startsWith("blob:")) return undefined;

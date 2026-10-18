@@ -1052,3 +1052,8 @@ Skipped: 409 (needs the GitHub environment setting changed by the repo owner).
 ### Batch 2 - category 1 (quick wins)
 Built: 4, 5, 6, 8, 9, 10, 11, 12, 16, 17, 18, 19, 21, 23, 24, 25, 26, 27, 28, 29, 32, 33, 34, 35, 36, 37, 38, 39 (pages share the new theme), 40, 41, 42, 44, 45, 46, 47, 48, 49, 50.
 Already in AUI: 1, 2, 3, 7, 13, 14, 15, 20, 22, 30, 31, 43.
+
+### Batch 3 - category 2 (ChatGPT-style layout)
+Built: 52, 54, 56, 57, 61, 64, 65, 68, 71, 74, 76, 77, 78, 79, 80, 83, 84, 85, 86, 87, 88, 89, 92, 93, 95, 96, 97, 98, 99, 100.
+Already in AUI: 51, 53, 55, 58, 59, 60, 62, 63, 66, 67, 69, 70, 72, 73, 75, 81, 82, 90, 94.
+Not applicable: 91 (web search is off on GitHub Pages).

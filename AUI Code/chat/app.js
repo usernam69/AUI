@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b2";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b3";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b2";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS } from "../modules/slm.js?v=20261018-b2";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b2";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b2";
+} from "../modules/uploads.js?v=20261018-b3";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS } from "../modules/slm.js?v=20261018-b3";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b3";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b3";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -291,6 +291,7 @@ const SVG_ICONS = {
   trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
+  temporary: '<path d="M21 12a9 9 0 0 1-13.5 7.8L3 21l1.2-4.5A9 9 0 1 1 21 12Z" stroke-dasharray="3 2.5"/>',
   share: '<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v13M7 8l5-5 5 5"/>'
 };
 
@@ -515,6 +516,224 @@ function setupQuickWins() {
   }
 }
 
+// --- ChatGPT-style layout polish from The Probe (category 2) ---
+
+const SETTINGS_TABS = [
+  ["general", "General", ["themeSelect", "enterToSendToggle", "fontScaleInput", "densitySelect", "timestampsToggle", "autoScrollToggle", "notifyToggle", "soundToggle"]],
+  ["personal", "Personalization", ["speedSelect", "customInstructionsInput", "memoryToggle", "markdownToggle", "voiceOutputToggle", "speechRateInput"]],
+  ["data", "Data controls", ["preloadModelBtn", "exportAllBtn", "archivedChatsList", "resetSettingsBtn"]]
+];
+
+// Group the long settings list into ChatGPT-style tabs with a left-hand nav.
+function setupSettingsTabs() {
+  const body = document.querySelector("#settingsDialog .settingsBody");
+  if (!body || body.querySelector(".settingsTabs")) return;
+  const nav = element("nav", "settingsTabs");
+  nav.setAttribute("role", "tablist");
+  nav.setAttribute("aria-label", "Settings sections");
+  const panels = element("div", "settingsPanels");
+  const rows = [...body.querySelectorAll(":scope > .settingRow")];
+  SETTINGS_TABS.forEach(([id, label, controls], index) => {
+    const tab = element("button", "settingsTab");
+    tab.type = "button";
+    tab.id = `settings-tab-${id}`;
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-controls", `settings-panel-${id}`);
+    tab.setAttribute("aria-selected", String(index === 0));
+    tab.textContent = label;
+    nav.append(tab);
+    const panel = element("div", "settingsPanel");
+    panel.id = `settings-panel-${id}`;
+    panel.setAttribute("role", "tabpanel");
+    panel.setAttribute("aria-labelledby", tab.id);
+    panel.hidden = index !== 0;
+    rows.filter(row => controls.some(control => row.querySelector(`#${control}`))).forEach(row => panel.append(row));
+    panels.append(panel);
+  });
+  // Anything not assigned stays in General so nothing disappears.
+  rows.filter(row => !row.parentElement?.classList.contains("settingsPanel")).forEach(row => panels.firstChild.append(row));
+  nav.addEventListener("click", event => {
+    const tab = event.target.closest(".settingsTab");
+    if (tab) selectSettingsTab(tab.id.replace("settings-tab-", ""));
+  });
+  nav.addEventListener("keydown", event => {
+    if (!["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight"].includes(event.key)) return;
+    const tabs = [...nav.children];
+    const current = tabs.indexOf(document.activeElement);
+    const next = tabs[(current + (/Down|Right/.test(event.key) ? 1 : tabs.length - 1)) % tabs.length];
+    next.focus();
+    selectSettingsTab(next.id.replace("settings-tab-", ""));
+    event.preventDefault();
+  });
+  const layout = element("div", "settingsLayout");
+  layout.append(nav, panels);
+  body.prepend(layout);
+}
+
+function selectSettingsTab(id) {
+  document.querySelectorAll(".settingsTab").forEach(tab => {
+    tab.setAttribute("aria-selected", String(tab.id === `settings-tab-${id}`));
+    tab.tabIndex = tab.id === `settings-tab-${id}` ? 0 : -1;
+  });
+  document.querySelectorAll(".settingsPanel").forEach(panel => {
+    panel.hidden = panel.id !== `settings-panel-${id}`;
+  });
+  if (id === "data") renderArchivedChats();
+}
+
+function renderArchivedChats() {
+  const list = byId("archivedChatsList");
+  if (!list) return;
+  const archived = state.chats.filter(chat => chat.archived);
+  list.replaceChildren();
+  if (!archived.length) {
+    list.textContent = "No archived chats.";
+    return;
+  }
+  archived.forEach(chat => {
+    const row = element("div", "archivedRow");
+    const name = element("span");
+    name.textContent = chat.title;
+    const restore = element("button", "secondaryBtn");
+    restore.type = "button";
+    restore.textContent = "Unarchive";
+    restore.addEventListener("click", () => {
+      chat.archived = false;
+      chat.updatedAt = Date.now();
+      persistChatChange();
+      renderChats();
+      renderArchivedChats();
+      toast("Chat restored to the sidebar");
+    });
+    row.append(name, restore);
+    list.append(row);
+  });
+}
+
+const PROMPT_PRESETS = [
+  ["Write", "Email", "Write a friendly, concise email that "],
+  ["Write", "Rewrite", "Rewrite this to be clearer and shorter:\n\n"],
+  ["Write", "Story", "Write a short story about "],
+  ["Learn", "Explain simply", "Explain this like I'm new to it: "],
+  ["Learn", "Quiz me", "Quiz me with 5 questions about "],
+  ["Learn", "Flashcards", "Make 10 flashcards (question / answer) about "],
+  ["Code", "Explain code", "Explain what this code does, step by step:\n\n"],
+  ["Code", "Find the bug", "Find the bug in this code and show the fix:\n\n"],
+  ["Code", "Regex", "Write a regular expression that matches "],
+  ["Plan", "Plan my day", "Help me plan my day. My tasks are: "],
+  ["Plan", "Trip", "Plan a 3-day trip to "],
+  ["Plan", "Workout", "Make a simple 20-minute workout for "],
+  ["Fun", "Joke", "Tell me a clever joke about "],
+  ["Fun", "Would you rather", "Give me 5 funny 'would you rather' questions."],
+  ["Fun", "Name ideas", "Give me 10 creative names for "]
+];
+
+function openPromptGallery() {
+  let dialog = byId("promptGalleryDialog");
+  if (!dialog) {
+    dialog = element("dialog", "dialog");
+    dialog.id = "promptGalleryDialog";
+    dialog.setAttribute("aria-labelledby", "promptGalleryTitle");
+    const groups = [...new Set(PROMPT_PRESETS.map(([group]) => group))];
+    dialog.innerHTML = `<div class="dialogPanel"><header><div><p class="eyebrow">Explore</p><h2 id="promptGalleryTitle">Prompt ideas</h2></div><button class="iconBtn" type="button" data-close-dialog="promptGalleryDialog" aria-label="Close prompt ideas">×</button></header><div class="dialogContent promptGallery">${groups.map(group => `<section><h3>${group}</h3><div>${PROMPT_PRESETS.filter(([g]) => g === group).map(([, name, text]) => `<button type="button" class="promptPreset" data-preset="${escapeHtml(text)}">${escapeHtml(name)}</button>`).join("")}</div></section>`).join("")}</div></div>`;
+    dialog.addEventListener("click", event => {
+      const preset = event.target.closest("[data-preset]");
+      if (preset) {
+        DOM.input.value = preset.dataset.preset;
+        dialog.close();
+        DOM.input.focus();
+        DOM.input.setSelectionRange(DOM.input.value.length, DOM.input.value.length);
+        scheduleTextareaResize();
+        updateComposerState();
+      } else if (event.target.closest("[data-close-dialog]") || event.target === dialog) {
+        dialog.close();
+      }
+    });
+    document.body.append(dialog);
+  }
+  dialog.showModal();
+}
+
+async function shareCurrentChat() {
+  const chat = getChat();
+  if (!chat?.messages.length) return toast("Nothing to share yet.", "error");
+  const text = chatToMarkdown(chat);
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: chat.title, text });
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+    }
+  }
+  await copyWholeChat();
+}
+
+function startTemporaryChat() {
+  const chat = makeChat();
+  chat.temporary = true;
+  chat.title = "Temporary chat";
+  state.chats.unshift(chat);
+  state.currentChatId = chat.id;
+  renderChats();
+  renderMessages();
+  DOM.input.focus();
+  toast("Temporary chat: it won’t be saved or used for memory.");
+}
+
+function setVersion(message, index) {
+  const versions = message.versions || [];
+  if (index < 0 || index >= versions.length) return;
+  message.versionIndex = index;
+  message.content = versions[index];
+  persist();
+  renderMessages({ preserveScroll: true });
+}
+
+function setupLayoutPolish() {
+  setupSettingsTabs();
+  const actions = document.querySelector(".composerActions");
+  const voice = byId("voiceBtn");
+  if (actions && voice) actions.insertBefore(voice, DOM.sendBtn);
+  const end = document.querySelector(".topBarEnd");
+  if (end) {
+    const make = (id, label, icon, onClick, extra = "") => {
+      const button = element("button", `iconBtn ${extra}`.trim());
+      button.id = id;
+      button.type = "button";
+      button.title = label;
+      button.setAttribute("aria-label", label);
+      button.innerHTML = svgIcon(icon, 18);
+      button.addEventListener("click", onClick);
+      return button;
+    };
+    end.prepend(
+      make("temporaryChatBtn", "Start a temporary chat", "temporary", startTemporaryChat, "temporaryBtn"),
+      make("shareChatBtn", "Share this chat", "share", shareCurrentChat)
+    );
+    end.append(make("mobileNewChatBtn", "New chat", "pencil", createChat, "mobileOnly"));
+    const avatar = element("button", "topAvatarBtn");
+    avatar.type = "button";
+    avatar.setAttribute("aria-label", "Account");
+    avatar.title = "Account";
+    avatar.addEventListener("click", () => DOM.loginBtn.click());
+    end.append(avatar);
+    syncTopAvatar();
+  }
+  const explore = element("button", "exploreBtn");
+  explore.type = "button";
+  explore.innerHTML = `${svgIcon("image", 16)}<span>Explore prompts</span>`;
+  explore.querySelector("svg").innerHTML = '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>';
+  explore.addEventListener("click", openPromptGallery);
+  document.querySelector(".chatSearch")?.after(explore);
+}
+
+function syncTopAvatar() {
+  const avatar = document.querySelector(".topAvatarBtn");
+  const source = document.querySelector("#loginBtn .avatar");
+  if (avatar && source) avatar.innerHTML = source.innerHTML;
+}
+
 let appInitialized = false;
 
 if (document.readyState === "loading") {
@@ -549,6 +768,7 @@ async function init() {
   bindEvents();
   hideServerOnlyTools();
   setupQuickWins();
+  setupLayoutPolish();
   applyPreferences();
   updateShortcutLabels();
   updateNetworkStatus();
@@ -795,6 +1015,8 @@ function normalizeChats(chats) {
     updatedAt: chat.updatedAt || chat.createdAt || Date.now(),
     pinned: Boolean(chat.pinned),
     favorite: Boolean(chat.favorite),
+    archived: Boolean(chat.archived),
+    temporary: Boolean(chat.temporary),
     messages: Array.isArray(chat.messages)
       ? chat.messages.map(message => ({
         id: message.id || createId("message"),
@@ -809,7 +1031,10 @@ function normalizeChats(chats) {
         comparisonLabel: message.comparisonLabel || "",
         tokensPerSecond: Number(message.tokensPerSecond) || 0,
         firstTokenMs: Number(message.firstTokenMs) || 0,
-        feedback: message.feedback === "up" || message.feedback === "down" ? message.feedback : ""
+        feedback: message.feedback === "up" || message.feedback === "down" ? message.feedback : "",
+        ...(Array.isArray(message.versions) && message.versions.length > 1
+          ? { versions: message.versions.map(String), versionIndex: Math.min(Number(message.versionIndex) || 0, message.versions.length - 1) }
+          : {})
       }))
       : []
   }));
@@ -1270,7 +1495,8 @@ async function sendMessage(options = {}) {
     status: "streaming",
     attachments: [],
     comparisonId: options.comparisonId || "",
-    comparisonLabel: options.comparisonLabel || ""
+    comparisonLabel: options.comparisonLabel || "",
+    ...(options.previousVersions?.length ? { versions: [...options.previousVersions] } : {})
   };
 
   if (!options.targetMessage) chat.messages.push(assistantMessage);
@@ -1308,10 +1534,12 @@ async function sendMessage(options = {}) {
         showLoadPercentInTitle(report);
         assistantMessage.content = `${describeProgress(report, model)} (first time only). Stop cancels; downloaded parts are kept for next time.`;
         scheduleStreamingRender(assistantMessage);
+        DOM.chatArea.querySelector(`[data-message-id="${CSS.escape(assistantMessage.id)}"]`)?.classList.add("isLoadingModel");
       }
     })) {
       if (loadingShown) {
         loadingShown = false;
+        DOM.chatArea.querySelector(`[data-message-id="${CSS.escape(assistantMessage.id)}"]`)?.classList.remove("isLoadingModel");
         document.title = baseDocumentTitle;
         assistantMessage.content = priorContent;
       }
@@ -1330,6 +1558,15 @@ async function sendMessage(options = {}) {
     if (tokenCount > 1 && seconds > 0) assistantMessage.tokensPerSecond = Math.round(tokenCount / seconds * 10) / 10;
 
     assistantMessage.status = assistantMessage.content ? "complete" : "error";
+    if (assistantMessage.versions && assistantMessage.content) {
+      // Continuing a reply updates the version on screen; regenerating adds a new one.
+      if (options.targetMessage && assistantMessage.versionIndex != null) {
+        assistantMessage.versions[assistantMessage.versionIndex] = assistantMessage.content;
+      } else {
+        assistantMessage.versions.push(assistantMessage.content);
+        assistantMessage.versionIndex = assistantMessage.versions.length - 1;
+      }
+    }
     if (!assistantMessage.content) assistantMessage.error = "The model returned an empty response.";
 
     if (!options.hiddenUser || options.countsTowardLimit) {
@@ -1820,6 +2057,7 @@ function captureMessageRenderState(message) {
     generatedImage: message.generatedImage,
     comparisonId: message.comparisonId,
     comparisonLabel: message.comparisonLabel,
+    versionIndex: message.versionIndex,
     searchResults: message.searchResults,
     attachments: message.attachments,
     timestampsEnabled: state.settings.timestamps,
@@ -1854,6 +2092,10 @@ function createMessageElement(message, index, { animate = true } = {}) {
   article.dataset.messageId = message.id;
   article.dataset.status = message.status || "complete";
   article.title = new Date(message.timestamp).toLocaleString();
+  const previous = getChat()?.messages[index - 1];
+  if (index > 0 && previous && new Date(previous.timestamp).toDateString() !== new Date(message.timestamp).toDateString()) {
+    article.dataset.dayLabel = new Date(message.timestamp).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  }
   article._auiRenderState = captureMessageRenderState(message);
 
   const inner = element("div", "messageInner");
@@ -1950,6 +2192,12 @@ function createMessageFooter(message, index) {
   footer.append(metrics);
 
   const actions = element("div", "messageActions");
+  if (message.role === "assistant" && message.versions?.length > 1 && message.status !== "streaming") {
+    const nav = element("span", "versionNav");
+    const current = message.versionIndex ?? message.versions.length - 1;
+    nav.innerHTML = `<button type="button" class="messageAction" data-message-action="version-prev" aria-label="Previous version" ${current === 0 ? "disabled" : ""}>‹</button><span>${current + 1}/${message.versions.length}</span><button type="button" class="messageAction" data-message-action="version-next" aria-label="Next version" ${current === message.versions.length - 1 ? "disabled" : ""}>›</button>`;
+    actions.append(nav);
+  }
   if (message.role === "assistant") {
     actions.append(
       actionButton("Copy", "copy"),
@@ -1996,7 +2244,7 @@ function createTypingIndicator() {
   const indicator = element("div", "typingIndicator");
   indicator.setAttribute("role", "status");
   indicator.setAttribute("aria-label", "AUI is thinking");
-  indicator.innerHTML = "<span></span><span></span><span></span>";
+  indicator.innerHTML = '<span class="thinkingText">Thinking…</span>';
   return indicator;
 }
 
@@ -2044,7 +2292,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b2");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b3");
   return markdownModulePromise;
 }
 
@@ -2142,6 +2390,12 @@ async function handleChatAction(event) {
     case "compare":
       compareMessageWithAnotherModel(message);
       break;
+    case "version-prev":
+    case "version-next": {
+      const current = message.versionIndex ?? message.versions.length - 1;
+      setVersion(message, current + (button.dataset.messageAction === "version-next" ? 1 : -1));
+      break;
+    }
     case "feedback-up":
     case "feedback-down": {
       const value = button.dataset.messageAction.slice(9);
@@ -2171,13 +2425,15 @@ function regenerateMessage(message) {
     return sendSearchMessage(userMessage.content);
   }
 
+  const previousVersions = message.versions?.length ? message.versions : (message.content ? [message.content] : []);
   chat.messages.splice(userIndex + 1);
   persist();
   sendMessage({
     text: userMessage.content,
     attachments: userMessage.attachments || [],
     userMessage,
-    hiddenUser: true
+    hiddenUser: true,
+    previousVersions
   });
 }
 
@@ -2302,6 +2558,7 @@ function updateMessageMetrics(article, message) {
 function renderChats() {
   const query = DOM.chatSearchInput.value.trim().toLowerCase();
   const filtered = state.chats
+    .filter(chat => query || !chat.archived)
     .filter(chat => !query || chat.title.toLowerCase().includes(query) || chat.messages.some(message => message.content.toLowerCase().includes(query)))
     .sort((a, b) => Number(b.pinned) - Number(a.pinned) || Number(b.favorite) - Number(a.favorite) || b.updatedAt - a.updatedAt);
   const visible = filtered.slice(0, visibleChatCount);
@@ -2394,6 +2651,7 @@ function createChatItem(chat) {
   actions.innerHTML = `
     <button type="button" data-chat-action="pin">${chat.pinned ? "Unpin" : "Pin"}</button>
     <button type="button" data-chat-action="rename">Rename</button>
+    <button type="button" data-chat-action="archive">${chat.archived ? "Unarchive" : "Archive"}</button>
     <button type="button" data-chat-action="export">Export as Markdown</button>
     <button type="button" data-chat-action="newtab">Open in new tab</button>
     <button type="button" class="dangerAction" data-chat-action="delete">Delete</button>`;
@@ -2442,6 +2700,18 @@ async function handleChatListAction(event) {
       break;
     case "rename":
       await renameChat(chat);
+      break;
+    case "archive":
+      chat.archived = !chat.archived;
+      if (chat.archived && chat.id === state.currentChatId) {
+        const next = state.chats.find(candidate => !candidate.archived && candidate.id !== chat.id);
+        if (next) state.currentChatId = next.id;
+        else createChat();
+      }
+      persistChatChange();
+      renderChats();
+      renderMessages();
+      toast(chat.archived ? "Chat archived. Find it in Settings, Data controls." : "Chat unarchived");
       break;
     case "export":
       exportChatMarkdown(chat);
@@ -4011,6 +4281,7 @@ function completeEmailSignupConfirmation() {
 }
 
 function updateAccount() {
+  queueMicrotask(syncTopAvatar);
   const strong = DOM.loginBtn.querySelector("strong");
   const small = DOM.loginBtn.querySelector("small");
   const avatar = DOM.loginBtn.querySelector(".avatar");
@@ -4084,7 +4355,7 @@ function updateMessageCounter() {
 }
 
 function rememberExchange(user, assistant) {
-  if (!state.settings.memory || !assistant) return;
+  if (!state.settings.memory || !assistant || getChat()?.temporary) return;
   state.memory.push({ user, ai: assistant, time: Date.now() });
   if (state.memory.length > CONFIG.MAX_MEMORY) state.memory.shift();
 }

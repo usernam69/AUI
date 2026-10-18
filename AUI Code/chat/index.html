@@ -24,7 +24,7 @@
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css">
-  <link rel="stylesheet" href="/style.css?v=20261018-b2">
+  <link rel="stylesheet" href="/style.css?v=20261018-b3">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -210,6 +210,7 @@
         <div class="settingRow"><span><strong>Model</strong><small>Download it now so your first reply starts fast</small></span><button class="secondaryBtn" id="preloadModelBtn" type="button">Download the model now</button></div>
         <div class="settingRow"><span><strong>Your chats</strong><small>Back up, restore or wipe chats in this browser</small></span><span class="settingActions"><button class="secondaryBtn" id="exportAllBtn" type="button">Export all</button><button class="secondaryBtn" id="importChatsBtn" type="button">Import</button><button class="secondaryBtn dangerButton" id="deleteAllChatsBtn" type="button">Delete all</button></span></div>
         <input id="importChatsInput" type="file" accept=".json,application/json" hidden>
+        <div class="settingRow settingRowStack"><span><strong>Archived chats</strong><small>Chats you archived from the sidebar</small></span><div id="archivedChatsList" class="archivedList"></div></div>
         <div class="settingRow"><span><strong>Reset settings</strong><small id="settingsVersion">AUI</small></span><button class="secondaryBtn" id="resetSettingsBtn" type="button">Reset to defaults</button></div>
         <p class="settingsFooter">Press <kbd>?</kbd> for keyboard shortcuts.</p>
       </div>
@@ -358,6 +359,6 @@
       navigator.serviceWorker.register("/chat/sw.js").catch(() => {});
     }
   </script>
-  <script type="module" src="/chat/app.js?v=20261018-b2"></script>
+  <script type="module" src="/chat/app.js?v=20261018-b3"></script>
 </body>
 </html>
