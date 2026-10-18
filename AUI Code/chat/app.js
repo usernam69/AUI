@@ -6,7 +6,8 @@ import {
   prepareFiles,
   prepareFolder
 } from "../modules/uploads.js?v=20260728-model-compare19";
-import { streamSlm } from "../modules/slm.js?v=20260728-model-compare19";
+import { streamSlm, describeProgress } from "../modules/slm.js?v=20260728-model-compare19";
+import { pickRelevantText } from "../modules/rag.js?v=20260728-model-compare19";
 import { isMessageSubmitKey } from "../modules/keyboard.js?v=20260728-model-compare19";
 
 const CONFIG = {
@@ -51,8 +52,12 @@ const CONFIG = {
 
 // Temporary placeholder: every visitor appears signed in as the owner in the UI.
 // This is a local-only user with no Supabase session, so it grants no server or
-// database access. Set AUTO_OWNER_LOGIN to false to restore normal sign-in.
-const AUTO_OWNER_LOGIN = true;
+// database access. Logging out of it turns it off in this browser (stored under
+// "auiNoAutoOwner"), so real sign-in can be used.
+const AUTO_OWNER_KEY = "auiNoAutoOwner";
+const AUTO_OWNER_LOGIN = (() => {
+  try { return localStorage.getItem(AUTO_OWNER_KEY) !== "1"; } catch { return true; }
+})();
 const PLACEHOLDER_OWNER_USER = {
   id: "local-owner",
   email: "sdgoldstein14@gmail.com",
@@ -538,6 +543,13 @@ function bindEvents() {
     DOM.compareBtn.hidden = true;
     DOM.compareBar.hidden = true;
   }
+  // The on-device model can't browse the web, make images, or read images, so hide those tools.
+  for (const control of [
+    DOM.searchBtn, DOM.imageGenerateBtn, DOM.imageUploadBtn,
+    byId("popoverWebSearch"), byId("generateImageBtn"), byId("popoverImageUpload")
+  ]) {
+    if (control) control.hidden = true;
+  }
   DOM.compareCloseBtn.addEventListener("click", () => setCompareMode(false));
   DOM.compareModelSelect.addEventListener("change", validateCompareModel);
   DOM.imageGenerateBtn.addEventListener("click", generateImage);
@@ -967,10 +979,10 @@ async function sendMessage(options = {}) {
     );
     for await (const token of streamSlm(slmMessages, {
       signal: abortController.signal,
-      onProgress: report => {
+      onProgress: (report, model) => {
         if (!sending) return;
         loadingShown = true;
-        assistantMessage.content = `Loading the AUI model in your browser… ${Math.round((report.progress || 0) * 100)}% (first time only)`;
+        assistantMessage.content = `${describeProgress(report, model)} (first time only). Stop cancels; downloaded parts are kept for next time.`;
         scheduleStreamingRender(assistantMessage);
       }
     })) {
@@ -1017,10 +1029,23 @@ async function sendMessage(options = {}) {
   }
 }
 
+const MODE_GUIDANCE = {
+  Normal: "Answer clearly and directly.",
+  Chaos: "Be playful and surprising, but stay helpful and accurate.",
+  "Safe Mode": "Use careful, family-friendly language and decline anything harmful.",
+  "Coder Mode": "Focus on code: give short explanations and complete, working snippets in fenced code blocks.",
+  Creative: "Be imaginative and vivid while staying on topic.",
+  "Beta Lab": "Answer clearly and directly."
+};
+
 function buildSlmSystemPrompt() {
   const parts = [
-    "You are AUI, a helpful, concise AI assistant running privately in the user's browser.",
-    `Response mode: ${state.mode}.`
+    "You are AUI, a friendly assistant that runs privately on the user's own device. You are a small model, so be honest about it.",
+    "Rules: keep answers short and well organized; use Markdown lists and code blocks when helpful; "
+      + "if you are not sure of a fact, a number or a date, say so instead of guessing; "
+      + "you cannot browse the web, see images, or know today's date unless the user tells you; "
+      + "ask one short clarifying question when a request is ambiguous.",
+    MODE_GUIDANCE[state.mode] || MODE_GUIDANCE.Normal
   ];
   if (state.settings.memory && state.memory.length) {
     const notes = state.memory.slice(-3)
@@ -1038,17 +1063,17 @@ const SLM_PROMPT_CHAR_BUDGET = 8000;
 const SLM_ATTACHMENT_CHAR_BUDGET = 3500;
 
 function buildSlmUserText(text, attachments = []) {
-  const notes = [];
-  let remaining = SLM_ATTACHMENT_CHAR_BUDGET;
-  for (const attachment of attachments) {
+  const readable = attachments.filter(attachment => attachment.extractedText);
+  const perFile = Math.floor(SLM_ATTACHMENT_CHAR_BUDGET / Math.max(1, readable.length));
+  const notes = attachments.map(attachment => {
     if (!attachment.extractedText) {
-      notes.push(`[Attached ${attachment.kind || "file"}: ${attachment.name} — this model can't read its contents]`);
-      continue;
+      return `[Attached ${attachment.kind || "file"}: ${attachment.name} — this model can't read its contents]`;
     }
-    const body = String(attachment.extractedText).slice(0, Math.max(0, remaining));
-    remaining -= body.length;
-    notes.push(`[Attached file: ${attachment.name}]\n${body}`);
-  }
+    const full = String(attachment.extractedText);
+    const body = pickRelevantText(full, text, perFile);
+    const label = body.length < full.length ? "Attached file (excerpts most relevant to the question)" : "Attached file";
+    return `[${label}: ${attachment.name}]\n${body}`;
+  });
   return notes.length ? `${text}\n\n${notes.join("\n\n")}` : text;
 }
 
@@ -2331,6 +2356,7 @@ function handlePaste(event) {
 }
 
 function toggleSearchMode() {
+  if (DOM.searchBtn.hidden) return;
   if (!searchMode && compareMode) setCompareMode(false);
   searchMode = !searchMode;
   updateSearchMode();
@@ -3060,9 +3086,14 @@ function removeProfileImage() {
 async function logoutFromProfile() {
   setProfileBusy(true, "logout");
   try {
-    const supabase = await getSupabase();
-    const { error } = await supabase.auth.signOut({ scope: "local" });
-    if (error) throw error;
+    if (state.user?.id === PLACEHOLDER_OWNER_USER.id) {
+      // The placeholder has no real session, so there is nothing to sign out of.
+      try { localStorage.setItem(AUTO_OWNER_KEY, "1"); } catch {}
+    } else {
+      const supabase = await getSupabase();
+      const { error } = await supabase.auth.signOut({ scope: "local" });
+      if (error) throw error;
+    }
     state.user = null;
     state.loggedIn = false;
     pendingProfileAvatar = "";

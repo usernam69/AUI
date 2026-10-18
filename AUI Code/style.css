@@ -1900,6 +1900,10 @@
     background: var(--surface-hover);
   }
 
+  .toolsPopover button[hidden] {
+    display: none;
+  }
+
   .toolsPopover button > span:first-child {
     display: grid;
     width: 30px;
