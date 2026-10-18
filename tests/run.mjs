@@ -184,6 +184,48 @@ export { buildSlmUserText, fitSlmMessages };`);
   assert.ok(messages.at(-2).content.endsWith("17"));
   const attached = buildSlmUserText("q", [{ name: "a.txt", extractedText: "y".repeat(9000) }, { name: "i.png", kind: "image" }]);
   assert.ok(attached.length < 4200 && attached.includes("can't read"));
+  // Trimming may drop older turns but must never leave the history starting with a reply.
+  const odd = [
+    { role: "user", content: "a".repeat(4000) }, { role: "assistant", content: "b".repeat(3000) },
+    { role: "user", content: "c".repeat(1500) }, { role: "assistant", content: "d".repeat(100) }
+  ];
+  const longMessage = fitSlmMessages("sys", [], `${"intro ".repeat(3000)}\nSummarize that in 3 bullets.`);
+  assert.ok(longMessage.at(-1).content.endsWith("Summarize that in 3 bullets.") && longMessage.at(-1).content.length <= 8000);
+  const trimmed = fitSlmMessages("sys", odd, "hi");
+  assert.equal(trimmed.length, 4, "oldest user turn and the reply that followed it are dropped");
+  assert.equal(trimmed[1].role, "user");
+});
+
+// --- service worker, root page and Pages workflow
+await test("service worker works under a sub-path and survives a missing page", async () => {
+  const vm = await import("node:vm");
+  const added = [];
+  const handlers = {};
+  const cache = {
+    addAll: async urls => { added.push(...urls); },
+    add: async url => { if (url.endsWith("/about")) throw new Error("redirected"); added.push(url); }
+  };
+  const context = {
+    URL, location: { origin: "https://x.github.io" },
+    caches: { open: async () => cache, keys: async () => [], match: async () => undefined },
+    self: { registration: { scope: "https://x.github.io/AUI/chat/" }, addEventListener: (type, fn) => { handlers[type] = fn; }, skipWaiting: async () => {}, clients: { claim: async () => {} } },
+    fetch: async () => ({})
+  };
+  vm.createContext(context);
+  vm.runInContext(readFileSync(join(root, "chat/sw.js"), "utf8"), context);
+  let finished;
+  handlers.install({ waitUntil: promise => { finished = promise; } });
+  await finished;
+  assert.ok(added.length >= 10 && added.every(url => url.startsWith("/AUI/")), added.join(", "));
+  assert.ok(added.includes("/AUI/chat"));
+});
+await test("root page redirects to the chat and the workflow rewrites the worker path", () => {
+  const index = readFileSync(join(root, "index.html"), "utf8");
+  assert.ok(/location\.replace\("chat\/"/.test(index) && !index.includes("app.js"));
+  const chatPage = readFileSync(join(root, "chat/index.html"), "utf8");
+  assert.ok(chatPage.includes('register("/chat/sw.js")'));
+  const workflow = readFileSync(join(root, "..", ".github/workflows/pages.yml"), "utf8");
+  assert.ok(workflow.includes('register("/AUI/chat/sw.js"'), "Pages workflow must rewrite the inline worker registration");
 });
 
 console.log(`\n${passed} test groups passed`);

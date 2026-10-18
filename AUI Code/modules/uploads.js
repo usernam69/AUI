@@ -298,9 +298,9 @@ async function extractWord(file, extension) {
     }
   }
 
+  // No text could be extracted; leave extractedText empty so the model is told it can't read the file.
   return {
-    dataUrl: arrayBufferToDataUrl(arrayBuffer, file.type || "application/msword"),
-    extractedText: `[Attached Word document: ${file.name}. Read and summarize the attached file.]`
+    dataUrl: arrayBufferToDataUrl(arrayBuffer, file.type || "application/msword")
   };
 }
 

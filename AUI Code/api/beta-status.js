@@ -44,7 +44,7 @@ export default async function handler(req, res) {
     const betaGrant = activeGrants.find(grant => grant.feature_key === "beta_lab");
     const approved = Boolean(role)
       || approvedByMetadata
-      || getApprovedBetaEmails().has(email)
+      || (emailVerified && getApprovedBetaEmails().has(email))
       || Boolean(betaGrant);
     const devGrant = activeGrants.find(grant => grant.feature_key === "dev_access");
     const devApproved = Boolean(role) || (approved && Boolean(devGrant));
