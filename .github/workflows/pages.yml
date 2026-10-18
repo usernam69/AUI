@@ -31,6 +31,8 @@ jobs:
           cp -r . ../_site
           cd ../_site
           rm -rf supabase scripts package.json pnpm-lock.yaml
+          # Smaller stylesheet: drop comments, indentation and blank lines
+          node -e "const f='style.css';const fs=require('fs');fs.writeFileSync(f,fs.readFileSync(f,'utf8').replace(/\/\*[\s\S]*?\*\//g,'').replace(/^\s+/gm,'').replace(/\n{2,}/g,'\n'))"
           # Project pages are served from /AUI/, so prefix root-absolute links
           find . -name '*.html' -exec sed -i -E 's#(src|href|content)="/([^/"][^"]*)?"#\1="/AUI/\2"#g' {} +
           # The service worker is registered from an inline script in chat/index.html

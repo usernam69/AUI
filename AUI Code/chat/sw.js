@@ -1,5 +1,5 @@
-const CACHE_NAME = "aui-t20261018-b7";
-const ASSET_VERSION = "20261018-b7";
+const CACHE_NAME = "aui-t20261018-b8";
+const ASSET_VERSION = "20261018-b8";
 const versioned = path => `${path}?v=${ASSET_VERSION}`;
 
 // The worker lives in <base>chat/, so resolve everything from there. That keeps it

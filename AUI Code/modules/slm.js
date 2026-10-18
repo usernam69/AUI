@@ -8,19 +8,25 @@ const ENGINE_SOURCES = [
 ];
 
 export const SLM_MODELS = {
+  micro: { id: "SmolLM2-360M-Instruct-q4f16_1-MLC", label: "SmolLM2 360M", approxMB: 380 },
+  microCompat: { id: "SmolLM2-360M-Instruct-q4f32_1-MLC", label: "SmolLM2 360M (compatibility build)", approxMB: 580 },
   tiny: { id: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC", label: "Qwen 2.5 0.5B", approxMB: 945 },
   tinyCompat: { id: "Qwen2.5-0.5B-Instruct-q4f32_1-MLC", label: "Qwen 2.5 0.5B (compatibility build)", approxMB: 1060 },
   small: { id: "Llama-3.2-1B-Instruct-q4f16_1-MLC", label: "Llama 3.2 1B", approxMB: 880 },
   smallCompat: { id: "Llama-3.2-1B-Instruct-q4f32_1-MLC", label: "Llama 3.2 1B (compatibility build)", approxMB: 1130 },
   large: { id: "Llama-3.2-3B-Instruct-q4f16_1-MLC", label: "Llama 3.2 3B", approxMB: 2260 },
-  largeCompat: { id: "Llama-3.2-3B-Instruct-q4f32_1-MLC", label: "Llama 3.2 3B (compatibility build)", approxMB: 2950 }
+  largeCompat: { id: "Llama-3.2-3B-Instruct-q4f32_1-MLC", label: "Llama 3.2 3B (compatibility build)", approxMB: 2950 },
+  phi: { id: "Phi-3.5-mini-instruct-q4f16_1-MLC", label: "Phi 3.5 mini", approxMB: 3670 },
+  phiCompat: { id: "Phi-3.5-mini-instruct-q4f32_1-MLC", label: "Phi 3.5 mini (compatibility build)", approxMB: 5480 }
 };
 
 // "fast" trades quality for speed, "smart" the reverse; "balanced" is the default.
 export const SLM_SPEEDS = {
+  tiny: { label: "Tiny", models: ["micro", "microCompat"] },
   fast: { label: "Fastest", models: ["tiny", "tinyCompat"] },
   balanced: { label: "Balanced", models: ["small", "smallCompat"] },
-  smart: { label: "Smartest", models: ["large", "largeCompat"] }
+  smart: { label: "Smart", models: ["large", "largeCompat"] },
+  phi: { label: "Smartest", models: ["phi", "phiCompat"] }
 };
 const SPEED_KEY = "aui.slmSpeed";
 
@@ -43,6 +49,7 @@ export function setSlmSpeed(speed) {
   plannedModel = null;
   const previous = enginePromise;
   enginePromise = null;
+  engineReady = false;
   previous?.then(engine => engine.unload?.()).catch(() => {});
 }
 
@@ -85,6 +92,8 @@ export function describeProgress(report, model = plannedModel) {
     const secondsLeft = Math.round(elapsed * (1 - progress) / progress);
     parts.push(secondsLeft >= 90 ? `about ${Math.round(secondsLeft / 60)} min left` : `about ${secondsLeft} s left`);
   }
+  const part = /\[(\d+)\/(\d+)\]/.exec(text);
+  if (part && Number(part[2]) > 1) parts.push(`part ${part[1]} of ${part[2]}`);
   const name = model?.label ? ` ${model.label}` : "";
   return `Loading the AUI model${name} in your browser… ${parts.join(" · ")}`;
 }
@@ -138,20 +147,29 @@ export function loadSlm(onProgress) {
         }
         throw error;
       }))
+      .then(engine => {
+        engineReady = true;
+        return engine;
+      })
       .catch(error => {
         enginePromise = null;
         throw error;
       });
+    // 316: ask the browser not to evict the downloaded model under storage pressure.
+    navigator.storage?.persist?.().catch(() => {});
   }
   return enginePromise;
 }
 
 // True when the model files are already in the browser cache, so loading needs no download.
+// Reads the browser cache directly so first-time visitors don't download the engine just to check.
 export async function isModelCached() {
-  if (!isSlmSupported()) return false;
+  if (!isSlmSupported() || typeof caches === "undefined") return false;
   try {
-    const [webllm, model] = await Promise.all([importEngine(), pickModel()]);
-    return Boolean(await webllm.hasModelInCache(model.id));
+    if (!(await caches.has("webllm/model"))) return false;
+    const model = await pickModel();
+    const keys = await (await caches.open("webllm/model")).keys();
+    return keys.some(request => request.url.includes(`/${model.id}/`) && request.url.endsWith("ndarray-cache.json"));
   } catch {
     return false;
   }
@@ -163,7 +181,22 @@ export function warmSlm() {
   loadSlm().catch(() => {});
 }
 
+let engineReady = false;
+export function isSlmReady() {
+  return engineReady;
+}
+
+// Free GPU memory; the next reply reloads the model from the browser cache.
+export function unloadSlm() {
+  if (!enginePromise) return;
+  const previous = enginePromise;
+  enginePromise = null;
+  engineReady = false;
+  previous.then(engine => engine.unload?.()).catch(() => {});
+}
+
 function discardEngine(engine) {
+  engineReady = false;
   enginePromise = null;
   Promise.resolve(engine.unload?.()).catch(() => {});
 }
@@ -176,7 +209,7 @@ function whenAborted(signal) {
   });
 }
 
-export async function* streamSlm(messages, { onProgress, signal } = {}) {
+export async function* streamSlm(messages, { onProgress, signal, maxTokens = 1024 } = {}) {
   let loaded;
   try {
     // Stop takes effect right away; the download keeps going in the background.
@@ -192,7 +225,7 @@ export async function* streamSlm(messages, { onProgress, signal } = {}) {
       messages,
       stream: true,
       temperature: 0.7,
-      max_tokens: 1024
+      max_tokens: maxTokens
     });
     for await (const chunk of stream) {
       if (signal?.aborted) break;

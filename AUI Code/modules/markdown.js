@@ -12,8 +12,48 @@ marked.setOptions({
 const cache = new Map();
 const CACHE_LIMIT = 80;
 
+const SANITIZE = { USE_PROFILES: { html: true }, ADD_ATTR: ["target", "rel", "aria-label"] };
+
+// Index of the last blank line that is not inside a code fence, or -1.
+function stableSplit(text) {
+  let index = text.lastIndexOf("
+
+");
+  while (index > 0) {
+    if ((text.slice(0, index).match(/^```/gm) || []).length % 2 === 0) return index;
+    index = text.lastIndexOf("
+
+", index - 1);
+  }
+  return -1;
+}
+
+// While streaming, only the unfinished last block is re-parsed on each paint.
+function renderStreamingTail(container, text) {
+  const split = stableSplit(text);
+  if (split < 400) return false;
+  const stable = text.slice(0, split);
+  let tail = container.querySelector(":scope > .streamTail");
+  if (container._auiStable !== stable || !tail) {
+    container.innerHTML = `${DOMPurify.sanitize(marked.parse(stable), SANITIZE)}<div class="streamTail"></div>`;
+    container._auiStable = stable;
+    tail = container.lastElementChild;
+  }
+  tail.innerHTML = DOMPurify.sanitize(marked.parse(text.slice(split)), SANITIZE);
+  // Force the final, non-streaming render to rebuild everything in one piece.
+  container._auiRenderedSource = null;
+  return true;
+}
+
 export function renderRichMarkdown(container, source, { streaming = false } = {}) {
   const text = String(source || "");
+  if (streaming && renderStreamingTail(container, text)) {
+    enhanceCodeBlocks(container);
+    const blocks = [...container.querySelectorAll("pre code")];
+    blocks.slice(0, text.split("```").length % 2 === 0 ? -1 : undefined).forEach(highlightCached);
+    return;
+  }
+  container._auiStable = null;
   let html = !streaming ? cache.get(text) : null;
 
   if (!html) {
@@ -42,6 +82,10 @@ export function renderRichMarkdown(container, source, { streaming = false } = {}
   container.querySelectorAll("a[href]").forEach(link => {
     link.target = "_blank";
     link.rel = "noopener noreferrer";
+  });
+  container.querySelectorAll("img").forEach(image => {
+    image.loading = "lazy";
+    image.decoding = "async";
   });
 
   container.querySelectorAll("pre code").forEach(highlightCached);

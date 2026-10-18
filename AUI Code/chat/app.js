@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b7";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b8";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b7";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS } from "../modules/slm.js?v=20261018-b7";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b7";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b7";
+} from "../modules/uploads.js?v=20261018-b8";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm } from "../modules/slm.js?v=20261018-b8";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b8";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b8";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -525,7 +525,7 @@ function setupQuickWins() {
 const SETTINGS_TABS = [
   ["general", "General", ["enterToSendToggle", "counterSelect", "composerStyleSelect", "spellcheckToggle", "voiceAutoSendToggle", "typingSoundToggle", "timestampsToggle", "autoScrollToggle", "notifyToggle", "soundToggle"]],
   ["appearance", "Appearance", ["themeSelect", "themeSwatches", "accentSwatches", "fontSelect", "fontWeightInput", "lineHeightSelect", "contentWidthSelect", "bubbleSelect", "bubbleColorInput", "iconWeightSelect", "fontScaleInput", "densitySelect", "seasonalToggle", "effectsToggle"]],
-  ["personal", "Personalization", ["speedSelect", "customInstructionsInput", "aiTitlesToggle", "memoryToggle", "markdownToggle", "voiceOutputToggle", "speechRateInput"]],
+  ["personal", "Personalization", ["speedSelect", "perfBtn", "backgroundDownloadToggle", "unloadIdleToggle", "customInstructionsInput", "aiTitlesToggle", "memoryToggle", "markdownToggle", "voiceOutputToggle", "speechRateInput"]],
   ["data", "Data controls", ["preloadModelBtn", "exportAllBtn", "storageMeter", "autoArchiveToggle", "archivedChatsList", "trashList", "resetSettingsBtn"]]
 ];
 
@@ -1637,6 +1637,8 @@ const SLASH_COMMANDS = [
   ["/star", "Show starred messages", () => openStarredMessages()],
   ["/save", "Save what you typed as a template", () => saveComposerAsTemplate()],
   ["/improve", "Improve what you typed", () => improvePrompt()],
+  ["/stats", "Model speed and a speed test", () => openPerformancePanel()],
+  ["/tiny", "Use the tiny model", () => switchSpeed("tiny")],
   ["/help", "Keyboard shortcuts", () => byId("shortcutsDialog")?.showModal()]
 ];
 
@@ -2445,6 +2447,139 @@ async function showDefinition(event) {
   }
 }
 
+// --- Model speed & performance from The Probe (category 7) ---
+
+// Keep the system prompt identical for a whole chat so the engine can reuse its
+// cached work on that prefix (new memories would otherwise change it every turn).
+const systemPromptSnapshots = new Map();
+function getChatSystemPrompt(chat) {
+  const key = `${chat?.id}|${state.settings.customInstructions || ""}|${state.settings.memory}`;
+  const cached = systemPromptSnapshots.get(chat?.id);
+  if (cached?.key === key) return cached.prompt;
+  const prompt = buildSlmSystemPrompt();
+  systemPromptSnapshots.set(chat?.id, { key, prompt });
+  return prompt;
+}
+
+// Smaller models get shorter prompts: less text to read before the first word.
+function getPromptBudget() {
+  return { tiny: 4500, fast: 5500, balanced: 7000, smart: 8000, phi: 8000 }[getSlmSpeed()] || 7000;
+}
+
+// Quick factual questions don't need room for an essay.
+function getReplyTokenLimit(text) {
+  const short = text.length < 80 && !/\b(explain|write|list|code|essay|story|steps|plan|compare|detail|example)/i.test(text);
+  return short ? 512 : 1024;
+}
+
+const SLOW_HINT_KEY = "aui.slowHintShown";
+function suggestFasterModel(tokensPerSecond) {
+  if (!tokensPerSecond || tokensPerSecond >= 4 || ["tiny", "fast"].includes(getSlmSpeed())) return;
+  try {
+    if (localStorage.getItem(SLOW_HINT_KEY)) return;
+    localStorage.setItem(SLOW_HINT_KEY, "1");
+  } catch {}
+  toast(`This device writes about ${tokensPerSecond} words per second. A smaller model would be faster.`, "info", {
+    label: "Use Fastest",
+    duration: 12000,
+    onClick: () => switchSpeed("fast")
+  });
+}
+
+function updateReadyBadge() {
+  const badge = byId("modelBadge");
+  if (badge) badge.classList.toggle("isReady", isSlmReady());
+}
+
+function isMeteredConnection() {
+  const connection = navigator.connection;
+  return Boolean(connection?.saveData || connection?.type === "cellular" || /(^|-)2g|3g/.test(connection?.effectiveType || ""));
+}
+
+// Free GPU memory if the tab sits hidden for 10 minutes.
+let idleUnloadTimer = null;
+function setupIdleUnload() {
+  document.addEventListener("visibilitychange", () => {
+    clearTimeout(idleUnloadTimer);
+    if (document.hidden && state.settings.unloadWhenIdle !== false) {
+      idleUnloadTimer = setTimeout(() => {
+        if (!state.loading && document.hidden) {
+          unloadSlm();
+          updateReadyBadge();
+        }
+      }, 10 * 60_000);
+    }
+  });
+}
+
+function setupBackgroundDownload() {
+  if (!state.settings.backgroundDownload || isMeteredConnection() || matchMedia("(pointer: coarse)").matches) return;
+  const idle = window.requestIdleCallback || (callback => setTimeout(callback, 20_000));
+  setTimeout(() => idle(() => preloadModel(), { timeout: 30_000 }), 15_000);
+}
+
+function openPerformancePanel() {
+  const replies = state.chats.flatMap(chat => chat.messages.filter(message => message.role === "assistant" && message.tokensPerSecond));
+  const average = key => {
+    const values = replies.map(message => message[key]).filter(Boolean);
+    return values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+  };
+  pickModel().then(model => {
+    let dialog = byId("perfDialog");
+    if (!dialog) {
+      dialog = element("dialog", "dialog");
+      dialog.id = "perfDialog";
+      document.body.append(dialog);
+      dialog.addEventListener("click", event => {
+        if (event.target === dialog || event.target.closest("[data-close-dialog]")) dialog.close();
+        if (event.target.closest("[data-run-benchmark]")) runBenchmark(dialog);
+      });
+    }
+    const memory = performance.memory ? `${Math.round(performance.memory.usedJSHeapSize / 1048576)} MB page memory` : "";
+    dialog.innerHTML = `<div class="dialogPanel compactDialog"><header><div><p class="eyebrow">Performance</p><h2>Model stats</h2></div><button class="iconBtn" type="button" data-close-dialog aria-label="Close">×</button></header><div class="dialogContent perfGrid">
+      <div><small>Model</small><strong>${escapeHtml(model.label)}</strong></div>
+      <div><small>Status</small><strong>${isSlmReady() ? "Loaded" : "Not loaded"}</strong></div>
+      <div><small>Average speed</small><strong>${average("tokensPerSecond").toFixed(1)} tokens/s</strong></div>
+      <div><small>Average first word</small><strong>${(average("firstTokenMs") / 1000).toFixed(1)} s</strong></div>
+      <div><small>Replies measured</small><strong>${replies.length}</strong></div>
+      <div><small>Device</small><strong>${navigator.deviceMemory ? `${navigator.deviceMemory} GB RAM` : "—"} ${memory ? `· ${memory}` : ""}</strong></div>
+      <p class="benchmarkResult" id="benchmarkResult"></p>
+      <button type="button" class="primaryBtn" data-run-benchmark>Run a speed test</button>
+    </div></div>`;
+    dialog.showModal();
+  });
+}
+
+// A fixed prompt timed on the current model.
+async function runBenchmark(dialog) {
+  const output = dialog.querySelector("#benchmarkResult");
+  if (state.loading) return toast("Wait for the current reply to finish.", "error");
+  output.textContent = "Running… (the model loads first if needed)";
+  let tokens = 0;
+  let first = 0;
+  const started = performance.now();
+  let loadDone = 0;
+  try {
+    await backgroundModelTask;
+    await loadSlm();
+    loadDone = performance.now();
+    for await (const _ of streamSlm([
+      { role: "system", content: "You are a helpful assistant." },
+      { role: "user", content: "Count from one to forty in words, separated by commas." }
+    ], { maxTokens: 160 })) {
+      if (!first) first = performance.now();
+      tokens += 1;
+    }
+  } catch (error) {
+    output.textContent = error.message || "The test failed.";
+    return;
+  }
+  const end = performance.now();
+  const speed = tokens > 1 ? (tokens - 1) / ((end - first) / 1000) : 0;
+  output.textContent = `${speed.toFixed(1)} tokens/s · first word after ${((first - loadDone) / 1000).toFixed(2)} s · load ${((loadDone - started) / 1000).toFixed(1)} s`;
+  updateReadyBadge();
+}
+
 let appInitialized = false;
 
 if (document.readyState === "loading") {
@@ -2485,6 +2620,13 @@ async function init() {
   setupFooterMenu();
   setupComposerExtras();
   DOM.chatArea.addEventListener("dblclick", showDefinition);
+  setupIdleUnload();
+  setupBackgroundDownload();
+  setInterval(updateReadyBadge, 3000);
+  // 318: hovering the message box warms an already-downloaded model.
+  DOM.composer.addEventListener("pointerenter", () => {
+    if (!matchMedia("(pointer: coarse)").matches) isModelCached().then(cached => cached && warmSlm());
+  }, { once: true });
   applyPreferences();
   updateShortcutLabels();
   updateNetworkStatus();
@@ -2811,7 +2953,7 @@ function bindEvents() {
   DOM.chatSearchInput.addEventListener("input", scheduleChatSearchRender);
 
   // Typing starts the download on desktop only: phones may be on metered data.
-  const meteredOrPhone = matchMedia("(pointer: coarse)").matches || navigator.connection?.saveData;
+  const meteredOrPhone = matchMedia("(pointer: coarse)").matches || isMeteredConnection();
   if (!meteredOrPhone) DOM.input.addEventListener("input", warmSlm, { once: true });
   DOM.input.addEventListener("input", () => {
     scheduleTextareaResize();
@@ -2901,7 +3043,8 @@ function bindEvents() {
   byId("themeSelect").addEventListener("change", saveSettingsFromDialog);
   byId("timestampsToggle").addEventListener("change", saveSettingsFromDialog);
   byId("speedSelect").addEventListener("change", saveSettingsFromDialog);
-  ["counterSelect", "composerStyleSelect", "spellcheckToggle", "voiceAutoSendToggle", "typingSoundToggle"].forEach(id => byId(id).addEventListener("change", saveSettingsFromDialog));
+  byId("perfBtn").addEventListener("click", openPerformancePanel);
+  ["counterSelect", "composerStyleSelect", "spellcheckToggle", "voiceAutoSendToggle", "typingSoundToggle", "backgroundDownloadToggle", "unloadIdleToggle"].forEach(id => byId(id).addEventListener("change", saveSettingsFromDialog));
   byId("customInstructionsInput").addEventListener("change", saveSettingsFromDialog);
   byId("autoScrollToggle").addEventListener("change", saveSettingsFromDialog);
   byId("memoryToggle").addEventListener("change", saveSettingsFromDialog);
@@ -3250,13 +3393,15 @@ async function sendMessage(options = {}) {
     const history = options.historyOverride
       || createHistory(chat, assistantMessage.id, Boolean(options.targetMessage));
     const slmMessages = fitSlmMessages(
-      buildSlmSystemPrompt(),
+      getChatSystemPrompt(chat),
       history,
-      buildSlmUserText(text, attachments)
+      buildSlmUserText(text, attachments),
+      getPromptBudget()
     );
     await backgroundModelTask;
     for await (const token of streamSlm(slmMessages, {
       signal: abortController.signal,
+      maxTokens: getReplyTokenLimit(text),
       onProgress: (report, model) => {
         if (!sending) return;
         loadingShown = true;
@@ -3288,6 +3433,7 @@ async function sendMessage(options = {}) {
     const seconds = firstTokenAt ? (performance.now() - firstTokenAt) / 1000 : 0;
     if (tokenCount > 1 && seconds > 0) assistantMessage.tokensPerSecond = Math.round(tokenCount / seconds * 10) / 10;
     assistantMessage.durationMs = modelWasLoading ? 0 : Math.round(performance.now() - requestedAt);
+    suggestFasterModel(assistantMessage.tokensPerSecond);
 
     assistantMessage.status = assistantMessage.content ? "complete" : "error";
     if (assistantMessage.versions && assistantMessage.content) {
@@ -3351,11 +3497,9 @@ async function sendMessage(options = {}) {
 
 function buildSlmSystemPrompt() {
   const parts = [
-    "You are AUI, a friendly assistant that runs privately on the user's own device. You are a small model, so be honest about it.",
-    "Rules: keep answers short and well organized; use Markdown lists and code blocks when helpful; "
-      + "if you are not sure of a fact, a number or a date, say so instead of guessing; "
-      + "you cannot browse the web, see images, or know today's date unless the user tells you; "
-      + "ask one short clarifying question when a request is ambiguous.",
+    "You are AUI, a friendly assistant running privately on the user's device.",
+    "Be concise and organized; use Markdown when it helps. Say when you're unsure instead of guessing. "
+      + "You can't browse the web or see images.",
     "Answer clearly and directly."
   ];
   const custom = String(state.settings.customInstructions || "").trim();
@@ -3391,12 +3535,12 @@ function buildSlmUserText(text, attachments = []) {
   return notes.length ? `${text}\n\n${notes.join("\n\n")}` : text;
 }
 
-function fitSlmMessages(systemPrompt, history, userText) {
+function fitSlmMessages(systemPrompt, history, userText, totalBudget = SLM_PROMPT_CHAR_BUDGET) {
   // Keep both ends of an over-long message: the question is often the last line.
-  const user = userText.length > SLM_PROMPT_CHAR_BUDGET
-    ? `${userText.slice(0, 4800)}\n[…middle of the message trimmed to fit the model…]\n${userText.slice(-3000)}`
+  const user = userText.length > totalBudget
+    ? `${userText.slice(0, Math.round(totalBudget * 0.6))}\n[…middle of the message trimmed to fit the model…]\n${userText.slice(-Math.round(totalBudget * 0.375))}`
     : userText;
-  let budget = SLM_PROMPT_CHAR_BUDGET - systemPrompt.length - user.length;
+  let budget = totalBudget - systemPrompt.length - user.length;
   const kept = [];
   for (let index = history.length - 1; index >= 0; index -= 1) {
     const cost = history[index].content.length;
@@ -4051,7 +4195,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b7");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b8");
   return markdownModulePromise;
 }
 
@@ -5191,6 +5335,8 @@ function openSettings() {
   byId("spellcheckToggle").checked = state.settings.spellcheck !== false;
   byId("voiceAutoSendToggle").checked = Boolean(state.settings.voiceAutoSend);
   byId("typingSoundToggle").checked = Boolean(state.settings.typingSound);
+  byId("backgroundDownloadToggle").checked = Boolean(state.settings.backgroundDownload);
+  byId("unloadIdleToggle").checked = state.settings.unloadWhenIdle !== false;
   byId("customInstructionsInput").value = state.settings.customInstructions || "";
   if (!DOM.settingsDialog.open) DOM.settingsDialog.showModal();
 }
@@ -5216,6 +5362,8 @@ function saveSettingsFromDialog() {
   state.settings.spellcheck = byId("spellcheckToggle").checked;
   state.settings.voiceAutoSend = byId("voiceAutoSendToggle").checked;
   state.settings.typingSound = byId("typingSoundToggle").checked;
+  state.settings.backgroundDownload = byId("backgroundDownloadToggle").checked;
+  state.settings.unloadWhenIdle = byId("unloadIdleToggle").checked;
   DOM.input.spellcheck = state.settings.spellcheck;
   updateComposerState();
   const speed = byId("speedSelect").value;
@@ -6236,6 +6384,7 @@ function updateComposerState() {
     : counter === "tokens"
       ? `~${Math.ceil(length / 4).toLocaleString()} tokens`
       : `${words} ${words === 1 ? "word" : "words"}${length > 2000 ? ` · ${length.toLocaleString()} chars` : ""}`;
+  if (length > 3000) DOM.charCount.textContent += " · long messages take longer to answer";
 }
 
 function handleComposerKeydown(event) {

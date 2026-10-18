@@ -3461,3 +3461,14 @@
 @media (pointer: coarse) {
   .codeHeaderActions { opacity: 1; }
 }
+
+/* Model speed & performance from The Probe (category 7) */
+@layer components {
+  .streamTail { display: contents; }
+  .modelBadge.isReady::before { content: "● "; color: var(--success); font-size: 10px; vertical-align: middle; }
+  .perfGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .perfGrid > div { padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; }
+  .perfGrid small { display: block; color: var(--muted); font-size: 11px; }
+  .perfGrid .benchmarkResult, .perfGrid button { grid-column: 1 / -1; }
+  .benchmarkResult { min-height: 1.2em; color: var(--accent); font-weight: 600; }
+}
