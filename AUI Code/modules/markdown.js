@@ -307,15 +307,19 @@ function renderCharts(container) {
     if (host.nextElementSibling?.classList.contains("miniChart")) return;
     let spec;
     try { spec = JSON.parse(code.textContent); } catch { return; }
-    const values = (spec.data || []).map(Number).filter(Number.isFinite);
-    const labels = (spec.labels || values.map((_, index) => String(index + 1))).map(String);
+    if (!spec || !Array.isArray(spec.data)) return;
+    const given = Array.isArray(spec.labels) ? spec.labels : [];
+    // Keep each label next to its value when some values aren't numbers; negatives draw as zero.
+    const points = spec.data.map((value, index) => [Number(value), String(given[index] ?? index + 1)]).filter(([value]) => Number.isFinite(value));
+    const values = points.map(([value]) => value);
+    const labels = points.map(([, label]) => label);
     if (!values.length) return;
     const width = 560;
     const height = 220;
     const pad = 28;
     const max = Math.max(...values, 0) || 1;
     const step = (width - pad * 2) / values.length;
-    const y = value => height - pad - (value / max) * (height - pad * 2);
+    const y = value => height - pad - (Math.max(0, value) / max) * (height - pad * 2);
     let marks = "";
     if (spec.type === "line") {
       const points = values.map((value, index) => `${pad + step * index + step / 2},${y(value)}`).join(" ");

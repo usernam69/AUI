@@ -50,6 +50,7 @@ export function setSlmSpeed(speed) {
   const previous = enginePromise;
   enginePromise = null;
   engineReady = false;
+  currentEngine = null;
   previous?.then(engine => engine.unload?.()).catch(() => {});
 }
 
@@ -136,7 +137,7 @@ export function loadSlm(onProgress) {
     return Promise.reject(new Error("AUI runs its model in your browser and needs WebGPU. Try a recent desktop Chrome, Edge, or Safari."));
   }
   if (!enginePromise) {
-    enginePromise = Promise.all([importEngine().catch(() => {
+    const loading = Promise.all([importEngine().catch(() => {
       throw new Error("Couldn't load the AUI model engine. Check your connection and try again.");
     }), pickModel()])
       .then(([webllm, model]) => createEngine(webllm, model.id, {
@@ -148,13 +149,17 @@ export function loadSlm(onProgress) {
         throw error;
       }))
       .then(engine => {
-        engineReady = true;
+        if (enginePromise === loading) {
+          engineReady = true;
+          currentEngine = engine;
+        }
         return engine;
       })
       .catch(error => {
-        enginePromise = null;
+        if (enginePromise === loading) enginePromise = null;
         throw error;
       });
+    enginePromise = loading;
     // 316: ask the browser not to evict the downloaded model under storage pressure.
     navigator.storage?.persist?.().catch(() => {});
   }
@@ -203,6 +208,7 @@ export async function deleteCachedModels() {
 }
 
 let engineReady = false;
+let currentEngine = null;
 export function isSlmReady() {
   return engineReady;
 }
@@ -213,12 +219,17 @@ export function unloadSlm() {
   const previous = enginePromise;
   enginePromise = null;
   engineReady = false;
+  currentEngine = null;
   previous.then(engine => engine.unload?.()).catch(() => {});
 }
 
 function discardEngine(engine) {
-  engineReady = false;
-  enginePromise = null;
+  // Only forget the engine if it is still the current one, not one a speed switch replaced.
+  if (currentEngine === engine) {
+    engineReady = false;
+    enginePromise = null;
+    currentEngine = null;
+  }
   Promise.resolve(engine.unload?.()).catch(() => {});
 }
 

@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b11";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b12";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b11";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b11";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b11";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b11";
+} from "../modules/uploads.js?v=20261018-b12";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b12";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b12";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b12";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -1069,7 +1069,9 @@ function decorateChatItem(item, chat, query) {
   if (chat.color) item.style.setProperty("--chat-color", chat.color);
   item.classList.toggle("hasColor", Boolean(chat.color));
   item.classList.toggle("isUnread", Boolean(chat.unread) && chat.id !== state.currentChatId);
-  if (chat.unread && chat.id !== state.currentChatId) open?.setAttribute("aria-label", `${chat.title}, new reply`);
+  const name = chat.lock ? "Locked chat" : chat.title;
+  if (chat.unread && chat.id !== state.currentChatId) open?.setAttribute("aria-label", `${name}, new reply`);
+  if (open && chat.lock) open.title = name;
   item.classList.toggle("isLocked", Boolean(chat.lock));
   if (open && !chat.lock) {
     const firstUser = chat.messages.find(message => message.role === "user");
@@ -1083,7 +1085,7 @@ function decorateChatItem(item, chat, query) {
     const box = element("input", "chatSelectBox");
     box.type = "checkbox";
     box.checked = selectedChatIds.has(chat.id);
-    box.setAttribute("aria-label", `Select ${chat.title}`);
+    box.setAttribute("aria-label", `Select ${name}`);
     box.dataset.selectChat = chat.id;
     item.prepend(box);
     item.classList.add("selecting");
@@ -1240,9 +1242,11 @@ async function generateAiTitle(chat, { force = false } = {}) {
   if (!chat || (!force && (chat.aiTitled || state.settings.aiTitles === false))) return;
   const firstUser = chat.messages.find(message => message.role === "user");
   if (!firstUser || state.loading) return;
+  const previous = backgroundModelTask;
   const task = (async () => {
     let title = "";
     try {
+      await previous;
       const messages = [
         { role: "system", content: "You write chat titles. Reply with only a 2 to 5 word title. No quotes, no punctuation at the end." },
         { role: "user", content: firstUser.content.slice(0, 600) }
@@ -1909,16 +1913,19 @@ function toggleEmojiPicker() {
 async function improvePrompt() {
   const original = DOM.input.value.trim();
   if (!original) return toast("Type a prompt first.", "error");
-  if (state.loading) return;
   const button = byId("improveBtn");
+  if (state.loading || button?.classList.contains("working")) return;
   button?.classList.add("working");
   let improved = "";
   try {
-    await backgroundModelTask;
-    for await (const token of streamSlm([
-      { role: "system", content: "Rewrite the user's request as a clearer, more specific prompt for an AI assistant. Keep the same intent and language. Reply with only the rewritten prompt." },
-      { role: "user", content: original.slice(0, 3000) }
-    ])) improved += token;
+    const task = backgroundModelTask.then(async () => {
+      for await (const token of streamSlm([
+        { role: "system", content: "Rewrite the user's request as a clearer, more specific prompt for an AI assistant. Keep the same intent and language. Reply with only the rewritten prompt." },
+        { role: "user", content: original.slice(0, 3000) }
+      ])) improved += token;
+    });
+    backgroundModelTask = task.catch(() => {});
+    await task;
   } catch (error) {
     toast(error.message || "Couldn’t improve the prompt.", "error");
     return;
@@ -2354,8 +2361,9 @@ async function makeTldr(message, article) {
   toast("Summarizing…");
   let summary = "";
   try {
-    await backgroundModelTask;
+    const previous = backgroundModelTask;
     const task = (async () => {
+      await previous;
       for await (const token of streamSlm([
         { role: "system", content: "Summarize the text in at most two short sentences. Reply with only the summary." },
         { role: "user", content: stripMarkdown(message.content).slice(0, 6000) }
@@ -2503,7 +2511,7 @@ async function showDefinition(event) {
 // cached work on that prefix (new memories would otherwise change it every turn).
 const systemPromptSnapshots = new Map();
 function getChatSystemPrompt(chat) {
-  const key = `${chat?.id}|${state.settings.customInstructions || ""}|${state.settings.memory}`;
+  const key = `${chat?.id}|${state.settings.customInstructions || ""}|${state.settings.memory}|${Math.floor(Date.now() / 900_000)}`;
   const cached = systemPromptSnapshots.get(chat?.id);
   if (cached?.key === key) return cached.prompt;
   const prompt = buildSlmSystemPrompt();
@@ -2553,7 +2561,7 @@ function setupIdleUnload() {
     clearTimeout(idleUnloadTimer);
     if (document.hidden && state.settings.unloadWhenIdle !== false) {
       idleUnloadTimer = setTimeout(() => {
-        if (!state.loading && document.hidden) {
+        if (!state.loading && !modelTestRunning && document.hidden) {
           unloadSlm();
           updateReadyBadge();
         }
@@ -2582,8 +2590,8 @@ function openPerformancePanel() {
       document.body.append(dialog);
       dialog.addEventListener("click", event => {
         if (event.target === dialog || event.target.closest("[data-close-dialog]")) dialog.close();
-        if (event.target.closest("[data-run-benchmark]")) runBenchmark(dialog);
-        if (event.target.closest("[data-run-quality]")) runQualityCheck(dialog.querySelector("#qualityResult"));
+        if (event.target.closest("[data-run-benchmark]")) runModelTest(() => runBenchmark(dialog));
+        if (event.target.closest("[data-run-quality]")) runModelTest(() => runQualityCheck(dialog.querySelector("#qualityResult")));
       });
     }
     const memory = performance.memory ? `${Math.round(performance.memory.usedJSHeapSize / 1048576)} MB page memory` : "";
@@ -2604,17 +2612,25 @@ function openPerformancePanel() {
   });
 }
 
+// Tests share the engine with replies: one at a time, queued behind titles and
+// summaries, and replies sent meanwhile wait for them (sendMessage awaits backgroundModelTask).
+let modelTestRunning = false;
+function runModelTest(test) {
+  if (state.loading || modelTestRunning) return toast("Wait for the current reply or test to finish.", "error");
+  modelTestRunning = true;
+  const task = backgroundModelTask.then(test).finally(() => { modelTestRunning = false; });
+  backgroundModelTask = task.catch(() => {});
+}
+
 // A fixed prompt timed on the current model.
 async function runBenchmark(dialog) {
   const output = dialog.querySelector("#benchmarkResult");
-  if (state.loading) return toast("Wait for the current reply to finish.", "error");
   output.textContent = "Running… (the model loads first if needed)";
   let tokens = 0;
   let first = 0;
   const started = performance.now();
   let loadDone = 0;
   try {
-    await backgroundModelTask;
     await loadSlm();
     loadDone = performance.now();
     for await (const _ of streamSlm([
@@ -2650,8 +2666,8 @@ function evaluateArithmetic(expression) {
       if (next() !== ")") throw new Error("paren");
       return value;
     }
-    if (token === "-") return -primary();
-    if (token === "+") return primary();
+    if (token === "-") return -power();
+    if (token === "+") return power();
     const value = Number(token);
     if (!Number.isFinite(value)) throw new Error("number");
     return value;
@@ -2692,6 +2708,8 @@ function findCalculation(text) {
   const candidates = normalized.match(/[\d(][\d\s+\-*/^%().]*[\d)]/g) || [];
   for (const candidate of candidates.sort((a, b) => b.length - a.length)) {
     if (!/\d\s*[-+*/^%]\s*[\d(]/.test(candidate)) continue;
+    // 2026-10-18, pages 3-5, 555-1234 and 10/18/2026 are not sums to work out.
+    if (/^\d+(?:-\d+)+$/.test(candidate.trim()) || /^\d{1,4}\/\d{1,2}\/\d{1,4}$/.test(candidate.trim())) continue;
     const result = evaluateArithmetic(candidate.trim());
     if (result !== null) return `${candidate.trim()} = ${Number(result.toPrecision(12))}`;
   }
@@ -2757,11 +2775,11 @@ async function runTools(text) {
   }
   if (!state.settings.onlineLookups || !navigator.onLine) return { notes, sources };
 
-  const weather = /\bweather\b.*?\b(?:in|for|at)\s+([a-z][\w\s,.'-]{1,40})/i.exec(text);
+  const weather = /\bweather\b.*?\b(?:in|for|at)\s+(\p{L}[\p{L}\p{M}\d\s,.'-]{1,40})/iu.exec(text);
   const define = /^(?:define|definition of|what does)\s+["']?([a-z][a-z'-]{1,30})["']?(?:\s+mean)?\??$/i.exec(text.trim());
   const fact = /^(?:who|what)\s+(?:is|was|are|were)\s+(?:the\s+|a\s+|an\s+)?(.{2,60}?)\??$/i.exec(text.trim());
   if (weather) {
-    const place = weather[1].replace(/[?.!]+$/, "").trim();
+    const place = weather[1].replace(/[?.!]+$/, "").replace(/(?:\s+(?:today|tomorrow|tonight|right now|now|this (?:morning|afternoon|evening|week|weekend)|please))+$/i, "").trim();
     const geo = await fetchJson(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(place)}&count=1`);
     const spot = geo?.results?.[0];
     if (spot) {
@@ -2779,7 +2797,7 @@ async function runTools(text) {
       notes.push(`Dictionary: ${define[1]} (${meaning.partOfSpeech}): ${meaning.definitions[0].definition}`);
       sources.push("Free Dictionary");
     }
-  } else if (fact) {
+  } else if (fact && !/^(?:your|my|you|me|i|it|this|that|these|those|he|she|they|up)\b|^(?:time|date|today|tomorrow)$/i.test(fact[1].trim())) {
     const summary = await fetchJson(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(fact[1].trim().replace(/\s+/g, "_"))}`);
     if (summary?.extract && summary.type !== "disambiguation") {
       notes.push(`Wikipedia (${summary.title}): ${summary.extract.slice(0, 900)}`);
@@ -2842,7 +2860,9 @@ function startFocusTimer(minutes = 25) {
       chip.remove();
       playChime();
       toast(`${minutes}-minute timer finished. Take a break!`);
-      if (Notification?.permission === "granted") new Notification("AUI timer", { body: "Time's up. Take a break!" });
+      try {
+        if ("Notification" in window && Notification.permission === "granted") new Notification("AUI timer", { body: "Time's up. Take a break!" });
+      } catch {}
     }
   };
   focusTimer = { interval: setInterval(tick, 1000) };
@@ -2868,7 +2888,6 @@ const EVAL_QUESTIONS = [
 ];
 
 async function runQualityCheck(output) {
-  if (state.loading) return toast("Wait for the current reply to finish.", "error");
   let correct = 0;
   output.textContent = "Asking 10 questions…";
   for (const [question, expected] of EVAL_QUESTIONS) {
@@ -2940,7 +2959,14 @@ function prefillFromUrl() {
   const parts = [params.get("title"), params.get("text"), params.get("url"), params.get("q")].filter(Boolean);
   if (!parts.length) return;
   let text = parts.join("\n");
-  if (text.startsWith("web+aui:")) text = decodeURIComponent(text.slice(8)).replace(/^\/+/, "");
+  if (text.startsWith("web+aui:")) {
+    try {
+      text = decodeURIComponent(text.slice(8));
+    } catch {
+      text = text.slice(8);
+    }
+    text = text.replace(/^\/+/, "");
+  }
   if (getChat()?.messages.length) createChat();
   DOM.input.value = text.slice(0, 32000);
   scheduleTextareaResize();
@@ -2968,6 +2994,7 @@ async function deleteDownloadedModels() {
     cancelLabel: "Cancel"
   });
   if (!confirmed) return;
+  if (state.loading || modelTestRunning) return toast("Wait for the current reply or test to finish.", "error");
   unloadSlm();
   const removed = await deleteCachedModels();
   preloadPromise = null;
@@ -2977,10 +3004,13 @@ async function deleteDownloadedModels() {
 
 // --- Accessibility from The Probe (category 10) ---
 
+// Ctrl/⌘ + these keys belong to the browser (copy, paste, undo, find, print, save…).
+const RESERVED_SHORTCUT_KEYS = "acvxyzfprswtnqlo";
+
 function shortcutKey(name) {
   const defaults = { newChat: "k", search: "/", settings: "," };
   const value = String(state.settings[`shortcut_${name}`] || defaults[name]).toLowerCase();
-  return value.length === 1 ? value : defaults[name];
+  return value.length === 1 && !RESERVED_SHORTCUT_KEYS.includes(value) ? value : defaults[name];
 }
 
 // Mark messages in right-to-left scripts so screen readers and layout use the right language.
@@ -4713,7 +4743,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b11");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b12");
   return markdownModulePromise;
 }
 
@@ -5110,20 +5140,21 @@ function createChatItem(chat) {
   open.type = "button";
   open.dataset.chatAction = "open";
   const count = chat.messages.length;
-  open.innerHTML = `<span>${escapeHtml(chat.title)}</span><small>${formatRelativeTime(chat.updatedAt)}${count ? ` · ${count} msg` : ""}</small>`;
-  open.title = chat.title;
+  const name = chat.lock ? "Locked chat" : chat.title;
+  open.innerHTML = `<span>${escapeHtml(name)}</span><small>${formatRelativeTime(chat.updatedAt)}${count ? ` · ${count} msg` : ""}</small>`;
+  open.title = name;
 
   const favorite = element("button", `chatIconBtn${chat.favorite ? " selected" : ""}`);
   favorite.type = "button";
   favorite.dataset.chatAction = "favorite";
-  favorite.setAttribute("aria-label", `${chat.favorite ? "Remove from" : "Add to"} favorites: ${chat.title}`);
+  favorite.setAttribute("aria-label", `${chat.favorite ? "Remove from" : "Add to"} favorites: ${name}`);
   favorite.title = chat.favorite ? "Remove favorite" : "Favorite";
   favorite.textContent = "★";
 
   const menu = element("button", "chatIconBtn");
   menu.type = "button";
   menu.dataset.chatAction = "menu";
-  menu.setAttribute("aria-label", `More options for ${chat.title}`);
+  menu.setAttribute("aria-label", `More options for ${name}`);
   menu.textContent = "•••";
 
   const actions = element("div", "chatMenu");
@@ -5917,7 +5948,10 @@ function saveSettingsFromDialog() {
   ["NewChat", "Search", "Settings"].forEach(name => {
     const value = byId(`shortcut${name}Input`).value.trim().toLowerCase();
     const key = `shortcut_${name[0].toLowerCase()}${name.slice(1)}`;
-    if (value.length === 1) state.settings[key] = value;
+    if (value.length === 1 && RESERVED_SHORTCUT_KEYS.includes(value)) {
+      toast(`Ctrl+${value.toUpperCase()} is used by the browser. Pick another letter.`, "error");
+      byId(`shortcut${name}Input`).value = shortcutKey(key.slice(9));
+    } else if (value.length === 1) state.settings[key] = value;
   });
   applyAccessibilityPrefs();
   state.settings.unloadWhenIdle = byId("unloadIdleToggle").checked;
@@ -7157,7 +7191,9 @@ function openChatFromUrl() {
 function highlightLinkedMessage() {
   const match = /^#msg-(.+)$/.exec(location.hash);
   if (!match) return;
-  const article = DOM.chatArea.querySelector(`[data-message-id="${CSS.escape(decodeURIComponent(match[1]))}"]`);
+  let id = match[1];
+  try { id = decodeURIComponent(id); } catch {}
+  const article = DOM.chatArea.querySelector(`[data-message-id="${CSS.escape(id)}"]`);
   if (!article) return;
   article.scrollIntoView({ block: "center" });
   article.classList.add("linkedMessage");

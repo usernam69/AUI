@@ -3,7 +3,7 @@
 // Usage: node scripts/serve.mjs [port]   then open http://localhost:8080/AUI/
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
-import { join, extname, resolve } from "node:path";
+import { join, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL("../AUI Code/", import.meta.url)));
@@ -16,8 +16,13 @@ const TYPES = {
 };
 
 async function resolveFile(path) {
-  const target = join(root, decodeURIComponent(path));
-  if (!target.startsWith(root)) return null;
+  let target;
+  try {
+    target = join(root, decodeURIComponent(path));
+  } catch {
+    return null;
+  }
+  if (target !== root && !target.startsWith(root + sep)) return null;
   for (const candidate of [target, join(target, "index.html"), `${target}.html`]) {
     try {
       if ((await stat(candidate)).isFile()) return candidate;
