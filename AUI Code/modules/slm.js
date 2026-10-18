@@ -8,14 +8,43 @@ const ENGINE_SOURCES = [
 ];
 
 export const SLM_MODELS = {
+  tiny: { id: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC", label: "Qwen 2.5 0.5B", approxMB: 945 },
+  tinyCompat: { id: "Qwen2.5-0.5B-Instruct-q4f32_1-MLC", label: "Qwen 2.5 0.5B (compatibility build)", approxMB: 1060 },
   small: { id: "Llama-3.2-1B-Instruct-q4f16_1-MLC", label: "Llama 3.2 1B", approxMB: 880 },
   smallCompat: { id: "Llama-3.2-1B-Instruct-q4f32_1-MLC", label: "Llama 3.2 1B (compatibility build)", approxMB: 1130 },
-  large: { id: "Llama-3.2-3B-Instruct-q4f16_1-MLC", label: "Llama 3.2 3B", approxMB: 2260 }
+  large: { id: "Llama-3.2-3B-Instruct-q4f16_1-MLC", label: "Llama 3.2 3B", approxMB: 2260 },
+  largeCompat: { id: "Llama-3.2-3B-Instruct-q4f32_1-MLC", label: "Llama 3.2 3B (compatibility build)", approxMB: 2950 }
 };
+
+// "fast" trades quality for speed, "smart" the reverse; "balanced" is the default.
+export const SLM_SPEEDS = {
+  fast: { label: "Fastest", models: ["tiny", "tinyCompat"] },
+  balanced: { label: "Balanced", models: ["small", "smallCompat"] },
+  smart: { label: "Smartest", models: ["large", "largeCompat"] }
+};
+const SPEED_KEY = "aui.slmSpeed";
 
 let enginePromise = null;
 let progressListener = null;
 let plannedModel = null;
+
+export function getSlmSpeed() {
+  try {
+    const saved = globalThis.localStorage?.getItem(SPEED_KEY);
+    if (SLM_SPEEDS[saved]) return saved;
+  } catch {}
+  return "balanced";
+}
+
+// Switching speed drops the loaded engine so the next reply uses the new model.
+export function setSlmSpeed(speed) {
+  if (!SLM_SPEEDS[speed] || speed === getSlmSpeed()) return;
+  try { globalThis.localStorage?.setItem(SPEED_KEY, speed); } catch {}
+  plannedModel = null;
+  const previous = enginePromise;
+  enginePromise = null;
+  previous?.then(engine => engine.unload?.()).catch(() => {});
+}
 
 function abortError() {
   return new DOMException("Generation stopped", "AbortError");
@@ -25,13 +54,14 @@ export function isSlmSupported() {
   return typeof navigator !== "undefined" && "gpu" in navigator;
 }
 
-// Use the fast 1B model everywhere: the 3B one replies about three times slower.
+// Pick the model for the chosen speed, using the f32 build when the GPU lacks f16 support.
 export async function pickModel() {
   if (plannedModel) return plannedModel;
-  let choice = SLM_MODELS.small;
+  const [normal, compat] = SLM_SPEEDS[getSlmSpeed()].models;
+  let choice = SLM_MODELS[normal];
   try {
-    const adapter = await navigator.gpu?.requestAdapter();
-    if (!adapter?.features?.has("shader-f16")) choice = SLM_MODELS.smallCompat;
+    const adapter = await navigator.gpu?.requestAdapter({ powerPreference: "high-performance" });
+    if (!adapter?.features?.has("shader-f16")) choice = SLM_MODELS[compat];
   } catch {
     // Keep the safe default.
   }
@@ -71,6 +101,26 @@ async function importEngine() {
   throw lastError;
 }
 
+// Run the model in a Web Worker so the page stays smooth while it thinks;
+// fall back to the page itself where workers or the worker API are unavailable.
+async function createEngine(webllm, modelId, config) {
+  if (typeof Worker === "function" && typeof webllm.CreateWebWorkerMLCEngine === "function") {
+    let worker;
+    try {
+      worker = new Worker(new URL("./slm-worker.js", import.meta.url), { type: "module" });
+      const failed = new Promise((_, reject) => worker.addEventListener("error", event => {
+        event.preventDefault?.();
+        reject(new Error("The model worker could not start"));
+      }, { once: true }));
+      return await Promise.race([webllm.CreateWebWorkerMLCEngine(worker, modelId, config), failed]);
+    } catch (error) {
+      worker?.terminate();
+      if (/fetch|network|load failed/i.test(String(error?.message || error))) throw error;
+    }
+  }
+  return webllm.CreateMLCEngine(modelId, config);
+}
+
 export function loadSlm(onProgress) {
   progressListener = onProgress || null;
   if (!isSlmSupported()) {
@@ -80,7 +130,7 @@ export function loadSlm(onProgress) {
     enginePromise = Promise.all([importEngine().catch(() => {
       throw new Error("Couldn't load the AUI model engine. Check your connection and try again.");
     }), pickModel()])
-      .then(([webllm, model]) => webllm.CreateMLCEngine(model.id, {
+      .then(([webllm, model]) => createEngine(webllm, model.id, {
         initProgressCallback: report => progressListener?.(report, model)
       }).catch(error => {
         if (/fetch|network|load failed/i.test(String(error?.message || error))) {

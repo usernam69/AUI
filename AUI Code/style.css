@@ -2944,175 +2944,136 @@
   }
 }
 
-/* ChatGPT-style theme: unlayered, so it overrides the layers above */
-:root,
-:root[data-theme="dark"] {
-  --accent: #ffffff;
-  --accent-hover: #e5e5e5;
-  --accent-soft: transparent;
-  --accent-border: transparent;
-  --bg: #212121;
-  --bg-elevated: #2a2a2a;
-  --sidebar: #171717;
-  --surface: #303030;
-  --surface-raised: #303030;
-  --surface-hover: #2f2f2f;
-  --surface-active: #424242;
-  --border: #3a3a3a;
-  --border-strong: #444;
-  --text: #ececec;
-  --text-secondary: #b4b4b4;
-  --muted: #8f8f8f;
-  --focus-ring: 0 0 0 0 transparent;
-  --font-sans: "Söhne", ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --content-width: 768px;
-  --sidebar-width: 260px;
+/* ChatGPT-style blue theme. Tokens go in the tokens layer and component styles in the
+   components layer, so Settings (utilities) and phone layouts (responsive) still win. */
+@layer tokens {
+  :root {
+    --font-sans: "Söhne", ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --content-width: 768px;
+    --sidebar-width: 260px;
+    --focus-ring: 0 0 0 0 transparent;
+  }
+  :root,
+  :root[data-theme="dark"] {
+    --accent: #4f8cff;
+    --accent-hover: #3b7bf5;
+    --accent-soft: rgb(79 140 255 / 0.14);
+    --accent-border: rgb(79 140 255 / 0.35);
+    --bg: #161b26;
+    --bg-elevated: #1c2230;
+    --sidebar: #0f131c;
+    --surface: #222a3a;
+    --surface-raised: #222a3a;
+    --surface-hover: #1e2533;
+    --surface-active: #2a3448;
+    --border: #2a3345;
+    --border-strong: #354057;
+    --text: #e8edf7;
+    --text-secondary: #a9b4c8;
+    --muted: #7d889d;
+    --bubble: linear-gradient(135deg, #2f6df0, #2559d6);
+    --bubble-text: #fff;
+  }
+  :root[data-theme="light"] {
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-soft: rgb(37 99 235 / 0.1);
+    --accent-border: rgb(37 99 235 / 0.3);
+    --bg: #f7f9fd;
+    --bg-elevated: #ffffff;
+    --sidebar: #eef3fb;
+    --surface: #e8effb;
+    --surface-raised: #e8effb;
+    --surface-hover: #e1e9f7;
+    --surface-active: #d5e1f5;
+    --border: #d8e1f0;
+    --border-strong: #c3d0e6;
+    --text: #0f1a2e;
+    --text-secondary: #4a5a75;
+    --muted: #7c8799;
+  }
 }
-:root[data-theme="light"] {
-  --accent: #0d0d0d;
-  --accent-hover: #333;
-  --bg: #ffffff;
-  --bg-elevated: #ffffff;
-  --sidebar: #f9f9f9;
-  --surface: #f4f4f4;
-  --surface-raised: #f4f4f4;
-  --surface-hover: #ececec;
-  --surface-active: #e3e3e3;
-  --border: #e5e5e5;
-  --border-strong: #d9d9d9;
-  --text: #0d0d0d;
-  --text-secondary: #5d5d5d;
-  --muted: #8f8f8f;
+
+@layer base {
+  body { font-size: 16px; }
+  ::selection { background: rgb(79 140 255 / 0.3); }
+  :focus-visible { outline-color: var(--accent); }
 }
 
-body { font-size: 16px; }
-::selection { background: rgb(120 120 120 / 0.35); }
-:focus-visible { outline-color: var(--text-secondary); }
+@layer components {
+  /* Sidebar */
+  .sidebar { border-right: 0; }
+  .brandMark, .emptyBrand { background: linear-gradient(135deg, #4f8cff, #2563eb); color: #fff; box-shadow: none; border-radius: 50%; }
+  .brand small { display: none; }
+  .newChatBtn { border: 0; background: transparent; font-weight: 500; padding: 9px 10px; border-radius: 10px; }
+  .newChatBtn:hover { background: var(--surface-hover); border: 0; }
+  .newChatBtn > span:first-child { color: var(--accent); }
+  .chatSearch { border: 0; background: transparent; }
+  .chatItem.active { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
 
-/* Sidebar */
-.sidebar { background: var(--sidebar); border-right: 0; }
-.brandMark, .emptyBrand { background: var(--text); color: var(--bg); box-shadow: none; border-radius: 50%; }
-.brand small { display: none; }
-.newChatBtn { border: 0; background: transparent; font-weight: 500; padding: 9px 10px; border-radius: 10px; }
-.newChatBtn:hover { background: var(--surface-hover); border: 0; }
-.newChatBtn > span:first-child { color: var(--text); }
-.chatSearch { border: 0; background: transparent; }
-.chatItem.active { box-shadow: none; background: var(--surface-active); }
-:root[data-theme="dark"] .chatItem.active, :root:not([data-theme]) .chatItem.active { background: #2f2f2f; }
+  /* Top bar */
+  .topBar { border-bottom: 0; background: var(--bg); }
+  .modelBadge { font-size: 18px; font-weight: 600; background: transparent; border: 0; color: var(--text-secondary); }
+  .connectionStatus, .visitorCounter { display: none; }
 
-/* Top bar */
-.topBar { border-bottom: 0; background: var(--bg); }
-.modelBadge { font-size: 18px; font-weight: 600; background: transparent; border: 0; color: var(--text-secondary); }
-.connectionStatus, .visitorCounter { display: none; }
+  /* Messages: no avatars or names; the header only appears for timestamps or compare labels */
+  .message + .message { margin-top: var(--space-6); }
+  .messageIdentity > .messageAvatar,
+  .messageIdentity > strong { display: none; }
+  .messageHeader:not(:has(time, .comparisonBadge)) { display: none; }
+  .userMessage .messageInner { width: auto; max-width: 70%; display: flex; flex-direction: column; align-items: flex-end; }
+  .userMessage .messageContent { border: 0; border-radius: 1.5rem; background: var(--bubble, var(--surface)); color: var(--bubble-text, var(--text)); padding: 10px 20px; }
+  .userMessage .messageContent a { color: inherit; }
+  .messageContent a { color: var(--accent); }
+  .assistantMessage .messageContent { line-height: 1.75; }
 
-/* Messages */
-.message + .message { margin-top: var(--space-6); }
-.messageHeader { display: none; }
-.userMessage .messageInner { width: auto; max-width: 70%; display: flex; flex-direction: column; align-items: flex-end; }
-.userMessage .messageContent { border: 0; border-radius: 1.5rem; background: var(--surface); padding: 10px 20px; }
-.assistantMessage .messageContent { font-size: 16px; line-height: 1.75; }
+  /* Empty state */
+  .emptyState h1 { font-size: 28px; font-weight: 500; letter-spacing: -0.01em; }
+  .heroTagline span, .eyebrow { color: var(--accent); }
+  .suggestionGrid button { border-radius: 1rem; background: transparent; }
+  .suggestionGrid button:hover { transform: none; box-shadow: none; border-color: var(--accent-border); background: var(--accent-soft); }
 
-/* Empty state */
-.emptyState h1 { font-size: 28px; font-weight: 500; letter-spacing: -0.01em; }
-.heroTagline span, .eyebrow { color: var(--text-secondary); }
-.suggestionGrid button { border-radius: 1rem; background: transparent; }
-.suggestionGrid button:hover { transform: none; box-shadow: none; }
+  /* Composer: rounded pill */
+  .composerDock { background: var(--bg); }
+  .composer, .app.isEmpty .composer { border: 0; border-radius: 28px; background: var(--surface); box-shadow: 0 0 0 1px rgb(255 255 255 / 0.04), 0 4px 16px rgb(0 0 0 / 0.12); }
+  :root[data-theme="light"] .composer { box-shadow: 0 0 0 1px var(--border), 0 4px 16px rgb(0 0 0 / 0.06); background: #fff; }
+  .composer:focus-within { border-color: transparent; box-shadow: 0 0 0 1px var(--accent-border), 0 4px 20px rgb(37 99 235 / 0.18); }
+  .toolBtn { border-radius: 50%; color: var(--text-secondary); }
+  .toolBtn.active, .toolBtn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+  .selectWrap select { border-radius: 999px; }
+  .sendBtn { width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: #fff; box-shadow: none; }
+  .sendBtn:not(:disabled):hover { background: var(--accent-hover); transform: none; }
+  .sendBtn:disabled { background: var(--surface-active); color: var(--muted); }
+  .composerHint { font-size: 12px; color: var(--muted); text-align: center; }
 
-/* Composer: rounded pill */
-.composerDock { background: var(--bg); }
-.composer, .app.isEmpty .composer { border: 0; border-radius: 28px; background: var(--surface); box-shadow: 0 0 0 1px rgb(255 255 255 / 0.04), 0 4px 16px rgb(0 0 0 / 0.12); }
-:root[data-theme="light"] .composer { box-shadow: 0 0 0 1px var(--border), 0 4px 16px rgb(0 0 0 / 0.06); background: #fff; }
-.composer:focus-within { border-color: transparent; box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 4px 16px rgb(0 0 0 / 0.16); }
-.toolBtn { border-radius: 50%; color: var(--text-secondary); }
-.selectWrap select { border-radius: 999px; }
-.sendBtn { width: 36px; height: 36px; border-radius: 50%; background: var(--text); color: var(--bg); box-shadow: none; }
-.sendBtn:not(:disabled):hover { background: var(--text-secondary); transform: none; }
-.sendBtn:disabled { background: var(--surface-active); color: var(--muted); }
-.composerHint { font-size: 12px; color: var(--muted); text-align: center; }
-
-/* Buttons/dialogs */
-.primaryBtn { background: var(--text); color: var(--bg); border-radius: 999px; }
-.dialogPanel { border-radius: 1rem; }
-
-/* Blue variant of the ChatGPT-style theme */
-:root,
-:root[data-theme="dark"] {
-  --accent: #4f8cff;
-  --accent-hover: #3b7bf5;
-  --accent-soft: rgb(79 140 255 / 0.14);
-  --accent-border: rgb(79 140 255 / 0.35);
-  --bg: #161b26;
-  --sidebar: #0f131c;
-  --surface: #222a3a;
-  --surface-raised: #222a3a;
-  --surface-hover: #1e2533;
-  --surface-active: #2a3448;
-  --border: #2a3345;
-  --border-strong: #354057;
-  --text: #e8edf7;
-  --text-secondary: #a9b4c8;
-  --muted: #7d889d;
+  /* Buttons and dialogs */
+  .primaryBtn { background: var(--accent); color: #fff; border-radius: 999px; }
+  .dialogPanel { border-radius: 1rem; }
 }
-:root[data-theme="light"] {
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-soft: rgb(37 99 235 / 0.1);
-  --accent-border: rgb(37 99 235 / 0.3);
-  --bg: #f7f9fd;
-  --sidebar: #eef3fb;
-  --surface: #e8effb;
-  --surface-raised: #e8effb;
-  --surface-hover: #e1e9f7;
-  --surface-active: #d5e1f5;
-  --border: #d8e1f0;
-  --border-strong: #c3d0e6;
-  --text: #0f1a2e;
-  --text-secondary: #4a5a75;
-}
-::selection { background: rgb(79 140 255 / 0.3); }
-:focus-visible { outline-color: var(--accent); }
-.brandMark, .emptyBrand { background: linear-gradient(135deg, #4f8cff, #2563eb); color: #fff; }
-.newChatBtn > span:first-child, .heroTagline span, .eyebrow { color: var(--accent); }
-.chatItem.active,
-:root[data-theme="dark"] .chatItem.active,
-:root:not([data-theme]) .chatItem.active { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
-.userMessage .messageContent { background: linear-gradient(135deg, #2f6df0, #2559d6); color: #fff; }
-.userMessage .messageContent a { color: #fff; }
-.messageContent a { color: var(--accent); }
-.composer:focus-within { box-shadow: 0 0 0 1px var(--accent-border), 0 4px 20px rgb(37 99 235 / 0.18); }
-.sendBtn { background: var(--accent); color: #fff; }
-.sendBtn:not(:disabled):hover { background: var(--accent-hover); }
-.primaryBtn { background: var(--accent); color: #fff; }
-.toolBtn.active, .toolBtn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
-.suggestionGrid button:hover { border-color: var(--accent-border); background: var(--accent-soft); }
 
-/* Keep Settings working on top of the theme overrides above */
-.messageHeader { display: flex; }
-.messageIdentity > .messageAvatar,
-.messageIdentity > strong { display: none; }
-.messageHeader:not(:has(time, .comparisonBadge)) { display: none; }
-.messageContent,
-.assistantMessage .messageContent { font-size: calc(16px * var(--chat-font-scale, 1)); }
-:root[data-density="compact"] .message + .message { margin-top: var(--space-4); }
-:root[data-density="compact"] .userMessage .messageContent { padding: 8px 12px; }
-:root[data-contrast="high"] {
-  --bg: #000;
-  --sidebar: #000;
-  --surface: #0a0a0a;
-  --surface-raised: #141414;
-  --surface-hover: #1c1c1c;
-  --surface-active: #262626;
-  --border: #8a8a92;
-  --border-strong: #c4c4cc;
-  --text: #fff;
-  --text-secondary: #f0f0f0;
-  --muted: #d0d0d6;
-  --accent: #7ab0ff;
-  --accent-hover: #a3c8ff;
+@layer utilities {
+  .messageContent,
+  .assistantMessage .messageContent { font-size: calc(16px * var(--chat-font-scale, 1)); }
+  :root[data-contrast="high"] {
+    --surface-hover: #1c1c1c;
+    --surface-active: #262626;
+    --accent: #7ab0ff;
+    --accent-hover: #a3c8ff;
+    --bubble: #0b3a8c;
+  }
+  :root[data-contrast="high"] .userMessage .messageContent { border: 1px solid #7ab0ff; }
+  :root[data-contrast="high"] .sendBtn,
+  :root[data-contrast="high"] .primaryBtn { color: #000; }
 }
-:root[data-contrast="high"] .userMessage .messageContent { background: #0b3a8c; border: 1px solid #7ab0ff; }
-:root[data-contrast="high"] .sendBtn,
-:root[data-contrast="high"] .primaryBtn { color: #000; }
-@media (max-width: 720px) {
-  .userMessage .messageInner { max-width: 88%; }
+
+@layer responsive {
+  @media (max-width: 720px) {
+    .userMessage .messageInner { max-width: 88%; }
+  }
+}
+
+@layer components {
+  .settingRowStack { flex-direction: column; align-items: stretch; gap: var(--space-2); }
+  .settingRowStack textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); resize: vertical; }
+  .feedbackBtn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
 }

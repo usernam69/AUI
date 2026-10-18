@@ -189,6 +189,40 @@ await test("no WebGPU gives a clear error", async () => {
   await assert.rejects(async () => { for await (const t of slm.streamSlm([], {})) {} }, /needs WebGPU/);
 });
 
+await test("model speed setting picks the matching model and survives bad saved values", async () => {
+  const store = {};
+  globalThis.localStorage = { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = v; } };
+  setGpu({ gpu: { requestAdapter: async () => ({ features: new Set(["shader-f16"]) }) } });
+  const slm = await freshSlm("speed");
+  assert.equal(slm.getSlmSpeed(), "balanced");
+  slm.setSlmSpeed("fast");
+  assert.equal((await slm.pickModel()).id, "Qwen2.5-0.5B-Instruct-q4f16_1-MLC");
+  slm.setSlmSpeed("smart");
+  assert.equal((await slm.pickModel()).id, "Llama-3.2-3B-Instruct-q4f16_1-MLC");
+  store["aui.slmSpeed"] = "warp";
+  assert.equal(slm.getSlmSpeed(), "balanced");
+  slm.setSlmSpeed("nonsense");
+  assert.equal(store["aui.slmSpeed"], "warp", "unknown speeds are ignored");
+  delete globalThis.localStorage;
+});
+await test("a worker that cannot start falls back to running on the page", async () => {
+  setGpu({ gpu: {} });
+  const workerEngine = join(sandbox, "worker-webllm.mjs");
+  writeFileSync(workerEngine, readFileSync(mockEngine, "utf8") + `
+export function CreateWebWorkerMLCEngine() { return new Promise(() => {}); }`);
+  globalThis.Worker = class {
+    constructor() { this.listeners = {}; setTimeout(() => this.listeners.error?.({ preventDefault() {} }), 5); }
+    addEventListener(type, fn) { this.listeners[type] = fn; }
+    terminate() { this.terminated = true; }
+  };
+  const file = join(sandbox, "slm-worker-fallback.mjs");
+  writeFileSync(file, readFileSync(join(root, "modules/slm.js"), "utf8").replace(/const ENGINE_SOURCES = \[[\s\S]*?\];/,
+    `const ENGINE_SOURCES = [${JSON.stringify(pathToFileURL(workerEngine).href)}];`));
+  const slm = await import(pathToFileURL(file).href);
+  assert.deepEqual((await collect(slm, {})).out, ["a", "b", "c", "d"]);
+  delete globalThis.Worker;
+});
+
 // --- chat page prompt helpers (extracted from chat/app.js)
 await test("prompt trimming keeps newest turns within budget", async () => {
   const source = readFileSync(join(root, "chat/app.js"), "utf8");

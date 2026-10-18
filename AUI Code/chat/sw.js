@@ -1,5 +1,5 @@
-const CACHE_NAME = "aui-t20261018-fix1";
-const ASSET_VERSION = "20261018-fix1";
+const CACHE_NAME = "aui-t20261018-b1";
+const ASSET_VERSION = "20261018-b1";
 const versioned = path => `${path}?v=${ASSET_VERSION}`;
 
 // The worker lives in <base>chat/, so resolve everything from there. That keeps it
@@ -18,6 +18,7 @@ const PRECACHE_ASSETS = [
   at(versioned("modules/markdown.js")),
   at(versioned("modules/uploads.js")),
   at(versioned("modules/slm.js")),
+  at("modules/slm-worker.js"),
   at(versioned("modules/rag.js"))
 ];
 

@@ -24,7 +24,7 @@
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css">
-  <link rel="stylesheet" href="/style.css?v=20261018-fix1">
+  <link rel="stylesheet" href="/style.css?v=20261018-b1">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -204,6 +204,8 @@
         <label class="settingRow"><span><strong>Markdown</strong><small>Render formatting, code, tables, and math</small></span><input id="markdownToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow"><span><strong>Voice output</strong><small>Allow responses to be read aloud</small></span><input id="voiceOutputToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow rangeRow"><span><strong>Playback speed</strong><small id="speechRateValue">1×</small></span><input id="speechRateInput" type="range" min="0.75" max="2" step="0.25" value="1"></label>
+        <label class="settingRow"><span><strong>Model speed</strong><small>Fastest is quickest; Smartest gives better answers but is slower and a bigger download</small></span><select id="speedSelect"><option value="fast">Fastest (0.5B)</option><option value="balanced">Balanced (1B)</option><option value="smart">Smartest (3B)</option></select></label>
+        <label class="settingRow settingRowStack"><span><strong>Custom instructions</strong><small>How should AUI answer? For example: "Keep it short" or "Explain like I'm new to coding"</small></span><textarea id="customInstructionsInput" rows="3" maxlength="1500" placeholder="Anything AUI should know or do in every reply"></textarea></label>
         <div class="settingRow"><span><strong>Model</strong><small>Download it now so your first reply starts fast</small></span><button class="secondaryBtn" id="preloadModelBtn" type="button">Download the model now</button></div>
         <div class="settingRow"><span><strong>Your chats</strong><small>Back up, restore or wipe chats in this browser</small></span><span class="settingActions"><button class="secondaryBtn" id="exportAllBtn" type="button">Export all</button><button class="secondaryBtn" id="importChatsBtn" type="button">Import</button><button class="secondaryBtn dangerButton" id="deleteAllChatsBtn" type="button">Delete all</button></span></div>
         <input id="importChatsInput" type="file" accept=".json,application/json" hidden>
@@ -354,6 +356,6 @@
       navigator.serviceWorker.register("/chat/sw.js").catch(() => {});
     }
   </script>
-  <script type="module" src="/chat/app.js?v=20261018-fix1"></script>
+  <script type="module" src="/chat/app.js?v=20261018-b1"></script>
 </body>
 </html>

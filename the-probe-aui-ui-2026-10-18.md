@@ -1039,3 +1039,12 @@
 998. **AUI OS** - A full desktop-like web shell.
 999. **Holographic AUI** - 3D mascot with WebGL.
 1000. **AUI writes AUI** - The model suggests its own UI improvements.
+
+---
+
+## Build log
+Ideas marked here were built. "Skipped" means the idea contradicts another, needs an outside account or service, or needs a person (interviews, launches).
+
+### Batch 1 - top 10
+Built: 67 (thumbs feedback added to the existing action row), 141, 151, 284 (plus 347 first-word time), 301, 308, 312, 319, 320, 344, 400, 414.
+Skipped: 409 (needs the GitHub environment setting changed by the repo owner).

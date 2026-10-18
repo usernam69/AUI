@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-fix1";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b1";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-fix1";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm } from "../modules/slm.js?v=20261018-fix1";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-fix1";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-fix1";
+} from "../modules/uploads.js?v=20261018-b1";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS } from "../modules/slm.js?v=20261018-b1";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b1";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b1";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -101,7 +101,8 @@ const defaultState = {
     notify: false,
     sound: false,
     fontScale: 1,
-    density: "comfortable"
+    density: "comfortable",
+    customInstructions: ""
   },
   sidebarCollapsed: false,
   pendingAttachments: [],
@@ -293,9 +294,19 @@ function startApp() {
   });
 }
 
+// Web search and image generation need a server, which the GitHub Pages site doesn't have.
+function hideServerOnlyTools() {
+  if (ONLINE_TOOLS_ENABLED) return;
+  ["searchBtn", "imageGenerateBtn", "popoverWebSearch", "generateImageBtn"].forEach(id => {
+    const button = byId(id);
+    if (button) button.hidden = true;
+  });
+}
+
 async function init() {
   normalizeState();
   bindEvents();
+  hideServerOnlyTools();
   applyPreferences();
   updateShortcutLabels();
   updateNetworkStatus();
@@ -554,7 +565,9 @@ function normalizeChats(chats) {
         generatedImage: message.generatedImage || "",
         comparisonId: message.comparisonId || "",
         comparisonLabel: message.comparisonLabel || "",
-        tokensPerSecond: Number(message.tokensPerSecond) || 0
+        tokensPerSecond: Number(message.tokensPerSecond) || 0,
+        firstTokenMs: Number(message.firstTokenMs) || 0,
+        feedback: message.feedback === "up" || message.feedback === "down" ? message.feedback : ""
       }))
       : []
   }));
@@ -603,7 +616,9 @@ function bindEvents() {
   DOM.folderInput.addEventListener("change", event => addFolder(event.target.files));
   DOM.chatSearchInput.addEventListener("input", scheduleChatSearchRender);
 
-  DOM.input.addEventListener("input", warmSlm, { once: true });
+  // Typing starts the download on desktop only: phones may be on metered data.
+  const meteredOrPhone = matchMedia("(pointer: coarse)").matches || navigator.connection?.saveData;
+  if (!meteredOrPhone) DOM.input.addEventListener("input", warmSlm, { once: true });
   DOM.input.addEventListener("input", () => {
     scheduleTextareaResize();
     updateComposerState();
@@ -691,6 +706,8 @@ function bindEvents() {
   DOM.settingsDialog.addEventListener("close", saveSettingsFromDialog);
   byId("themeSelect").addEventListener("change", saveSettingsFromDialog);
   byId("timestampsToggle").addEventListener("change", saveSettingsFromDialog);
+  byId("speedSelect").addEventListener("change", saveSettingsFromDialog);
+  byId("customInstructionsInput").addEventListener("change", saveSettingsFromDialog);
   byId("autoScrollToggle").addEventListener("change", saveSettingsFromDialog);
   byId("memoryToggle").addEventListener("change", saveSettingsFromDialog);
   byId("markdownToggle").addEventListener("change", saveSettingsFromDialog);
@@ -1028,6 +1045,8 @@ async function sendMessage(options = {}) {
   let sending = true;
   let tokenCount = 0;
   let firstTokenAt = 0;
+  const requestedAt = performance.now();
+  let modelWasLoading = false;
   const priorContent = assistantMessage.content;
   setFaviconBusy(true);
   try {
@@ -1043,6 +1062,7 @@ async function sendMessage(options = {}) {
       onProgress: (report, model) => {
         if (!sending) return;
         loadingShown = true;
+        modelWasLoading = true;
         showLoadPercentInTitle(report);
         assistantMessage.content = `${describeProgress(report, model)} (first time only). Stop cancels; downloaded parts are kept for next time.`;
         scheduleStreamingRender(assistantMessage);
@@ -1053,7 +1073,11 @@ async function sendMessage(options = {}) {
         document.title = baseDocumentTitle;
         assistantMessage.content = priorContent;
       }
-      if (!firstTokenAt) firstTokenAt = performance.now();
+      if (!firstTokenAt) {
+        firstTokenAt = performance.now();
+        // Only meaningful when the model was already loaded; a download would swamp it.
+        assistantMessage.firstTokenMs = modelWasLoading ? 0 : Math.round(firstTokenAt - requestedAt);
+      }
       tokenCount += 1;
       assistantMessage.content += token;
       checkpointMessages();
@@ -1111,6 +1135,9 @@ function buildSlmSystemPrompt() {
       + "ask one short clarifying question when a request is ambiguous.",
     "Answer clearly and directly."
   ];
+  const custom = String(state.settings.customInstructions || "").trim();
+  if (custom) parts.push(`The user's instructions for how you should answer:
+${custom.slice(0, 1500)}`);
   if (state.settings.memory && state.memory.length) {
     const notes = state.memory.slice(-3)
       .map(item => `- User: ${String(item.user || "").slice(0, 120)} / You: ${String(item.ai || "").slice(0, 160)}`)
@@ -1674,7 +1701,8 @@ function createMessageFooter(message, index) {
   const metrics = element("span", "messageMetrics");
   if (message.role === "assistant" && message.content) {
     metrics.textContent = getReadingMetrics(message.content)
-      + (message.tokensPerSecond ? ` · ${message.tokensPerSecond} tokens/s` : "");
+      + (message.tokensPerSecond ? ` · ${message.tokensPerSecond} tokens/s` : "")
+      + (message.firstTokenMs ? ` · first word in ${(message.firstTokenMs / 1000).toFixed(1)} s` : "");
   }
   footer.append(metrics);
 
@@ -1687,6 +1715,7 @@ function createMessageFooter(message, index) {
       actionButton("Link", "permalink")
     );
     if (message.status === "complete") {
+      actions.append(feedbackButton(message, "up"), feedbackButton(message, "down"));
       actions.append(actionButton("Regenerate", "regenerate"), actionButton("Continue", "continue"));
       if (getUserTier() !== "guest" && MODEL_NAMES[message.model]) {
         if (Object.keys(MODEL_NAMES).length > 1) actions.append(actionButton("Compare model", "compare"));
@@ -1702,6 +1731,14 @@ function createMessageFooter(message, index) {
   }
   footer.append(actions);
   return footer;
+}
+
+function feedbackButton(message, value) {
+  const button = actionButton(value === "up" ? "👍" : "👎", `feedback-${value}`);
+  button.setAttribute("aria-label", value === "up" ? "Good response" : "Bad response");
+  button.setAttribute("aria-pressed", String(message.feedback === value));
+  button.classList.add("feedbackBtn");
+  return button;
 }
 
 function actionButton(label, action) {
@@ -1763,7 +1800,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-fix1");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b1");
   return markdownModulePromise;
 }
 
@@ -1861,6 +1898,17 @@ async function handleChatAction(event) {
     case "compare":
       compareMessageWithAnotherModel(message);
       break;
+    case "feedback-up":
+    case "feedback-down": {
+      const value = button.dataset.messageAction.slice(9);
+      message.feedback = message.feedback === value ? "" : value;
+      persist();
+      article.querySelectorAll(".feedbackBtn").forEach(item => {
+        item.setAttribute("aria-pressed", String(item.dataset.messageAction === `feedback-${message.feedback}`));
+      });
+      if (message.feedback) toast("Thanks for the feedback.");
+      break;
+    }
   }
 }
 
@@ -2027,9 +2075,32 @@ function renderChats() {
   const pinned = visible.filter(chat => chat.pinned);
   const recent = visible.filter(chat => !chat.pinned);
   if (pinned.length) DOM.chatList.append(createChatGroup("Pinned", pinned));
-  if (recent.length) DOM.chatList.append(createChatGroup(query ? "Results" : "Recent", recent));
+  if (query) {
+    if (recent.length) DOM.chatList.append(createChatGroup("Results", recent));
+  } else {
+    groupChatsByDate(recent).forEach(([label, chats]) => DOM.chatList.append(createChatGroup(label, chats)));
+  }
   DOM.chatListSentinel.hidden = visible.length >= filtered.length;
   DOM.chatList.append(DOM.chatListSentinel);
+}
+
+// ChatGPT-style buckets: Today, Yesterday, Previous 7 days, Previous 30 days, then by month.
+function groupChatsByDate(chats, now = new Date()) {
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const day = 86_400_000;
+  const groups = new Map();
+  for (const chat of chats) {
+    const time = Number(chat.updatedAt) || 0;
+    let label;
+    if (time >= startOfToday) label = "Today";
+    else if (time >= startOfToday - day) label = "Yesterday";
+    else if (time >= startOfToday - 7 * day) label = "Previous 7 days";
+    else if (time >= startOfToday - 30 * day) label = "Previous 30 days";
+    else label = new Date(time).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(chat);
+  }
+  return [...groups];
 }
 
 function scheduleChatSearchRender() {
@@ -2756,6 +2827,8 @@ function openSettings() {
   byId("fontScaleInput").value = state.settings.fontScale;
   byId("fontScaleValue").textContent = `${Math.round(state.settings.fontScale * 100)}%`;
   byId("densitySelect").value = state.settings.density;
+  byId("speedSelect").value = getSlmSpeed();
+  byId("customInstructionsInput").value = state.settings.customInstructions || "";
   if (!DOM.settingsDialog.open) DOM.settingsDialog.showModal();
 }
 
@@ -2774,6 +2847,14 @@ function saveSettingsFromDialog() {
   state.settings.fontScale = Number(byId("fontScaleInput").value) || 1;
   byId("fontScaleValue").textContent = `${Math.round(state.settings.fontScale * 100)}%`;
   state.settings.density = byId("densitySelect").value === "compact" ? "compact" : "comfortable";
+  state.settings.customInstructions = String(byId("customInstructionsInput").value || "").slice(0, 1500);
+  const speed = byId("speedSelect").value;
+  if (SLM_SPEEDS[speed] && speed !== getSlmSpeed()) {
+    setSlmSpeed(speed);
+    preloadPromise = null;
+    showModelName();
+    toast(`Model speed: ${SLM_SPEEDS[speed].label}. The next reply uses the new model.`);
+  }
   applyPreferences();
   persist();
   renderMessages();
