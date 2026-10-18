@@ -1,5 +1,5 @@
-const CACHE_NAME = "aui-t20261018-b13";
-const ASSET_VERSION = "20261018-b13";
+const CACHE_NAME = "aui-t20261018-b14";
+const ASSET_VERSION = "20261018-b14";
 const versioned = path => `${path}?v=${ASSET_VERSION}`;
 
 // The worker lives in <base>chat/, so resolve everything from there. That keeps it
@@ -7,7 +7,7 @@ const versioned = path => `${path}?v=${ASSET_VERSION}`;
 const BASE = new URL("../", self.registration.scope).pathname;
 const at = path => `${BASE}${path}`;
 
-const PRECACHE_PAGES = [at("chat"), at("about"), at("help.html"), at("changelog.html")];
+const PRECACHE_PAGES = [at("chat"), at("about"), at("help.html"), at("changelog.html"), at("accessibility.html")];
 const RUNTIME_CACHE = "aui-runtime";
 const RUNTIME_HOSTS = ["esm.sh", "cdn.jsdelivr.net", "fonts.googleapis.com", "fonts.gstatic.com"];
 const PRECACHE_ASSETS = [

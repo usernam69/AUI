@@ -3520,3 +3520,73 @@
   .chatItem.isUnread .chatSelectBtn span::after { background: Highlight; }
   .readingRuler { background: transparent; border-color: Highlight; }
 }
+
+/* --- Mobile experience from The Probe (category 11) --- */
+@layer components {
+  .actionSheet { position: fixed; inset: 0; z-index: 90; display: flex; align-items: flex-end; justify-content: center; background: var(--overlay); opacity: 0; transition: opacity var(--duration-fast); }
+  .actionSheet.open { opacity: 1; }
+  .actionSheetPanel { width: min(100%, 520px); max-height: 80vh; overflow-y: auto; padding: 8px 12px max(12px, env(safe-area-inset-bottom)); border-radius: 20px 20px 0 0; background: var(--surface-raised); box-shadow: var(--shadow-lg); transform: translateY(100%); transition: transform var(--duration-normal) var(--ease-out); }
+  .actionSheet.open .actionSheetPanel { transform: none; }
+  .actionSheetPanel::before { content: ""; display: block; width: 40px; height: 4px; margin: 2px auto 10px; border-radius: 4px; background: var(--border-strong); }
+  .actionSheetTitle { margin: 0 4px 8px; color: var(--muted); font-size: 13px; text-align: center; }
+  .actionSheetBody { margin: 0 6px 10px; color: var(--text); font-size: 15px; line-height: 1.5; }
+  .actionSheetBody ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+  .actionSheetPanel button { display: block; width: 100%; min-height: 48px; padding: 0 14px; border: 0; border-radius: 12px; background: transparent; color: var(--text); font: inherit; font-size: 16px; text-align: left; }
+  .actionSheetPanel button:hover, .actionSheetPanel button:focus-visible { background: var(--surface-hover); }
+  .actionSheetPanel .actionSheetCancel { margin-top: 6px; background: var(--surface-hover); color: var(--accent); font-weight: 600; text-align: center; }
+  .selectTextBody { white-space: pre-wrap; user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; font-size: 16px; line-height: 1.55; }
+  .handoffBody { display: grid; justify-items: center; gap: 12px; text-align: center; }
+  .handoffBody svg { width: min(78vw, 320px); height: auto; padding: 10px; border-radius: 12px; background: #fff; }
+  .handoffBody p { color: var(--muted); font-size: 13px; }
+  .message { transition: transform var(--duration-fast); }
+  .message.swipeReady { box-shadow: inset 3px 0 0 var(--accent); }
+  .topBar.pullReady { box-shadow: inset 0 -3px 0 var(--accent); }
+  .thumbBar { display: none; }
+  .touchOnly { display: none !important; }
+  .lightbox img { touch-action: pinch-zoom; cursor: zoom-in; }
+  .lightbox img.zoomed { max-width: none; max-height: none; width: 200%; cursor: zoom-out; }
+  .lightbox:has(img.zoomed) { overflow: auto; }
+  /* 525: a soft fade shows there is more code to the side */
+  @media screen { .codeBlock pre { background: linear-gradient(to right, var(--code-bg) 30%, transparent) left / 24px 100% no-repeat local, linear-gradient(to left, var(--code-bg) 30%, transparent) right / 24px 100% no-repeat local, radial-gradient(farthest-side at 0 50%, rgb(0 0 0 / 0.35), transparent) left / 10px 100% no-repeat scroll, radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 0.35), transparent) right / 10px 100% no-repeat scroll, var(--code-bg) !important; } }
+  /* 526: wide tables keep their first column in view */
+  .tableWrap td:first-child { position: sticky; left: 0; z-index: 1; background: var(--bg); box-shadow: 1px 0 0 var(--border); }
+}
+
+@layer responsive {
+  @media (pointer: coarse) {
+    .touchOnly { display: flex !important; }
+    html, body { overscroll-behavior-y: none; }
+    .message .messageContent { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    .message .messageContent :is(pre, code, table, a) { -webkit-user-select: text; user-select: text; }
+    /* 537: a bigger send button */
+    .sendBtn { min-width: 44px; min-height: 44px; }
+    .scrollBottomBtn { min-height: 44px; }
+    /* 523: voice-first puts a large microphone button by your thumb */
+    [data-voice-first="true"] #voiceBtn { width: 52px; height: 52px; font-size: 22px; border-radius: 50%; background: var(--accent); color: #fff; }
+    /* 508: one-hand mode */
+    [data-one-hand="true"] .thumbBar { position: absolute; right: 12px; bottom: calc(100% + 8px); display: flex; gap: 8px; }
+    [data-one-hand="true"] .thumbBar button { width: 48px; height: 48px; border: 1px solid var(--border); border-radius: 50%; background: var(--surface-raised); color: var(--text); font-size: 20px; box-shadow: var(--shadow-md); }
+    [data-one-hand="true"] .composerDock { position: relative; }
+  }
+
+  @media (max-width: 720px) {
+    /* 513/516: tighter header, slightly larger reading text */
+    .topBar { min-height: 50px; }
+    .messageContent { font-size: 16.5px; }
+    /* 538: settings open as a full-screen sheet */
+    #settingsDialog { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; }
+    #settingsDialog .dialogPanel { height: 100%; max-height: none; border-radius: 0; }
+    /* 501: the tools menu slides up from the bottom */
+    .toolsPopover:popover-open, .toolsPopover[data-fallback-open] { position: fixed; inset: auto 0 0 0; width: 100%; max-width: none; margin: 0; padding-bottom: max(12px, env(safe-area-inset-bottom)); border-radius: 20px 20px 0 0; }
+  }
+
+  /* 518: tablets in landscape keep the chat list on screen */
+  @media (min-width: 768px) and (max-width: 980px) and (orientation: landscape) and (pointer: coarse) {
+    .app, .app.sidebarCollapsed { grid-template-columns: 260px minmax(0, 1fr); }
+    .sidebar { position: relative; inset: auto; width: auto; box-shadow: none; opacity: 1; pointer-events: auto; transform: none; }
+    .menuBtn, .sidebarCloseBtn, .sidebarBackdrop { display: none; }
+  }
+
+  /* 511/539: low battery turns animations off */
+  [data-battery-saver="true"] *, [data-battery-saver="true"] *::before, [data-battery-saver="true"] *::after { animation: none !important; transition: none !important; }
+}

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#161b26">
+  <meta name="description" content="How AUI supports keyboard, screen reader and low-vision use, and how to report a problem.">
+  <title>AUI accessibility</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <script>document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";</script>
+  <style>
+    body { overflow: auto; padding: 40px 16px 80px; }
+    main { max-width: 760px; margin: 0 auto; line-height: 1.7; }
+    h1 { font-size: 30px; margin-bottom: 4px; }
+    h2 { margin-top: 32px; font-size: 20px; }
+    li { margin: 4px 0; }
+    kbd { padding: 1px 6px; border-radius: 6px; background: var(--surface-hover); font-family: var(--font-mono); font-size: 13px; }
+    a { color: var(--accent); }
+    .back { display: inline-block; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="/chat">← Back to AUI</a>
+    <h1>Accessibility</h1>
+    <p style="color:var(--text-secondary)">AUI aims to meet WCAG 2.2 level AA. Each release is scanned with axe-core with no violations found; we have not yet tested it by hand with every screen reader.</p>
+
+    <h2>What works today</h2>
+    <ul>
+      <li><strong>Keyboard:</strong> every control can be reached with <kbd>Tab</kbd>. Skip links jump to the message box, the conversation and the chat list. <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>, <kbd>/</kbd> and <kbd>,</kbd> open a new chat, search and settings, and you can change those letters in Settings, Accessibility.</li>
+      <li><strong>Screen readers:</strong> new replies are announced when they finish, unread chats say so, code blocks and charts have labels, and charts include a hidden data table.</li>
+      <li><strong>Seeing the screen:</strong> high-contrast and OLED themes, text size up to 150%, the Atkinson Hyperlegible and Lexend fonts, a reading ruler, one-paragraph focus, and a Pause button that freezes the text while AUI keeps writing.</li>
+      <li><strong>Motion:</strong> AUI follows your system's reduced-motion setting, and effects can be turned off in Settings, Appearance.</li>
+      <li><strong>Language:</strong> a "simple language" switch asks AUI for plain words and short sentences. Right-to-left messages (Hebrew, Arabic) are laid out right to left.</li>
+      <li><strong>Listening:</strong> any reply, or any text you select, can be read aloud in the voice you choose.</li>
+    </ul>
+
+    <h2>Known gaps</h2>
+    <ul>
+      <li>Diagrams drawn from Mermaid code have no text description beyond their source code.</li>
+      <li>AUI cannot describe pictures yet, because the in-browser models don't see images.</li>
+      <li>Manual testing with NVDA, JAWS, VoiceOver and TalkBack is still to do.</li>
+    </ul>
+
+    <h2>Report a problem</h2>
+    <p>If something gets in your way, open an issue at <a href="https://github.com/usernam69/AUI/issues">github.com/usernam69/AUI/issues</a> and say which browser and assistive technology you use.</p>
+  </main>
+</body>
+</html>

@@ -134,7 +134,11 @@ async function createEngine(webllm, modelId, config) {
 export function loadSlm(onProgress) {
   progressListener = onProgress || null;
   if (!isSlmSupported()) {
-    return Promise.reject(new Error("AUI runs its model in your browser and needs WebGPU. Try a recent desktop Chrome, Edge, or Safari."));
+    // 533: iPhones and iPads get Safari-specific steps.
+    const apple = typeof navigator !== "undefined" && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+    return Promise.reject(new Error(apple
+      ? "AUI runs its model in your browser and needs WebGPU. On iPhone and iPad, update to iOS 26, or on older versions turn on WebGPU in Settings, Safari, Advanced, Feature Flags."
+      : "AUI runs its model in your browser and needs WebGPU. Try a recent desktop Chrome, Edge, or Safari."));
   }
   if (!enginePromise) {
     const loading = Promise.all([importEngine().catch(() => {

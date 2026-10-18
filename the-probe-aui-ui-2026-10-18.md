@@ -1100,3 +1100,8 @@ Built: 451, 456, 457 (axe scan: 5 issues fixed, now 0 violations), 460, 462, 463
 Already in AUI: 452, 453, 454, 455, 458, 459, 461, 465, 467, 468, 475, 478, 479, 484, 487, 488, 490, 491, 494, 496, 499.
 Skipped: 476 (needs an image model the browser doesn't have), 485 (needs manual NVDA and VoiceOver testing), 500 (moved to a later batch with the CI work).
 Bug fixed: batch 8 broke the Markdown module (a literal line break inside a string), so replies showed as plain text. The syntax test missed it because "node --check" passes typeless ES modules; the test now checks modules properly.
+
+### Batch 12 - category 11 (mobile)
+Built: 501 (bottom sheets for message actions and the tools menu), 502, 503 (swipe a message right to quote it), 504 (press and hold a message), 505, 508, 509, 510, 511, 512, 513, 515, 516, 518 (tablets in landscape keep the chat list visible), 520 (Back closes the top sheet, dialog or sidebar), 523, 525, 526, 527, 529, 531, 532, 533, 534, 535 (pull the top bar down for a new chat), 537, 538, 539, 542 ("Select text" sheet), 548, 549 (QR code that carries the chat; nothing is uploaded). Also the accessibility statement page (486), which batch 11 listed but had not written.
+Already in AUI: 506, 507, 514, 517, 519, 521, 522, 524, 528, 530, 536, 540, 541, 543, 544, 545, 546, 547.
+Skipped: 550 (needs real iPhone, Pixel and budget Android devices; the gestures, sheets, Back button and tablet layout are checked in Chromium's phone and tablet emulation instead).

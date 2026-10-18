@@ -30,7 +30,7 @@
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css" integrity="sha384-wH75j6z1lH97ZOpMOInqhgKzFkAInZPPSPlZpYKYTOqsaizPvhQZmAtLcPKXpLyH" crossorigin="anonymous" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="/style.css?v=20261018-b13">
+  <link rel="stylesheet" href="/style.css?v=20261018-b14">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -255,6 +255,11 @@
         <label class="settingRow"><span><strong>Model speed</strong><small>Fastest is quickest; Smartest gives better answers but is slower and a bigger download</small></span><select id="speedSelect"><option value="tiny">Tiny (SmolLM 360M, ~380 MB)</option><option value="fast">Fastest (Qwen 0.5B, ~950 MB)</option><option value="balanced">Balanced (Llama 1B, ~880 MB)</option><option value="smart">Smart (Llama 3B, ~2.3 GB)</option><option value="phi">Smartest (Phi 3.5 mini, ~3.7 GB)</option></select></label>
         <div class="settingRow"><span><strong>Model stats</strong><small>Average speed and a quick speed test</small></span><button class="secondaryBtn" id="perfBtn" type="button">Open stats</button></div>
         <label class="settingRow"><span><strong>Download in the background</strong><small>On desktop Wi-Fi, fetch the model while you browse so it's ready</small></span><input id="backgroundDownloadToggle" type="checkbox" role="switch"></label>
+        <label class="settingRow"><span><strong>Download on Wi-Fi only</strong><small>Wait for Wi-Fi before downloading the model on a phone</small></span><input id="wifiOnlyToggle" type="checkbox" role="switch"></label>
+        <label class="settingRow"><span><strong>Battery saver</strong><small>Below 15% battery, free the model's memory and turn off animations</small></span><input id="batterySaverToggle" type="checkbox" role="switch" checked></label>
+        <label class="settingRow"><span><strong>Cooler replies</strong><small>Write a little slower so phones stay cool</small></span><input id="coolModeToggle" type="checkbox" role="switch"></label>
+        <label class="settingRow"><span><strong>One-hand mode</strong><small>On phones, put the menu and new-chat buttons by your thumb</small></span><input id="oneHandToggle" type="checkbox" role="switch"></label>
+        <label class="settingRow"><span><strong>Big microphone button</strong><small>On phones, make voice input the main button</small></span><input id="voiceFirstToggle" type="checkbox" role="switch"></label>
         <label class="settingRow"><span><strong>Free memory when idle</strong><small>Unload the model after 10 minutes in a background tab</small></span><input id="unloadIdleToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow"><span><strong>Answer length</strong><small>How long replies usually are</small></span><select id="answerLengthSelect"><option value="short">Short</option><option value="medium">Medium</option><option value="long">Long</option></select></label>
         <label class="settingRow"><span><strong>Online lookups</strong><small>For weather, definitions and "who/what is" questions, fetch facts from Open-Meteo, a free dictionary and Wikipedia. Your question is sent to those sites.</small></span><input id="onlineLookupsToggle" type="checkbox" role="switch"></label>
@@ -416,6 +421,6 @@
       navigator.serviceWorker.register("/chat/sw.js").catch(() => {});
     }
   </script>
-  <script type="module" src="/chat/app.js?v=20261018-b13"></script>
+  <script type="module" src="/chat/app.js?v=20261018-b14"></script>
 </body>
 </html>

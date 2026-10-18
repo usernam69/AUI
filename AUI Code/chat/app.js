@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b13";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b14";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b13";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b13";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b13";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b13";
+} from "../modules/uploads.js?v=20261018-b14";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b14";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b14";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b14";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -538,7 +538,7 @@ function setupQuickWins() {
   byId("copyChatBtn")?.addEventListener("click", copyWholeChat);
   byId("resetSettingsBtn")?.addEventListener("click", resetSettings);
   const version = byId("settingsVersion");
-  if (version) version.innerHTML = `AUI v${APP_VERSION} · <a href="../changelog.html" target="_blank" rel="noopener">What's new</a> · <a href="../help.html" target="_blank" rel="noopener">Help</a>`;
+  if (version) version.innerHTML = `AUI v${APP_VERSION} · <a href="../changelog.html" target="_blank" rel="noopener">What's new</a> · <a href="../help.html" target="_blank" rel="noopener">Help</a> · <a href="../accessibility.html" target="_blank" rel="noopener">Accessibility</a>`;
   // Popovers float over the page; close them when it scrolls under them.
   DOM.chatViewport.addEventListener("scroll", () => hideToolsPopover(), { passive: true });
   if (!matchMedia("(pointer: coarse)").matches && !location.hash) {
@@ -550,7 +550,7 @@ function setupQuickWins() {
 
 const SETTINGS_TABS = [
   ["accessibility", "Accessibility", ["voiceSelect", "simpleLanguageToggle", "simpleLayoutToggle", "lineFocusToggle", "readingRulerToggle", "shortcutNewChatInput"]],
-  ["general", "General", ["enterToSendToggle", "counterSelect", "composerStyleSelect", "spellcheckToggle", "voiceAutoSendToggle", "typingSoundToggle", "timestampsToggle", "autoScrollToggle", "notifyToggle", "soundToggle"]],
+  ["general", "General", ["enterToSendToggle", "counterSelect", "composerStyleSelect", "spellcheckToggle", "voiceAutoSendToggle", "typingSoundToggle", "timestampsToggle", "autoScrollToggle", "notifyToggle", "soundToggle", "wifiOnlyToggle", "batterySaverToggle", "coolModeToggle", "oneHandToggle", "voiceFirstToggle"]],
   ["appearance", "Appearance", ["themeSelect", "themeSwatches", "accentSwatches", "fontSelect", "fontWeightInput", "lineHeightSelect", "contentWidthSelect", "bubbleSelect", "bubbleColorInput", "iconWeightSelect", "fontScaleInput", "densitySelect", "seasonalToggle", "effectsToggle"]],
   ["personal", "Personalization", ["answerLengthSelect", "onlineLookupsToggle", "speedSelect", "perfBtn", "backgroundDownloadToggle", "unloadIdleToggle", "customInstructionsInput", "aiTitlesToggle", "memoryToggle", "markdownToggle", "voiceOutputToggle", "speechRateInput"]],
   ["data", "Data controls", ["preloadModelBtn", "deleteModelsBtn", "exportAllBtn", "storageMeter", "autoArchiveToggle", "archivedChatsList", "trashList", "resetSettingsBtn"]]
@@ -2354,10 +2354,14 @@ function openLightbox(src, alt = "") {
   if (!dialog) {
     dialog = element("dialog", "lightbox");
     dialog.id = "lightboxDialog";
-    dialog.addEventListener("click", () => dialog.close());
+    // 527: tap the picture to zoom in (then pan or pinch), anywhere else to close.
+    dialog.addEventListener("click", event => {
+      if (event.target.tagName === "IMG") event.target.classList.toggle("zoomed");
+      else dialog.close();
+    });
     document.body.append(dialog);
   }
-  dialog.innerHTML = `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"><p>Click anywhere to close</p>`;
+  dialog.innerHTML = `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"><p>Tap the picture to zoom. Tap outside it to close.</p>`;
   dialog.showModal();
 }
 
@@ -3105,6 +3109,482 @@ function readSelectionAloud(text) {
   speechSynthesis.speak(utterance);
 }
 
+// --- Mobile experience from The Probe (category 11) ---
+
+function isTouchDevice() {
+  return matchMedia("(pointer: coarse)").matches;
+}
+
+function findMessageForArticle(article) {
+  return getChat()?.messages.find(message => message.id === article?.dataset.messageId) || null;
+}
+
+// 505: hand one reply to the phone's share sheet (copies where sharing isn't available).
+async function shareMessage(message) {
+  const text = stripMarkdown(message.content);
+  if (navigator.share) {
+    try { await navigator.share({ title: "AUI", text }); } catch {}
+    return;
+  }
+  copyText(text).then(() => toast("Copied to clipboard")).catch(() => toast("Couldn’t copy.", "error"));
+}
+
+// 503: quote a message into the composer.
+function quoteMessage(message) {
+  const quote = stripMarkdown(message.content).slice(0, 600).split("\n").map(line => `> ${line}`).join("\n");
+  DOM.input.value = `${quote}\n\n${DOM.input.value}`;
+  scheduleTextareaResize();
+  updateComposerState();
+  saveDraft();
+  DOM.input.focus();
+  navigator.vibrate?.(10);
+}
+
+// 520: the Android back button (and browser back) closes the top sheet, dialog or sidebar.
+let backClosesPending = 0;
+let ignoreNextPop = false;
+function overlayOpened() {
+  if (isTouchDevice()) history.pushState({ auiOverlay: true }, "");
+}
+function overlayClosed() {
+  if (backClosesPending > 0) {
+    backClosesPending -= 1;
+    return;
+  }
+  if (isTouchDevice() && history.state?.auiOverlay) {
+    ignoreNextPop = true;
+    history.back();
+  }
+}
+function setupBackButton() {
+  window.addEventListener("popstate", () => {
+    if (ignoreNextPop) {
+      ignoreNextPop = false;
+      return;
+    }
+    const sheet = document.querySelector(".actionSheet.open");
+    const dialog = [...document.querySelectorAll("dialog[open]")].at(-1);
+    if (sheet) {
+      backClosesPending += 1;
+      sheet._close();
+    } else if (dialog) {
+      backClosesPending += 1;
+      dialog.close();
+    } else if (DOM.sidebar.classList.contains("mobileOpen")) {
+      backClosesPending += 1;
+      closeMobileSidebar();
+    }
+  });
+  new MutationObserver(records => records.forEach(record => {
+    const wasOpen = record.oldValue !== null;
+    if (record.target.open !== wasOpen) (record.target.open ? overlayOpened : overlayClosed)();
+  })).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["open"], attributeOldValue: true });
+  new MutationObserver(records => records.forEach(record => {
+    const wasOpen = /\bmobileOpen\b/.test(record.oldValue || "");
+    const isOpen = DOM.sidebar.classList.contains("mobileOpen");
+    if (isOpen !== wasOpen) (isOpen ? overlayOpened : overlayClosed)();
+  })).observe(DOM.sidebar, { attributes: true, attributeFilter: ["class"], attributeOldValue: true });
+}
+
+// 501/504: menus slide up from the bottom of the screen.
+function openActionSheet(title, actions, body = "") {
+  document.querySelector(".actionSheet")?.remove();
+  const sheet = element("div", "actionSheet");
+  sheet.setAttribute("role", "dialog");
+  sheet.setAttribute("aria-modal", "true");
+  sheet.setAttribute("aria-label", title);
+  sheet.innerHTML = `<div class="actionSheetPanel"><p class="actionSheetTitle">${escapeHtml(title)}</p>${body ? `<div class="actionSheetBody">${body}</div>` : ""}${actions.map(([label], index) => `<button type="button" data-sheet-index="${index}">${escapeHtml(label)}</button>`).join("")}<button type="button" class="actionSheetCancel" data-sheet-cancel>${actions.length ? "Cancel" : "Got it"}</button></div>`;
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    sheet.classList.remove("open");
+    setTimeout(() => sheet.remove(), 220);
+    overlayClosed();
+  };
+  sheet._close = close;
+  sheet.addEventListener("click", event => {
+    const pick = event.target.closest("[data-sheet-index]");
+    if (pick) {
+      // A picked action may open a dialog that reuses this back-button entry.
+      closed = true;
+      sheet.classList.remove("open");
+      setTimeout(() => sheet.remove(), 220);
+      actions[Number(pick.dataset.sheetIndex)][1]();
+      setTimeout(() => {
+        if (!document.querySelector("dialog[open], .actionSheet.open")) overlayClosed();
+      }, 300);
+    } else if (event.target === sheet || event.target.closest("[data-sheet-cancel]")) {
+      close();
+    }
+  });
+  sheet.addEventListener("keydown", event => {
+    if (event.key === "Escape") close();
+  });
+  document.body.append(sheet);
+  requestAnimationFrame(() => sheet.classList.add("open"));
+  sheet.querySelector("button")?.focus({ preventScroll: true });
+  if (navigator.userActivation?.hasBeenActive) navigator.vibrate?.(8);
+  overlayOpened();
+  return sheet;
+}
+
+// 542: phones get a clean "Select text" view instead of fiddly selection handles.
+function openSelectableText(message) {
+  let dialog = byId("selectTextDialog");
+  if (!dialog) {
+    dialog = element("dialog", "dialog");
+    dialog.id = "selectTextDialog";
+    document.body.append(dialog);
+    dialog.addEventListener("click", event => {
+      if (event.target === dialog || event.target.closest("[data-close-dialog]")) dialog.close();
+    });
+  }
+  dialog.innerHTML = `<div class="dialogPanel"><header><div><p class="eyebrow">Select text</p><h2>${message.role === "user" ? "Your message" : "AUI's reply"}</h2></div><button class="iconBtn" type="button" data-close-dialog aria-label="Close">×</button></header><div class="dialogContent selectTextBody">${escapeHtml(message.content)}</div></div>`;
+  dialog.showModal();
+}
+
+function openMessageSheet(article) {
+  const message = findMessageForArticle(article);
+  if (!message || !message.content) return;
+  const click = action => () => article.querySelector(`[data-message-action="${action}"]`)?.click();
+  const actions = [
+    ["Copy", click("copy")],
+    ...(navigator.share ? [["Share…", () => shareMessage(message)]] : []),
+    ["Quote in reply", () => quoteMessage(message)],
+    ["Select text", () => openSelectableText(message)],
+    ...(message.role === "assistant" ? [["Read aloud", click("speak")], ["Regenerate", click("regenerate")]] : [["Edit", click("edit")]]),
+    [message.starred ? "Remove star" : "Star", click("star")]
+  ];
+  openActionSheet(message.role === "user" ? "Your message" : "AUI's reply", actions);
+}
+
+// 503/504: swipe a message right to quote it; long-press for actions.
+function setupMessageGestures() {
+  let start = null;
+  let timer = null;
+  const reset = () => {
+    clearTimeout(timer);
+    if (start?.article) start.article.style.transform = "";
+    start = null;
+  };
+  DOM.chatArea.addEventListener("touchstart", event => {
+    const article = event.target.closest("[data-message-id]");
+    if (!article || event.touches.length !== 1 || event.target.closest("pre, table, button, a, input, textarea, .miniChart, .diagram, .followUps")) return;
+    const touch = event.touches[0];
+    start = { x: touch.clientX, y: touch.clientY, dx: 0, article };
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (!start || start.dx > 8) return;
+      const target = start.article;
+      reset();
+      openMessageSheet(target);
+    }, 500);
+  }, { passive: true });
+  DOM.chatArea.addEventListener("touchmove", event => {
+    if (!start) return;
+    const touch = event.touches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) clearTimeout(timer);
+    if (Math.abs(dy) > 24 && Math.abs(dy) > Math.abs(dx)) return reset();
+    if (dx > 0 && dx > Math.abs(dy) * 2) {
+      start.dx = dx;
+      start.article.style.transform = `translateX(${Math.min(dx, 84)}px)`;
+      start.article.classList.toggle("swipeReady", dx > 70);
+    }
+  }, { passive: true });
+  const finish = () => {
+    if (!start) return;
+    const { article, dx } = start;
+    article.classList.remove("swipeReady");
+    reset();
+    if (dx > 70) {
+      const message = findMessageForArticle(article);
+      if (message) quoteMessage(message);
+    }
+  };
+  DOM.chatArea.addEventListener("touchend", finish);
+  DOM.chatArea.addEventListener("touchcancel", reset);
+  // Android also reports a long-press as a context menu; the sheet replaces it.
+  DOM.chatArea.addEventListener("contextmenu", event => {
+    if (isTouchDevice() && event.target.closest("[data-message-id]") && !event.target.closest("a, img, pre")) event.preventDefault();
+  });
+}
+
+// 535: pull the top bar down to start a new chat.
+function setupHeaderPull() {
+  const bar = document.querySelector(".topBar");
+  if (!bar) return;
+  let startY = null;
+  bar.addEventListener("touchstart", event => {
+    startY = event.target.closest("button, a, input, select") ? null : event.touches[0].clientY;
+  }, { passive: true });
+  bar.addEventListener("touchmove", event => {
+    if (startY === null) return;
+    bar.classList.toggle("pullReady", event.touches[0].clientY - startY > 80);
+  }, { passive: true });
+  bar.addEventListener("touchend", () => {
+    if (bar.classList.contains("pullReady")) {
+      navigator.vibrate?.(12);
+      createChat();
+    }
+    bar.classList.remove("pullReady");
+    startY = null;
+  });
+}
+
+// 509/510: say how big the download is before a phone starts it, and honour Wi-Fi only.
+const MOBILE_DOWNLOAD_OK_KEY = "aui.mobileDownloadOk";
+async function confirmModelDownload() {
+  if (isSlmReady() || preloadPromise || await isModelCached()) return;
+  if (state.settings.wifiOnly && isMeteredConnection()) {
+    throw new Error("The model downloads on Wi-Fi only (Settings, General). Connect to Wi-Fi and send again.");
+  }
+  if (!isTouchDevice()) return;
+  try {
+    if (localStorage.getItem(MOBILE_DOWNLOAD_OK_KEY)) return;
+  } catch {}
+  const model = await pickModel();
+  const confirmed = await askForConfirmation({
+    eyebrow: "First reply",
+    title: `Download ${model.label}?`,
+    message: `AUI runs on your phone, so the first reply downloads about ${model.approxMB} MB once.${isMeteredConnection() ? " You seem to be on mobile data." : ""} Wi-Fi is best. Smaller models are under Settings.`,
+    submitLabel: "Download",
+    cancelLabel: "Not now"
+  });
+  if (!confirmed) throw new Error("Download cancelled. Send again when you're ready.");
+  try { localStorage.setItem(MOBILE_DOWNLOAD_OK_KEY, "1"); } catch {}
+}
+
+// 511/539: on low battery, free the model and switch off animations.
+async function setupBatterySaver() {
+  if (!navigator.getBattery) return;
+  try {
+    const battery = await navigator.getBattery();
+    const check = () => {
+      const low = state.settings.batterySaver !== false && !battery.charging && battery.level <= 0.15;
+      document.documentElement.dataset.batterySaver = String(low);
+      if (low && isSlmReady() && !state.loading && !modelTestRunning) {
+        unloadSlm();
+        updateReadyBadge();
+        toast("Battery is low, so AUI freed the model's memory. It reloads on your next message.", "info");
+      }
+    };
+    battery.addEventListener("levelchange", check);
+    battery.addEventListener("chargingchange", check);
+    check();
+  } catch {}
+}
+
+// 512: a short pause between words keeps the GPU (and the phone) cooler.
+function coolModeDelay() {
+  return state.settings.coolMode ? new Promise(resolve => setTimeout(resolve, 45)) : null;
+}
+
+// 531: a reply that died while the app was in the background gets a clear retry.
+let hiddenDuringReply = false;
+function noteBackgroundInterruption(message) {
+  const wasHidden = hiddenDuringReply;
+  hiddenDuringReply = false;
+  if (!wasHidden || message.status !== "error") return;
+  toast("The reply stopped while AUI was in the background.", "error", {
+    label: "Retry",
+    duration: 12000,
+    onClick: () => DOM.chatArea.querySelector(`[data-message-id="${CSS.escape(message.id)}"] [data-message-action="retry"]`)?.click()
+  });
+}
+
+// 532: phones with little memory start on a smaller model.
+function pickModelForMemory() {
+  try {
+    if (localStorage.getItem("aui.slmSpeed") || !navigator.deviceMemory || navigator.deviceMemory > 4) return;
+  } catch {
+    return;
+  }
+  setSlmSpeed(navigator.deviceMemory <= 2 ? "tiny" : "fast");
+  showModelName();
+}
+
+// 548: unread replies show as a badge on the installed app's icon.
+function updateAppBadge() {
+  if (!navigator.setAppBadge) return;
+  const unread = state.chats.filter(chat => chat.unread && !chat.archived).length;
+  (unread ? navigator.setAppBadge(unread) : navigator.clearAppBadge()).catch(() => {});
+}
+
+// 534: three tips the first time AUI opens on a phone.
+const MOBILE_TIPS_KEY = "aui.mobileTipsShown";
+function showMobileTips() {
+  if (!isTouchDevice()) return;
+  try {
+    if (localStorage.getItem(MOBILE_TIPS_KEY)) return;
+    localStorage.setItem(MOBILE_TIPS_KEY, "1");
+  } catch {
+    return;
+  }
+  setTimeout(() => {
+    if (document.querySelector("dialog[open], .actionSheet")) return;
+    openActionSheet("Three quick tips", [], "<ol><li><strong>Swipe a message right</strong> to quote it in your reply.</li><li><strong>Press and hold a message</strong> to copy, share or select text.</li><li><strong>Pull the top bar down</strong> to start a new chat.</li></ol>");
+  }, 1800);
+}
+
+// 549: a QR code that opens this chat on another device (the chat travels inside the link).
+async function encodeHandoff(chat) {
+  const pick = [];
+  let size = 0;
+  for (const message of [...chat.messages].reverse()) {
+    if (!["user", "assistant"].includes(message.role) || !message.content) continue;
+    size += message.content.length;
+    if (size > 2400 && pick.length) break;
+    pick.unshift([message.role === "user" ? "u" : "a", message.content.slice(0, 2400)]);
+  }
+  const json = JSON.stringify({ t: chat.title, m: pick });
+  const stream = new Blob([json]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+  const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+  let binary = "";
+  bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function decodeHandoff(code) {
+  const binary = atob(code.replace(/-/g, "+").replace(/_/g, "/"));
+  const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return JSON.parse(await new Response(stream).text());
+}
+
+async function showHandoffQr(chat) {
+  if (!chat?.messages.length) return toast("Send a message first.", "error");
+  if (!("CompressionStream" in window)) return toast("This browser can't make handoff codes.", "error");
+  try {
+    const code = await encodeHandoff(chat);
+    const url = new URL("/chat", location.origin);
+    url.hash = `import=${code}`;
+    const { default: qrcode } = await import("https://esm.sh/qrcode-generator@1.4.4");
+    const qr = qrcode(0, "L");
+    qr.addData(url.href);
+    qr.make();
+    let dialog = byId("handoffDialog");
+    if (!dialog) {
+      dialog = element("dialog", "dialog");
+      dialog.id = "handoffDialog";
+      document.body.append(dialog);
+      dialog.addEventListener("click", event => {
+        if (event.target === dialog || event.target.closest("[data-close-dialog]")) dialog.close();
+      });
+    }
+    dialog.innerHTML = `<div class="dialogPanel compactDialog"><header><div><p class="eyebrow">Continue on another device</p><h2>Scan with your phone</h2></div><button class="iconBtn" type="button" data-close-dialog aria-label="Close">×</button></header><div class="dialogContent handoffBody">${qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true, alt: "QR code for this chat" })}<p>The latest messages travel inside the code itself. Nothing is uploaded.</p></div></div>`;
+    dialog.showModal();
+  } catch {
+    toast("Couldn't make a code for this chat.", "error");
+  }
+}
+
+async function importHandoff() {
+  const match = /^#import=([\w-]+)$/.exec(location.hash);
+  if (!match || !("DecompressionStream" in window)) return;
+  history.replaceState(null, "", location.pathname + location.search);
+  try {
+    const data = await decodeHandoff(match[1]);
+    if (!Array.isArray(data?.m) || !data.m.length) return;
+    createChat();
+    const chat = getChat();
+    chat.title = String(data.t || "Chat from another device").slice(0, 80);
+    chat.messages = data.m.filter(item => Array.isArray(item) && typeof item[1] === "string").map(([role, content]) => ({
+      id: createId("message"),
+      role: role === "u" ? "user" : "assistant",
+      content: content.slice(0, 32000),
+      timestamp: Date.now(),
+      status: "complete",
+      attachments: []
+    }));
+    persistChatChange();
+    renderChats();
+    renderMessages();
+    toast("Chat opened from another device");
+  } catch {
+    toast("That handoff link is damaged.", "error");
+  }
+}
+
+// 529: take a photo straight into the chat.
+function setupCameraCapture() {
+  const popover = byId("toolsPopover");
+  if (!popover || byId("popoverCamera")) return;
+  const input = element("input", "");
+  input.type = "file";
+  input.accept = "image/*";
+  input.setAttribute("capture", "environment");
+  input.hidden = true;
+  input.id = "cameraInput";
+  input.addEventListener("change", event => {
+    addFiles([...event.target.files]);
+    input.value = "";
+  });
+  document.body.append(input);
+  const button = element("button", "touchOnly");
+  button.id = "popoverCamera";
+  button.type = "button";
+  button.innerHTML = '<span aria-hidden="true">◉</span><span><strong>Take a photo</strong><small>Use the camera</small></span>';
+  button.addEventListener("click", () => {
+    hideToolsPopover();
+    input.click();
+  });
+  popover.prepend(button);
+}
+
+// 508/510/511/512/523: mobile switches in Settings, General.
+const MOBILE_TOGGLES = [
+  ["wifiOnlyToggle", "wifiOnly", false],
+  ["batterySaverToggle", "batterySaver", true],
+  ["coolModeToggle", "coolMode", false],
+  ["oneHandToggle", "oneHand", false],
+  ["voiceFirstToggle", "voiceFirst", false]
+];
+function applyMobilePrefs() {
+  const root = document.documentElement;
+  root.dataset.oneHand = String(Boolean(state.settings.oneHand));
+  root.dataset.voiceFirst = String(Boolean(state.settings.voiceFirst));
+}
+function syncMobileToggles() {
+  MOBILE_TOGGLES.forEach(([id, key, fallback]) => {
+    const input = byId(id);
+    if (input) input.checked = state.settings[key] ?? fallback;
+  });
+}
+function setupMobile() {
+  MOBILE_TOGGLES.forEach(([id, key]) => byId(id)?.addEventListener("change", event => {
+    state.settings[key] = event.target.checked;
+    persist();
+    applyMobilePrefs();
+  }));
+  syncMobileToggles();
+  applyMobilePrefs();
+  pickModelForMemory();
+  setupBackButton();
+  setupMessageGestures();
+  setupHeaderPull();
+  setupCameraCapture();
+  setupBatterySaver();
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && state.loading) hiddenDuringReply = true;
+  });
+  // 508: in one-hand mode the menu and new-chat buttons sit by your thumb.
+  const thumb = element("div", "thumbBar");
+  thumb.innerHTML = '<button type="button" data-thumb="menu" aria-label="Open chats">☰</button><button type="button" data-thumb="new" aria-label="New chat">＋</button>';
+  thumb.addEventListener("click", event => {
+    const action = event.target.closest("[data-thumb]")?.dataset.thumb;
+    if (action === "menu") openMobileSidebar();
+    if (action === "new") createChat();
+  });
+  byId("composerDock")?.append(thumb);
+  showMobileTips();
+  setTimeout(importHandoff);
+  window.addEventListener("hashchange", importHandoff);
+  updateAppBadge();
+}
+
 let appInitialized = false;
 
 if (document.readyState === "loading") {
@@ -3151,6 +3631,7 @@ async function init() {
   setupInstallPrompt();
   setupUpdateChecks();
   setupFileHandling();
+  setupMobile();
   setTimeout(prefillFromUrl);
   setupBackgroundDownload();
   setInterval(updateReadyBadge, 3000);
@@ -3927,6 +4408,7 @@ async function sendMessage(options = {}) {
   try {
     const history = options.historyOverride
       || createHistory(chat, assistantMessage.id, Boolean(options.targetMessage));
+    await confirmModelDownload();
     const tools = await runTools(text);
     if (tools.sources.length) assistantMessage.toolSources = tools.sources;
     const slmMessages = fitSlmMessages(
@@ -3964,6 +4446,8 @@ async function sendMessage(options = {}) {
         // Only meaningful when the model was already loaded; a download would swamp it.
         assistantMessage.firstTokenMs = modelWasLoading ? 0 : Math.round(firstTokenAt - requestedAt);
       }
+      const cooling = coolModeDelay();
+      if (cooling) await cooling;
       tokenCount += 1;
       assistantMessage.content += token;
       checkpointMessages();
@@ -4020,6 +4504,7 @@ async function sendMessage(options = {}) {
     renderFollowUps();
     updateContextMeter();
     updatePauseButton();
+    noteBackgroundInterruption(assistantMessage);
     if (assistantMessage.status === "complete") announce("AUI finished replying");
     if (messageQueue.length) setTimeout(sendQueuedMessage, 400);
     if (assistantMessage.status === "complete") {
@@ -4663,6 +5148,7 @@ function createMessageFooter(message, index) {
       actionButton("Copy text", "copy-plain"),
       actionButton("Read", "speak"),
       actionButton("Download", "download"),
+      ...(navigator.share ? [actionButton("Share", "share")] : []),
       actionButton("Link", "permalink")
     );
     if (message.status === "complete") {
@@ -4756,7 +5242,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b13");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b14");
   return markdownModulePromise;
 }
 
@@ -4826,6 +5312,9 @@ async function handleChatAction(event) {
       break;
     case "download":
       downloadMessage(message);
+      break;
+    case "share":
+      shareMessage(message);
       break;
     case "permalink": {
       const url = new URL("/chat", location.origin);
@@ -5041,6 +5530,7 @@ function updateMessageMetrics(article, message) {
 }
 
 function renderChats() {
+  updateAppBadge();
   const query = DOM.chatSearchInput.value.trim().toLowerCase();
   const filtered = sortChats(filterByTag(state.chats
     .filter(chat => query || !chat.archived)
@@ -5178,6 +5668,7 @@ function createChatItem(chat) {
     <button type="button" data-chat-action="archive">${chat.archived ? "Unarchive" : "Archive"}</button>
     <button type="button" data-chat-action="export">Export as Markdown</button>
     <button type="button" data-chat-action="newtab">Open in new tab</button>
+    <button type="button" data-chat-action="handoff">Continue on another device</button>
     <button type="button" class="dangerAction" data-chat-action="delete">Delete</button>`;
 
   item.append(open, favorite, menu, actions);
@@ -5253,6 +5744,9 @@ async function handleChatListAction(event) {
           renderMessages();
         }
       } : null);
+      break;
+    case "handoff":
+      showHandoffQr(chat);
       break;
     case "export":
       exportChatMarkdown(chat);
@@ -5923,6 +6417,7 @@ function openSettings() {
   byId("shortcutSettingsInput").value = shortcutKey("settings");
   byId("onlineLookupsToggle").checked = Boolean(state.settings.onlineLookups);
   byId("unloadIdleToggle").checked = state.settings.unloadWhenIdle !== false;
+  syncMobileToggles();
   byId("customInstructionsInput").value = state.settings.customInstructions || "";
   if (!DOM.settingsDialog.open) DOM.settingsDialog.showModal();
 }
