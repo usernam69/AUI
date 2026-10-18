@@ -24,7 +24,7 @@
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css">
-  <link rel="stylesheet" href="/style.css?v=20260728-model-compare19">
+  <link rel="stylesheet" href="/style.css?v=20261018-gptstyle">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -85,6 +85,7 @@
           <div class="conversationHeading">
             <strong id="conversationTitle">New chat</strong>
             <span id="connectionStatus" class="connectionStatus"><i aria-hidden="true"></i>Online</span>
+            <span id="modelBadge" class="modelBadge">AUI SLM</span>
           </div>
         </div>
 
@@ -171,6 +172,7 @@
               <button class="sendBtn ripple" id="sendBtn" type="submit" disabled aria-label="Send message">
                 <span class="sendIcon" aria-hidden="true">↑</span>
                 <span class="stopIcon" aria-hidden="true"></span>
+                <span class="stopLabel" aria-hidden="true">Stop</span>
               </button>
             </div>
           </div>
@@ -201,13 +203,22 @@
     <form method="dialog" class="dialogPanel">
       <header><div><p class="eyebrow">Preferences</p><h2 id="settingsTitle">Settings</h2></div><button class="iconBtn" type="button" data-close-dialog="settingsDialog" aria-label="Close settings">×</button></header>
       <div class="settingsBody">
-        <label class="settingRow"><span><strong>Theme</strong><small>Choose how AUI looks</small></span><select id="themeSelect"><option value="system">System</option><option value="dark">Dark</option><option value="light">Light</option></select></label>
+        <label class="settingRow"><span><strong>Theme</strong><small>Choose how AUI looks</small></span><select id="themeSelect"><option value="system">System</option><option value="dark">Dark</option><option value="light">Light</option><option value="contrast">High contrast</option></select></label>
+        <label class="settingRow"><span><strong>Enter sends</strong><small>Off: Ctrl + Enter sends, Enter adds a line</small></span><input id="enterToSendToggle" type="checkbox" role="switch" checked></label>
+        <label class="settingRow rangeRow"><span><strong>Text size</strong><small id="fontScaleValue">100%</small></span><input id="fontScaleInput" type="range" min="0.9" max="1.3" step="0.05" value="1"></label>
+        <label class="settingRow"><span><strong>Density</strong><small>Space between messages</small></span><select id="densitySelect"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
+        <label class="settingRow"><span><strong>Notify when done</strong><small>Browser notification if AUI finishes in a background tab</small></span><input id="notifyToggle" type="checkbox" role="switch"></label>
+        <label class="settingRow"><span><strong>Finish sound</strong><small>Soft chime when a reply finishes</small></span><input id="soundToggle" type="checkbox" role="switch"></label>
         <label class="settingRow"><span><strong>Show timestamps</strong><small>Display when each message was sent</small></span><input id="timestampsToggle" type="checkbox" role="switch"></label>
         <label class="settingRow"><span><strong>Auto-scroll</strong><small>Follow responses while they stream</small></span><input id="autoScrollToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow"><span><strong>Memory</strong><small>Use saved context in future chats</small></span><input id="memoryToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow"><span><strong>Markdown</strong><small>Render formatting, code, tables, and math</small></span><input id="markdownToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow"><span><strong>Voice output</strong><small>Allow responses to be read aloud</small></span><input id="voiceOutputToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow rangeRow"><span><strong>Playback speed</strong><small id="speechRateValue">1×</small></span><input id="speechRateInput" type="range" min="0.75" max="2" step="0.25" value="1"></label>
+        <div class="settingRow"><span><strong>Model</strong><small>Download it now so your first reply starts fast</small></span><button class="secondaryBtn" id="preloadModelBtn" type="button">Download the model now</button></div>
+        <div class="settingRow"><span><strong>Your chats</strong><small>Back up, restore or wipe chats in this browser</small></span><span class="settingActions"><button class="secondaryBtn" id="exportAllBtn" type="button">Export all</button><button class="secondaryBtn" id="importChatsBtn" type="button">Import</button><button class="secondaryBtn dangerButton" id="deleteAllChatsBtn" type="button">Delete all</button></span></div>
+        <input id="importChatsInput" type="file" accept=".json,application/json" hidden>
+        <p class="settingsFooter">Press <kbd>?</kbd> for keyboard shortcuts.</p>
       </div>
     </form>
   </dialog>
@@ -326,6 +337,26 @@
     </div>
   </dialog>
 
+  <dialog class="dialog" id="shortcutsDialog" aria-labelledby="shortcutsTitle">
+    <div class="dialogPanel compactDialog">
+      <header><div><p class="eyebrow">Help</p><h2 id="shortcutsTitle">Keyboard shortcuts</h2></div><button class="iconBtn dialogCloseBtn" type="button" data-close-dialog="shortcutsDialog" aria-label="Close shortcuts">×</button></header>
+      <div class="dialogContent">
+        <dl class="shortcutList">
+          <dt><kbd>Ctrl/⌘</kbd> <kbd>K</kbd></dt><dd>New chat</dd>
+          <dt><kbd>Ctrl/⌘</kbd> <kbd>/</kbd></dt><dd>Search chats</dd>
+          <dt><kbd>Ctrl/⌘</kbd> <kbd>,</kbd></dt><dd>Settings</dd>
+          <dt><kbd>Ctrl/⌘</kbd> <kbd>Shift</kbd> <kbd>C</kbd></dt><dd>Copy the last reply</dd>
+          <dt><kbd>Enter</kbd></dt><dd>Send (change in Settings)</dd>
+          <dt><kbd>Shift</kbd> <kbd>Enter</kbd></dt><dd>New line</dd>
+          <dt><kbd>Esc</kbd></dt><dd>Stop a reply or close a dialog</dd>
+          <dt><kbd>?</kbd></dt><dd>Show this list</dd>
+          <dt>Double-click a chat title</dt><dd>Rename it</dd>
+          <dt>Middle-click a chat</dt><dd>Open it in a new tab</dd>
+        </dl>
+      </div>
+    </div>
+  </dialog>
+
   <div class="toastRegion" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
   <div class="srOnly" id="announcer" aria-live="polite" aria-atomic="true"></div>
 
@@ -334,6 +365,6 @@
       navigator.serviceWorker.register("/chat/sw.js").catch(() => {});
     }
   </script>
-  <script type="module" src="/chat/app.js?v=20260728-model-compare19"></script>
+  <script type="module" src="/chat/app.js?v=20261018-quickwins1"></script>
 </body>
 </html>

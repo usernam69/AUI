@@ -99,7 +99,7 @@ function enhanceCodeBlocks(container) {
     wrapper.className = "codeBlock";
     const header = document.createElement("div");
     header.className = "codeHeader";
-    header.innerHTML = `<span>${escapeText(language)}</span><button type="button" data-copy-code aria-label="Copy ${escapeText(language)} code">Copy</button>`;
+    header.innerHTML = `<span>${escapeText(language)}</span><span class="codeHeaderActions"><button type="button" data-wrap-code aria-pressed="false" aria-label="Wrap long lines">Wrap</button><button type="button" data-copy-code aria-label="Copy ${escapeText(language)} code">Copy</button></span>`;
     pre.before(wrapper);
     wrapper.append(header, pre);
   });
