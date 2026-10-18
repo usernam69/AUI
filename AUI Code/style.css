@@ -1550,6 +1550,10 @@
     transition: background var(--duration-fast), color var(--duration-fast), transform var(--duration-fast);
   }
 
+  .toolBtn[hidden] {
+    display: none;
+  }
+
   .toolBtn:hover,
   .toolBtn.active {
     background: var(--surface-hover);

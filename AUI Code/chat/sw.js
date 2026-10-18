@@ -12,7 +12,8 @@ const PRECACHE_URLS = [
   versioned("/modules/storage.js"),
   versioned("/modules/keyboard.js"),
   versioned("/modules/markdown.js"),
-  versioned("/modules/uploads.js")
+  versioned("/modules/uploads.js"),
+  versioned("/modules/slm.js")
 ];
 
 self.addEventListener("install", event => {
