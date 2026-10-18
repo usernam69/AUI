@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b8";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b9";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b8";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm } from "../modules/slm.js?v=20261018-b8";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b8";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b8";
+} from "../modules/uploads.js?v=20261018-b9";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm } from "../modules/slm.js?v=20261018-b9";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b9";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b9";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -525,7 +525,7 @@ function setupQuickWins() {
 const SETTINGS_TABS = [
   ["general", "General", ["enterToSendToggle", "counterSelect", "composerStyleSelect", "spellcheckToggle", "voiceAutoSendToggle", "typingSoundToggle", "timestampsToggle", "autoScrollToggle", "notifyToggle", "soundToggle"]],
   ["appearance", "Appearance", ["themeSelect", "themeSwatches", "accentSwatches", "fontSelect", "fontWeightInput", "lineHeightSelect", "contentWidthSelect", "bubbleSelect", "bubbleColorInput", "iconWeightSelect", "fontScaleInput", "densitySelect", "seasonalToggle", "effectsToggle"]],
-  ["personal", "Personalization", ["speedSelect", "perfBtn", "backgroundDownloadToggle", "unloadIdleToggle", "customInstructionsInput", "aiTitlesToggle", "memoryToggle", "markdownToggle", "voiceOutputToggle", "speechRateInput"]],
+  ["personal", "Personalization", ["answerLengthSelect", "onlineLookupsToggle", "speedSelect", "perfBtn", "backgroundDownloadToggle", "unloadIdleToggle", "customInstructionsInput", "aiTitlesToggle", "memoryToggle", "markdownToggle", "voiceOutputToggle", "speechRateInput"]],
   ["data", "Data controls", ["preloadModelBtn", "exportAllBtn", "storageMeter", "autoArchiveToggle", "archivedChatsList", "trashList", "resetSettingsBtn"]]
 ];
 
@@ -636,7 +636,19 @@ const PROMPT_PRESETS = [
   ["Plan", "Workout", "Make a simple 20-minute workout for "],
   ["Fun", "Joke", "Tell me a clever joke about "],
   ["Fun", "Would you rather", "Give me 5 funny 'would you rather' questions."],
-  ["Fun", "Name ideas", "Give me 10 creative names for "]
+  ["Fun", "Name ideas", "Give me 10 creative names for "],
+  ["Fun", "Story together", "Let's write a story together. You write a paragraph, then I'll add one. Start with: "],
+  ["Fun", "Character chat", "Pretend to be this character and stay in character: "],
+  ["Fun", "Debate me", "Take the opposite side and debate me, politely, on: "],
+  ["Write", "Fix grammar", "Fix the grammar and spelling in this text and list what you changed:\n\n"],
+  ["Write", "Summarize", "Summarize this in 5 bullet points:\n\n"],
+  ["Write", "Email reply", "Write a polite reply to this email:\n\n"],
+  ["Learn", "Homework hints", "Help me with this problem by giving hints, not the answer: "],
+  ["Learn", "Brainstorm", "Brainstorm 15 quick ideas for "],
+  ["Code", "SQL helper", "Write and explain an SQL query that "],
+  ["Code", "Explain line by line", "Explain this code line by line:\n\n"],
+  ["Plan", "Recipe", "Give me a recipe for 4 people using: "],
+  ["Plan", "Study session", "Make a 25-minute study plan for: "]
 ];
 
 function openPromptGallery() {
@@ -1638,6 +1650,7 @@ const SLASH_COMMANDS = [
   ["/save", "Save what you typed as a template", () => saveComposerAsTemplate()],
   ["/improve", "Improve what you typed", () => improvePrompt()],
   ["/stats", "Model speed and a speed test", () => openPerformancePanel()],
+  ["/timer", "Start a 25-minute focus timer (or /timer 10)", () => startFocusTimer(25)],
   ["/tiny", "Use the tiny model", () => switchSpeed("tiny")],
   ["/help", "Keyboard shortcuts", () => byId("shortcutsDialog")?.showModal()]
 ];
@@ -2533,6 +2546,7 @@ function openPerformancePanel() {
       dialog.addEventListener("click", event => {
         if (event.target === dialog || event.target.closest("[data-close-dialog]")) dialog.close();
         if (event.target.closest("[data-run-benchmark]")) runBenchmark(dialog);
+        if (event.target.closest("[data-run-quality]")) runQualityCheck(dialog.querySelector("#qualityResult"));
       });
     }
     const memory = performance.memory ? `${Math.round(performance.memory.usedJSHeapSize / 1048576)} MB page memory` : "";
@@ -2542,9 +2556,12 @@ function openPerformancePanel() {
       <div><small>Average speed</small><strong>${average("tokensPerSecond").toFixed(1)} tokens/s</strong></div>
       <div><small>Average first word</small><strong>${(average("firstTokenMs") / 1000).toFixed(1)} s</strong></div>
       <div><small>Replies measured</small><strong>${replies.length}</strong></div>
+      <div><small>Your ratings</small><strong>👍 ${state.chats.flatMap(chat => chat.messages).filter(message => message.feedback === "up").length} · 👎 ${state.chats.flatMap(chat => chat.messages).filter(message => message.feedback === "down").length}</strong></div>
       <div><small>Device</small><strong>${navigator.deviceMemory ? `${navigator.deviceMemory} GB RAM` : "—"} ${memory ? `· ${memory}` : ""}</strong></div>
       <p class="benchmarkResult" id="benchmarkResult"></p>
       <button type="button" class="primaryBtn" data-run-benchmark>Run a speed test</button>
+      <p class="benchmarkResult" id="qualityResult"></p>
+      <button type="button" class="secondaryBtn" data-run-quality>Run a 10-question fact check</button>
     </div></div>`;
     dialog.showModal();
   });
@@ -2578,6 +2595,260 @@ async function runBenchmark(dialog) {
   const speed = tokens > 1 ? (tokens - 1) / ((end - first) / 1000) : 0;
   output.textContent = `${speed.toFixed(1)} tokens/s · first word after ${((first - loadDone) / 1000).toFixed(2)} s · load ${((loadDone - started) / 1000).toFixed(1)} s`;
   updateReadyBadge();
+}
+
+// --- Answer quality & tools from The Probe (category 8) ---
+
+// Safe arithmetic: numbers, + - * / ^ % and parentheses. No eval.
+function evaluateArithmetic(expression) {
+  const tokens = expression.replace(/\s+/g, "").match(/\d+(?:\.\d+)?|[-+*/^%()]/g);
+  if (!tokens || tokens.join("") !== expression.replace(/\s+/g, "")) return null;
+  let position = 0;
+  const peek = () => tokens[position];
+  const next = () => tokens[position++];
+  const primary = () => {
+    const token = next();
+    if (token === "(") {
+      const value = sum();
+      if (next() !== ")") throw new Error("paren");
+      return value;
+    }
+    if (token === "-") return -primary();
+    if (token === "+") return primary();
+    const value = Number(token);
+    if (!Number.isFinite(value)) throw new Error("number");
+    return value;
+  };
+  const power = () => {
+    const base = primary();
+    if (peek() === "^") {
+      next();
+      return base ** power();
+    }
+    return base;
+  };
+  const product = () => {
+    let value = power();
+    while (["*", "/", "%"].includes(peek())) {
+      const operator = next();
+      const right = power();
+      value = operator === "*" ? value * right : operator === "/" ? value / right : value % right;
+    }
+    return value;
+  };
+  const sum = () => {
+    let value = product();
+    while (["+", "-"].includes(peek())) value = next() === "+" ? value + product() : value - product();
+    return value;
+  };
+  try {
+    const result = sum();
+    return position === tokens.length && Number.isFinite(result) ? result : null;
+  } catch {
+    return null;
+  }
+}
+
+function findCalculation(text) {
+  const normalized = text.replace(/(\d)\s*[x×]\s*(\d)/g, "$1*$2").replace(/÷/g, "/")
+    .replace(/\btimes\b/gi, "*").replace(/\bplus\b/gi, "+").replace(/\bminus\b/gi, "-").replace(/\bdivided by\b/gi, "/");
+  const candidates = normalized.match(/[\d(][\d\s+\-*/^%().]*[\d)]/g) || [];
+  for (const candidate of candidates.sort((a, b) => b.length - a.length)) {
+    if (!/\d\s*[-+*/^%]\s*[\d(]/.test(candidate)) continue;
+    const result = evaluateArithmetic(candidate.trim());
+    if (result !== null) return `${candidate.trim()} = ${Number(result.toPrecision(12))}`;
+  }
+  return "";
+}
+
+const UNIT_TABLE = {
+  km: ["length", 1000], kilometer: ["length", 1000], kilometers: ["length", 1000], m: ["length", 1], meter: ["length", 1], meters: ["length", 1],
+  cm: ["length", 0.01], mm: ["length", 0.001], mi: ["length", 1609.344], mile: ["length", 1609.344], miles: ["length", 1609.344],
+  ft: ["length", 0.3048], foot: ["length", 0.3048], feet: ["length", 0.3048], in: ["length", 0.0254], inch: ["length", 0.0254], inches: ["length", 0.0254], yd: ["length", 0.9144], yards: ["length", 0.9144],
+  kg: ["mass", 1], kilogram: ["mass", 1], kilograms: ["mass", 1], g: ["mass", 0.001], grams: ["mass", 0.001], lb: ["mass", 0.45359237], lbs: ["mass", 0.45359237], pound: ["mass", 0.45359237], pounds: ["mass", 0.45359237], oz: ["mass", 0.028349523], ounces: ["mass", 0.028349523],
+  l: ["volume", 1], liter: ["volume", 1], liters: ["volume", 1], ml: ["volume", 0.001], gal: ["volume", 3.785411784], gallon: ["volume", 3.785411784], gallons: ["volume", 3.785411784], cup: ["volume", 0.2365882365], cups: ["volume", 0.2365882365]
+};
+
+function findUnitConversion(text) {
+  const temperature = /(-?\d+(?:\.\d+)?)\s*°?\s*(c|celsius|f|fahrenheit)\b\s*(?:to|in)\s*°?\s*(c|celsius|f|fahrenheit)\b/i.exec(text);
+  if (temperature) {
+    const value = Number(temperature[1]);
+    const from = temperature[2][0].toLowerCase();
+    const to = temperature[3][0].toLowerCase();
+    if (from === to) return "";
+    const result = from === "c" ? value * 9 / 5 + 32 : (value - 32) * 5 / 9;
+    return `${value}°${from.toUpperCase()} = ${Number(result.toFixed(2))}°${to.toUpperCase()}`;
+  }
+  const match = /(-?\d+(?:\.\d+)?)\s*([a-z]+)\s+(?:to|in|into)\s+([a-z]+)\b/i.exec(text);
+  if (!match) return "";
+  const from = UNIT_TABLE[match[2].toLowerCase()];
+  const to = UNIT_TABLE[match[3].toLowerCase()];
+  if (!from || !to || from[0] !== to[0]) return "";
+  const result = Number(match[1]) * from[1] / to[1];
+  return `${match[1]} ${match[2]} = ${Number(result.toPrecision(6))} ${match[3]}`;
+}
+
+async function fetchJson(url, timeout = 3500) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const WEATHER_CODES = { 0: "clear", 1: "mostly clear", 2: "partly cloudy", 3: "overcast", 45: "fog", 48: "fog", 51: "light drizzle", 53: "drizzle", 55: "heavy drizzle", 61: "light rain", 63: "rain", 65: "heavy rain", 71: "light snow", 73: "snow", 75: "heavy snow", 80: "rain showers", 81: "rain showers", 82: "heavy showers", 95: "thunderstorm" };
+
+// Facts the small model gets wrong are fetched or computed here and handed to it.
+async function runTools(text) {
+  const notes = [];
+  const sources = [];
+  const calculation = findCalculation(text);
+  if (calculation) {
+    notes.push(`Calculator: ${calculation}`);
+    sources.push("Calculator");
+  }
+  const conversion = findUnitConversion(text);
+  if (conversion) {
+    notes.push(`Unit converter: ${conversion}`);
+    sources.push("Unit converter");
+  }
+  if (!state.settings.onlineLookups || !navigator.onLine) return { notes, sources };
+
+  const weather = /\bweather\b.*?\b(?:in|for|at)\s+([a-z][\w\s,.'-]{1,40})/i.exec(text);
+  const define = /^(?:define|definition of|what does)\s+["']?([a-z][a-z'-]{1,30})["']?(?:\s+mean)?\??$/i.exec(text.trim());
+  const fact = /^(?:who|what)\s+(?:is|was|are|were)\s+(?:the\s+|a\s+|an\s+)?(.{2,60}?)\??$/i.exec(text.trim());
+  if (weather) {
+    const place = weather[1].replace(/[?.!]+$/, "").trim();
+    const geo = await fetchJson(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(place)}&count=1`);
+    const spot = geo?.results?.[0];
+    if (spot) {
+      const forecast = await fetchJson(`https://api.open-meteo.com/v1/forecast?latitude=${spot.latitude}&longitude=${spot.longitude}&current=temperature_2m,weather_code,wind_speed_10m&timezone=auto`);
+      const now = forecast?.current;
+      if (now) {
+        notes.push(`Weather now in ${spot.name}, ${spot.country}: ${now.temperature_2m}°C, ${WEATHER_CODES[now.weather_code] || "conditions unknown"}, wind ${now.wind_speed_10m} km/h.`);
+        sources.push("Open-Meteo");
+      }
+    }
+  } else if (define) {
+    const data = await fetchJson(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(define[1].toLowerCase())}`);
+    const meaning = data?.[0]?.meanings?.[0];
+    if (meaning?.definitions?.[0]?.definition) {
+      notes.push(`Dictionary: ${define[1]} (${meaning.partOfSpeech}): ${meaning.definitions[0].definition}`);
+      sources.push("Free Dictionary");
+    }
+  } else if (fact) {
+    const summary = await fetchJson(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(fact[1].trim().replace(/\s+/g, "_"))}`);
+    if (summary?.extract && summary.type !== "disambiguation") {
+      notes.push(`Wikipedia (${summary.title}): ${summary.extract.slice(0, 900)}`);
+      sources.push("Wikipedia");
+    }
+  }
+  return { notes, sources };
+}
+
+function withToolNotes(userText, tools) {
+  if (!tools.notes.length) return userText;
+  return `${userText}\n\n[Verified information to use in your answer]\n${tools.notes.join("\n")}`;
+}
+
+// Lower temperature for code and facts, higher for creative writing.
+function chooseTemperature(text) {
+  if (/```|\b(code|function|bug|error|regex|sql|python|javascript|calculate|how many)\b/i.test(text)) return 0.3;
+  if (/\b(story|poem|joke|names?|creative|imagine|song|lyrics|brainstorm|ideas)\b/i.test(text)) return 0.9;
+  return 0.7;
+}
+
+function isFactualQuestion(text) {
+  return /^(who|when|where|how many|how much|what year|which)\b/i.test(text.trim());
+}
+
+const HARD_HINT_KEY = "aui.hardHintShown";
+function suggestBiggerModel(text) {
+  if (!["tiny", "fast"].includes(getSlmSpeed())) return;
+  const hard = text.length > 400 || /```/.test(text) || /\b(prove|derive|analy[sz]e|step by step|architecture|debug)\b/i.test(text);
+  if (!hard) return;
+  try {
+    if (sessionStorage.getItem(HARD_HINT_KEY)) return;
+    sessionStorage.setItem(HARD_HINT_KEY, "1");
+  } catch {}
+  toast("This looks like a hard one. A bigger model may answer better.", "info", { label: "Use Balanced", duration: 10000, onClick: () => switchSpeed("balanced") });
+}
+
+// Older turns that no longer fit are listed by topic so the model keeps the thread.
+function summarizeDroppedTurns(history, kept) {
+  const dropped = history.slice(0, Math.max(0, history.length - kept));
+  const topics = dropped.filter(message => message.role === "user").map(message => stripMarkdown(message.content).split(/[.?!\n]/)[0].slice(0, 80)).filter(Boolean);
+  return topics.length ? `Earlier in this chat the user asked about: ${topics.slice(-8).join("; ")}.` : "";
+}
+
+// Pomodoro-style timer: /timer 25
+let focusTimer = null;
+function startFocusTimer(minutes = 25) {
+  clearInterval(focusTimer?.interval);
+  document.querySelector(".focusTimer")?.remove();
+  const ends = Date.now() + minutes * 60_000;
+  const chip = element("button", "focusTimer");
+  chip.type = "button";
+  chip.title = "Click to stop the timer";
+  document.querySelector(".topBarStart")?.append(chip);
+  const tick = () => {
+    const left = Math.max(0, ends - Date.now());
+    chip.textContent = `⏱ ${String(Math.floor(left / 60_000)).padStart(2, "0")}:${String(Math.floor(left / 1000) % 60).padStart(2, "0")}`;
+    if (!left) {
+      clearInterval(focusTimer.interval);
+      chip.remove();
+      playChime();
+      toast(`${minutes}-minute timer finished. Take a break!`);
+      if (Notification?.permission === "granted") new Notification("AUI timer", { body: "Time's up. Take a break!" });
+    }
+  };
+  focusTimer = { interval: setInterval(tick, 1000) };
+  tick();
+  chip.addEventListener("click", () => {
+    clearInterval(focusTimer.interval);
+    chip.remove();
+    toast("Timer stopped");
+  });
+}
+
+const EVAL_QUESTIONS = [
+  ["What is the capital of France?", ["paris"]],
+  ["How many legs does a spider have?", ["8", "eight"]],
+  ["What is 12 times 12?", ["144"]],
+  ["Who wrote Romeo and Juliet?", ["shakespeare"]],
+  ["What planet is known as the Red Planet?", ["mars"]],
+  ["What is the boiling point of water in Celsius at sea level?", ["100"]],
+  ["What gas do plants absorb from the air?", ["carbon dioxide", "co2"]],
+  ["What is the largest ocean on Earth?", ["pacific"]],
+  ["In which year did World War II end?", ["1945"]],
+  ["What is the chemical symbol for gold?", ["au"]]
+];
+
+async function runQualityCheck(output) {
+  if (state.loading) return toast("Wait for the current reply to finish.", "error");
+  let correct = 0;
+  output.textContent = "Asking 10 questions…";
+  for (const [question, expected] of EVAL_QUESTIONS) {
+    let answer = "";
+    try {
+      for await (const token of streamSlm([
+        { role: "system", content: "Answer in one short sentence." },
+        { role: "user", content: question }
+      ], { maxTokens: 60, temperature: 0 })) answer += token;
+    } catch (error) {
+      output.textContent = error.message || "The check failed.";
+      return;
+    }
+    if (expected.some(word => answer.toLowerCase().includes(word))) correct += 1;
+    output.textContent = `Checked ${EVAL_QUESTIONS.indexOf(EVAL_QUESTIONS.find(item => item[0] === question)) + 1}/10 · ${correct} correct so far`;
+  }
+  output.textContent = `${correct}/10 facts correct on this model`;
 }
 
 let appInitialized = false;
@@ -2898,6 +3169,8 @@ function normalizeChats(chats) {
         tokensPerSecond: Number(message.tokensPerSecond) || 0,
         firstTokenMs: Number(message.firstTokenMs) || 0,
         durationMs: Number(message.durationMs) || 0,
+        ...(Array.isArray(message.toolSources) ? { toolSources: message.toolSources.map(String) } : {}),
+        ...(message.factNote ? { factNote: true } : {}),
         ...(message.tldr ? { tldr: String(message.tldr), tldrHidden: Boolean(message.tldrHidden) } : {}),
         feedback: message.feedback === "up" || message.feedback === "down" ? message.feedback : "",
         starred: Boolean(message.starred),
@@ -3044,7 +3317,7 @@ function bindEvents() {
   byId("timestampsToggle").addEventListener("change", saveSettingsFromDialog);
   byId("speedSelect").addEventListener("change", saveSettingsFromDialog);
   byId("perfBtn").addEventListener("click", openPerformancePanel);
-  ["counterSelect", "composerStyleSelect", "spellcheckToggle", "voiceAutoSendToggle", "typingSoundToggle", "backgroundDownloadToggle", "unloadIdleToggle"].forEach(id => byId(id).addEventListener("change", saveSettingsFromDialog));
+  ["counterSelect", "composerStyleSelect", "spellcheckToggle", "voiceAutoSendToggle", "typingSoundToggle", "backgroundDownloadToggle", "unloadIdleToggle", "answerLengthSelect", "onlineLookupsToggle"].forEach(id => byId(id).addEventListener("change", saveSettingsFromDialog));
   byId("customInstructionsInput").addEventListener("change", saveSettingsFromDialog);
   byId("autoScrollToggle").addEventListener("change", saveSettingsFromDialog);
   byId("memoryToggle").addEventListener("change", saveSettingsFromDialog);
@@ -3392,16 +3665,21 @@ async function sendMessage(options = {}) {
   try {
     const history = options.historyOverride
       || createHistory(chat, assistantMessage.id, Boolean(options.targetMessage));
+    const tools = await runTools(text);
+    if (tools.sources.length) assistantMessage.toolSources = tools.sources;
     const slmMessages = fitSlmMessages(
       getChatSystemPrompt(chat),
       history,
-      buildSlmUserText(text, attachments),
+      withToolNotes(buildSlmUserText(text, attachments), tools),
       getPromptBudget()
     );
+    const droppedNote = summarizeDroppedTurns(history, slmMessages.length - 2);
+    if (droppedNote) slmMessages[0] = { ...slmMessages[0], content: `${slmMessages[0].content}\n${droppedNote}` };
     await backgroundModelTask;
     for await (const token of streamSlm(slmMessages, {
       signal: abortController.signal,
-      maxTokens: getReplyTokenLimit(text),
+      maxTokens: Math.round(getReplyTokenLimit(text) * ({ short: 0.6, medium: 1, long: 1.5 }[state.settings.answerLength || "medium"])),
+      temperature: chooseTemperature(text),
       onProgress: (report, model) => {
         if (!sending) return;
         loadingShown = true;
@@ -3434,6 +3712,7 @@ async function sendMessage(options = {}) {
     if (tokenCount > 1 && seconds > 0) assistantMessage.tokensPerSecond = Math.round(tokenCount / seconds * 10) / 10;
     assistantMessage.durationMs = modelWasLoading ? 0 : Math.round(performance.now() - requestedAt);
     suggestFasterModel(assistantMessage.tokensPerSecond);
+    if (isFactualQuestion(text) && !assistantMessage.toolSources) assistantMessage.factNote = true;
 
     assistantMessage.status = assistantMessage.content ? "complete" : "error";
     if (assistantMessage.versions && assistantMessage.content) {
@@ -3497,9 +3776,12 @@ async function sendMessage(options = {}) {
 
 function buildSlmSystemPrompt() {
   const parts = [
-    "You are AUI, a friendly assistant running privately on the user's device.",
-    "Be concise and organized; use Markdown when it helps. Say when you're unsure instead of guessing. "
-      + "You can't browse the web or see images.",
+    "You are AUI, a warm, slightly witty assistant running privately on the user's device.",
+    "Be organized; use Markdown when it helps and label code blocks with their language. "
+      + "Reply in the user's language. Help with any reasonable request. Say when you're unsure instead of guessing. "
+      + "You can't browse the web or see images; use any verified information the user's message includes.",
+    `Today is ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}, ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} (${Intl.DateTimeFormat().resolvedOptions().timeZone}).`,
+    { short: "Keep answers brief: a few sentences.", medium: "Keep answers fairly short.", long: "Give thorough, detailed answers." }[state.settings.answerLength || "medium"],
     "Answer clearly and directly."
   ];
   const custom = String(state.settings.customInstructions || "").trim();
@@ -4088,6 +4370,15 @@ function createMessageFooter(message, index) {
       + (message.durationMs ? ` · answered in ${(message.durationMs / 1000).toFixed(1)} s` : "");
   }
   footer.append(metrics);
+  if (message.role === "assistant" && message.toolSources?.length) {
+    const sources = element("span", "toolSources");
+    sources.textContent = `Sources: ${message.toolSources.join(", ")}`;
+    footer.append(sources);
+  } else if (message.role === "assistant" && message.factNote && message.status === "complete") {
+    const note = element("span", "factNote");
+    note.textContent = "Small models can get facts wrong. Check anything important.";
+    footer.append(note);
+  }
 
   const actions = element("div", "messageActions");
   if (message.role === "assistant" && message.versions?.length > 1 && message.status !== "streaming") {
@@ -4195,7 +4486,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b8");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b9");
   return markdownModulePromise;
 }
 
@@ -5336,6 +5627,8 @@ function openSettings() {
   byId("voiceAutoSendToggle").checked = Boolean(state.settings.voiceAutoSend);
   byId("typingSoundToggle").checked = Boolean(state.settings.typingSound);
   byId("backgroundDownloadToggle").checked = Boolean(state.settings.backgroundDownload);
+  byId("answerLengthSelect").value = state.settings.answerLength || "medium";
+  byId("onlineLookupsToggle").checked = Boolean(state.settings.onlineLookups);
   byId("unloadIdleToggle").checked = state.settings.unloadWhenIdle !== false;
   byId("customInstructionsInput").value = state.settings.customInstructions || "";
   if (!DOM.settingsDialog.open) DOM.settingsDialog.showModal();
@@ -5363,6 +5656,9 @@ function saveSettingsFromDialog() {
   state.settings.voiceAutoSend = byId("voiceAutoSendToggle").checked;
   state.settings.typingSound = byId("typingSoundToggle").checked;
   state.settings.backgroundDownload = byId("backgroundDownloadToggle").checked;
+  if (state.settings.answerLength !== byId("answerLengthSelect").value) systemPromptSnapshots.clear();
+  state.settings.answerLength = byId("answerLengthSelect").value;
+  state.settings.onlineLookups = byId("onlineLookupsToggle").checked;
   state.settings.unloadWhenIdle = byId("unloadIdleToggle").checked;
   DOM.input.spellcheck = state.settings.spellcheck;
   updateComposerState();
@@ -6438,6 +6734,15 @@ function handleComposerSubmit(event) {
   }
   hideComposerMenu();
   if (matchMedia("(pointer: coarse)").matches) navigator.vibrate?.(10);
+  const timerCommand = /^\/timer\s*(\d+)?\s*$/i.exec(DOM.input.value.trim());
+  if (timerCommand) {
+    startFocusTimer(Math.min(180, Number(timerCommand[1]) || 25));
+    DOM.input.value = "";
+    saveDraft();
+    updateComposerState();
+    return;
+  }
+  if (DOM.input.value.trim()) suggestBiggerModel(DOM.input.value);
   if (DOM.input.value.trim() || state.pendingAttachments.length) {
     countSendForHint();
     animateSend();

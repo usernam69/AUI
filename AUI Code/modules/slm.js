@@ -209,7 +209,7 @@ function whenAborted(signal) {
   });
 }
 
-export async function* streamSlm(messages, { onProgress, signal, maxTokens = 1024 } = {}) {
+export async function* streamSlm(messages, { onProgress, signal, maxTokens = 1024, temperature = 0.7, frequencyPenalty = 0.3 } = {}) {
   let loaded;
   try {
     // Stop takes effect right away; the download keeps going in the background.
@@ -224,7 +224,8 @@ export async function* streamSlm(messages, { onProgress, signal, maxTokens = 102
     const stream = await loaded.chat.completions.create({
       messages,
       stream: true,
-      temperature: 0.7,
+      temperature,
+      frequency_penalty: frequencyPenalty,
       max_tokens: maxTokens
     });
     for await (const chunk of stream) {

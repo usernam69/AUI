@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="/style.css?v=20261018-b8">
+  <link rel="stylesheet" href="/style.css?v=20261018-b9">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -242,6 +242,8 @@
         <div class="settingRow"><span><strong>Model stats</strong><small>Average speed and a quick speed test</small></span><button class="secondaryBtn" id="perfBtn" type="button">Open stats</button></div>
         <label class="settingRow"><span><strong>Download in the background</strong><small>On desktop Wi-Fi, fetch the model while you browse so it's ready</small></span><input id="backgroundDownloadToggle" type="checkbox" role="switch"></label>
         <label class="settingRow"><span><strong>Free memory when idle</strong><small>Unload the model after 10 minutes in a background tab</small></span><input id="unloadIdleToggle" type="checkbox" role="switch" checked></label>
+        <label class="settingRow"><span><strong>Answer length</strong><small>How long replies usually are</small></span><select id="answerLengthSelect"><option value="short">Short</option><option value="medium">Medium</option><option value="long">Long</option></select></label>
+        <label class="settingRow"><span><strong>Online lookups</strong><small>For weather, definitions and "who/what is" questions, fetch facts from Open-Meteo, a free dictionary and Wikipedia. Your question is sent to those sites.</small></span><input id="onlineLookupsToggle" type="checkbox" role="switch"></label>
         <label class="settingRow"><span><strong>AI chat titles</strong><small>Let the model name new chats after the first reply</small></span><input id="aiTitlesToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow settingRowStack"><span><strong>Custom instructions</strong><small>How should AUI answer? For example: "Keep it short" or "Explain like I'm new to coding"</small></span><textarea id="customInstructionsInput" rows="3" maxlength="1500" placeholder="Anything AUI should know or do in every reply"></textarea></label>
         <div class="settingRow"><span><strong>Model</strong><small>Download it now so your first reply starts fast</small></span><button class="secondaryBtn" id="preloadModelBtn" type="button">Download the model now</button></div>
@@ -399,6 +401,6 @@
       navigator.serviceWorker.register("/chat/sw.js").catch(() => {});
     }
   </script>
-  <script type="module" src="/chat/app.js?v=20261018-b8"></script>
+  <script type="module" src="/chat/app.js?v=20261018-b9"></script>
 </body>
 </html>

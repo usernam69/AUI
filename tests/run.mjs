@@ -223,6 +223,28 @@ export function CreateWebWorkerMLCEngine() { return new Promise(() => {}); }`);
   delete globalThis.Worker;
 });
 
+await test("calculator and unit converter give exact answers", async () => {
+  const source = readFileSync(join(root, "chat/app.js"), "utf8");
+  const start = source.indexOf("// --- Answer quality & tools");
+  const end = source.indexOf("async function fetchJson(");
+  const file = join(sandbox, "tools.mjs");
+  writeFileSync(file, `${source.slice(start, end)}
+export { evaluateArithmetic, findCalculation, findUnitConversion };`);
+  const { evaluateArithmetic, findCalculation, findUnitConversion } = await import(pathToFileURL(file).href);
+  assert.equal(evaluateArithmetic("2+3*4"), 14);
+  assert.equal(evaluateArithmetic("(2+3)*4"), 20);
+  assert.equal(evaluateArithmetic("2^3^2"), 512);
+  assert.equal(evaluateArithmetic("-5+2"), -3);
+  assert.equal(evaluateArithmetic("1/0"), null);
+  assert.equal(evaluateArithmetic("alert(1)"), null);
+  assert.equal(findCalculation("what is 23 x 47?"), "23*47 = 1081");
+  assert.equal(findCalculation("what is 12 times 12"), "12 * 12 = 144");
+  assert.equal(findCalculation("I have 3 cats"), "");
+  assert.equal(findUnitConversion("convert 100 C to F"), "100°C = 212°F");
+  assert.equal(findUnitConversion("5 km in miles"), "5 km = 3.10686 miles");
+  assert.equal(findUnitConversion("10 kg to miles"), "");
+});
+
 // --- chat page prompt helpers (extracted from chat/app.js)
 await test("prompt trimming keeps newest turns within budget", async () => {
   const source = readFileSync(join(root, "chat/app.js"), "utf8");
