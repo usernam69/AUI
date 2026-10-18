@@ -1073,3 +1073,8 @@ Built: 201, 202 (/save plus templates), 203, 204, 205, 206, 207, 208, 209, 210, 
 Already in AUI: 220, 223, 224, 226, 238, 248.
 Not applicable: 240 (only a few tools remain), 242, 243 (web search and image generation are off on GitHub Pages).
 Skipped: 247 (conflicts with 51 and 52: the composer starts centered and drops down on send).
+
+### Batch 7 - category 6 (message rendering & Markdown)
+Built: 251, 253, 254, 256, 257, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 273, 274, 276, 277, 278, 281, 285, 288 (checked in a headless browser: injected script and onerror payloads do not run), 291, 292, 293, 295, 296.
+Already in AUI: 255, 258, 272, 275, 279, 280, 283, 284, 286, 287, 289, 294, 297, 298, 299, 300.
+Skipped: 252 (holding back text the model already wrote makes replies feel slower), 282 (side-by-side needs two models in GPU memory at once, too much for most devices), 290 (off-screen messages already skip rendering; full virtual scrolling would break find-in-page and message links).

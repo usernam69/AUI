@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b6";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b7";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b6";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS } from "../modules/slm.js?v=20261018-b6";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b6";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b6";
+} from "../modules/uploads.js?v=20261018-b7";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS } from "../modules/slm.js?v=20261018-b7";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b7";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b7";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -2097,6 +2097,354 @@ function sendQueuedMessage() {
   sendMessage();
 }
 
+// --- Message rendering from The Probe (category 6) ---
+
+const CODE_EXTENSIONS = { javascript: "js", js: "js", typescript: "ts", ts: "ts", python: "py", py: "py", html: "html", css: "css", json: "json", bash: "sh", shell: "sh", sh: "sh", java: "java", c: "c", cpp: "cpp", csharp: "cs", go: "go", rust: "rs", ruby: "rb", php: "php", sql: "sql", yaml: "yml", xml: "xml", markdown: "md", swift: "swift", kotlin: "kt" };
+
+// Returns true when the click was one of the rich-content controls.
+function handleRichContentClick(event) {
+  const target = event.target;
+  const block = target.closest(".codeBlock");
+
+  if (target.closest("[data-code-lines]") && block) {
+    const pre = block.querySelector("pre");
+    const existing = block.querySelector(".lineNumbers");
+    if (existing) {
+      existing.remove();
+      block.classList.remove("withLines");
+    } else {
+      const count = (block.querySelector("code")?.textContent || "").replace(/\n$/, "").split("\n").length;
+      const gutter = element("div", "lineNumbers");
+      gutter.setAttribute("aria-hidden", "true");
+      gutter.textContent = Array.from({ length: count }, (_, index) => index + 1).join("\n");
+      pre.before(gutter);
+      block.classList.add("withLines");
+    }
+    target.closest("[data-code-lines]").setAttribute("aria-pressed", String(!existing));
+    return true;
+  }
+
+  if (target.closest("[data-code-download]") && block) {
+    const language = (block.dataset.language || block.querySelector(".codeHeader > span")?.textContent || "txt").toLowerCase();
+    downloadFile(`aui-code.${CODE_EXTENSIONS[language] || "txt"}`, block.querySelector("code")?.textContent || "", "text/plain");
+    return true;
+  }
+
+  if (target.closest("[data-code-run]") && block) {
+    runCodeBlock(block);
+    return true;
+  }
+
+  if (target.closest("[data-table-csv]")) {
+    const table = target.closest(".tableWrap")?.querySelector("table");
+    if (table) downloadFile("aui-table.csv", tableToCsv(table), "text/csv");
+    return true;
+  }
+
+  const header = target.closest("th[data-sort-column]");
+  if (header) {
+    sortTable(header);
+    return true;
+  }
+
+  const task = target.closest("input[data-task-index]");
+  if (task) {
+    toggleTask(task);
+    return true;
+  }
+
+  const math = target.closest("[data-tex]");
+  if (math) {
+    copyText(math.dataset.tex).then(() => toast("LaTeX copied")).catch(() => {});
+    return true;
+  }
+
+  const image = target.closest(".messageContent img, .generatedImage img");
+  if (image) {
+    openLightbox(image.src, image.alt);
+    return true;
+  }
+
+  const tocLink = target.closest("[data-toc-link]");
+  if (tocLink) {
+    event.preventDefault();
+    document.getElementById(tocLink.getAttribute("href").slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return true;
+  }
+
+  const foldable = target.closest(".foldable");
+  if (foldable) {
+    toggleSection(foldable);
+    return true;
+  }
+
+  const link = target.closest(".messageContent a[href]");
+  if (link) {
+    const warning = linkMismatch(link);
+    if (warning === null) return false;
+    // Stop the click now; open the link ourselves only if the person confirms.
+    event.preventDefault();
+    if (warning === "blocked") {
+      toast("AUI only opens web links.", "error");
+      return true;
+    }
+    askForConfirmation({
+      eyebrow: "Check this link",
+      title: "This link goes somewhere else",
+      message: `The text says ${warning.shown}, but it opens ${warning.host}. Open it anyway?`,
+      submitLabel: "Open",
+      cancelLabel: "Cancel"
+    }).then(ok => { if (ok) window.open(link.href, "_blank", "noopener,noreferrer"); });
+    return true;
+  }
+  return false;
+}
+
+function toggleSection(heading) {
+  const folded = heading.classList.toggle("folded");
+  const level = Number(heading.tagName[1]);
+  let node = heading.nextElementSibling;
+  while (node && !(/^H[1-6]$/.test(node.tagName) && Number(node.tagName[1]) <= level)) {
+    node.hidden = folded;
+    node = node.nextElementSibling;
+  }
+  heading.setAttribute("aria-expanded", String(!folded));
+}
+
+// A link whose text names a different site than where it goes gets a warning.
+function linkMismatch(link) {
+  let destination;
+  try { destination = new URL(link.href); } catch { return "blocked"; }
+  if (!/^https?:$/.test(destination.protocol)) return "blocked";
+  const shown = /([a-z0-9-]+\.)+[a-z]{2,}/i.exec(link.textContent)?.[0]?.toLowerCase();
+  const host = destination.hostname.toLowerCase();
+  if (!shown || host === shown || host.endsWith(`.${shown}`) || shown.endsWith(`.${host}`)) return null;
+  return { shown, host };
+}
+
+function runCodeBlock(block) {
+  const language = (block.dataset.language || block.querySelector(".codeHeader > span")?.textContent || "").toLowerCase();
+  const code = block.querySelector("code")?.textContent || "";
+  const html = ["javascript", "js"].includes(language)
+    ? `<!doctype html><body style="font:14px monospace;color:#e8edf7;background:#0e1422;margin:8px"><script>const out=(...a)=>{const d=document.createElement('div');d.textContent=a.map(x=>typeof x==='object'?JSON.stringify(x):String(x)).join(' ');document.body.append(d)};console.log=out;console.error=(...a)=>out('Error:',...a);window.onerror=(m)=>out('Error:',m);<\/script><script>${code.replace(/<\/script/gi, "<\\/script")}<\/script>`
+    : language === "css"
+      ? `<!doctype html><style>${code}</style><body><h1>Heading</h1><p>Paragraph with <a href="#">a link</a>.</p><button>Button</button></body>`
+      : code;
+  block.querySelector(".codeRunFrame")?.remove();
+  const frame = element("iframe", "codeRunFrame");
+  frame.setAttribute("sandbox", "allow-scripts");
+  frame.setAttribute("title", "Code preview");
+  frame.srcdoc = html;
+  block.append(frame);
+}
+
+function tableToCsv(table) {
+  return [...table.rows].map(row => [...row.cells].map(cell => {
+    const value = cell.textContent.trim();
+    return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  }).join(",")).join("\n");
+}
+
+function sortTable(header) {
+  const table = header.closest("table");
+  const body = table?.tBodies[0];
+  if (!body) return;
+  const column = Number(header.dataset.sortColumn);
+  const ascending = header.getAttribute("aria-sort") !== "ascending";
+  table.querySelectorAll("th").forEach(th => th.removeAttribute("aria-sort"));
+  header.setAttribute("aria-sort", ascending ? "ascending" : "descending");
+  const value = row => row.cells[column]?.textContent.trim() || "";
+  const rows = [...body.rows].sort((a, b) => {
+    const x = value(a);
+    const y = value(b);
+    const nx = Number(x.replace(/[^0-9.-]/g, ""));
+    const ny = Number(y.replace(/[^0-9.-]/g, ""));
+    const result = x && y && Number.isFinite(nx) && Number.isFinite(ny) && /\d/.test(x) && /\d/.test(y) ? nx - ny : x.localeCompare(y);
+    return ascending ? result : -result;
+  });
+  body.append(...rows);
+}
+
+function toggleTask(box) {
+  const article = box.closest("[data-message-id]");
+  const message = getChat()?.messages.find(item => item.id === article?.dataset.messageId);
+  if (!message) return;
+  const index = Number(box.dataset.taskIndex);
+  let seen = -1;
+  message.content = message.content.replace(/^(\s*[-*+] \[)([ xX])(\])/gm, (match, open, mark, close) => {
+    seen += 1;
+    return seen === index ? `${open}${box.checked ? "x" : " "}${close}` : match;
+  });
+  persist();
+}
+
+function openLightbox(src, alt = "") {
+  let dialog = byId("lightboxDialog");
+  if (!dialog) {
+    dialog = element("dialog", "lightbox");
+    dialog.id = "lightboxDialog";
+    dialog.addEventListener("click", () => dialog.close());
+    document.body.append(dialog);
+  }
+  dialog.innerHTML = `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"><p>Click anywhere to close</p>`;
+  dialog.showModal();
+}
+
+// Short summary of a long reply, made by the on-device model and kept with the message.
+async function makeTldr(message, article) {
+  if (message.tldr) {
+    message.tldrHidden = !message.tldrHidden;
+    persist();
+    renderMessages({ preserveScroll: true });
+    return;
+  }
+  if (state.loading) return toast("Wait for the current reply to finish.", "error");
+  toast("Summarizing…");
+  let summary = "";
+  try {
+    await backgroundModelTask;
+    const task = (async () => {
+      for await (const token of streamSlm([
+        { role: "system", content: "Summarize the text in at most two short sentences. Reply with only the summary." },
+        { role: "user", content: stripMarkdown(message.content).slice(0, 6000) }
+      ])) summary += token;
+    })();
+    backgroundModelTask = task.catch(() => {});
+    await task;
+  } catch (error) {
+    return toast(error.message || "Couldn’t summarize.", "error");
+  }
+  message.tldr = summary.trim();
+  message.tldrHidden = false;
+  persist();
+  renderMessages({ preserveScroll: true });
+}
+
+// Word-level diff between the shown version and the one before it.
+function showVersionDiff(message) {
+  const versions = message.versions || [];
+  const current = message.versionIndex ?? versions.length - 1;
+  if (versions.length < 2) return;
+  const before = versions[Math.max(0, current - 1)].split(/(\s+)/);
+  const after = versions[current].split(/(\s+)/);
+  const rows = before.length + 1;
+  const cols = after.length + 1;
+  if (rows * cols > 4_000_000) return toast("These versions are too long to compare.", "error");
+  const table = Array.from({ length: rows }, () => new Uint32Array(cols));
+  for (let i = before.length - 1; i >= 0; i -= 1) {
+    for (let j = after.length - 1; j >= 0; j -= 1) {
+      table[i][j] = before[i] === after[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1]);
+    }
+  }
+  let i = 0;
+  let j = 0;
+  let html = "";
+  while (i < before.length || j < after.length) {
+    if (i < before.length && j < after.length && before[i] === after[j]) {
+      html += escapeHtml(before[i]);
+      i += 1;
+      j += 1;
+    } else if (j < after.length && (i >= before.length || table[i][j + 1] >= table[i + 1][j])) {
+      html += `<ins>${escapeHtml(after[j])}</ins>`;
+      j += 1;
+    } else {
+      html += `<del>${escapeHtml(before[i])}</del>`;
+      i += 1;
+    }
+  }
+  let dialog = byId("diffDialog");
+  if (!dialog) {
+    dialog = element("dialog", "dialog");
+    dialog.id = "diffDialog";
+    document.body.append(dialog);
+    dialog.addEventListener("click", event => {
+      if (event.target === dialog || event.target.closest("[data-close-dialog]")) dialog.close();
+    });
+  }
+  dialog.innerHTML = `<div class="dialogPanel"><header><div><p class="eyebrow">Version ${current} → ${current + 1}</p><h2>What changed</h2></div><button class="iconBtn" type="button" data-close-dialog aria-label="Close">×</button></header><div class="dialogContent versionDiff">${html}</div></div>`;
+  dialog.showModal();
+}
+
+// Save one reply as a PNG card.
+async function exportMessageImage(article) {
+  const body = article?.querySelector(".messageContent");
+  if (!body) return;
+  try {
+    const { toPng } = await import("https://esm.sh/html-to-image@1.11.11");
+    const dataUrl = await toPng(body, {
+      backgroundColor: getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#161b26",
+      pixelRatio: 2,
+      style: { padding: "24px", maxWidth: "760px" }
+    });
+    const link = document.createElement("a");
+    link.href = dataUrl;
+    link.download = `${slugify(getChat()?.title || "aui-reply")}.png`;
+    link.click();
+  } catch {
+    toast("Couldn’t make an image of this reply.", "error");
+  }
+}
+
+// Highlight each word as it is read aloud (Chromium's Custom Highlight API).
+function speakWithHighlight(message, button, article) {
+  const body = article?.querySelector(".messageContent");
+  if (!body || !window.CSS?.highlights || !window.Highlight) return false;
+  const nodes = [];
+  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+  let text = "";
+  while (walker.nextNode()) {
+    nodes.push({ node: walker.currentNode, start: text.length });
+    text += walker.currentNode.nodeValue;
+  }
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = Number(state.settings.speechRate) || 1;
+  utterance.onboundary = event => {
+    if (event.name && event.name !== "word") return;
+    const start = event.charIndex;
+    const length = event.charLength || (/^\S+/.exec(text.slice(start))?.[0].length ?? 1);
+    const entry = [...nodes].reverse().find(item => item.start <= start);
+    if (!entry) return;
+    const range = new Range();
+    const offset = start - entry.start;
+    range.setStart(entry.node, Math.min(offset, entry.node.length));
+    range.setEnd(entry.node, Math.min(offset + length, entry.node.length));
+    CSS.highlights.set("aui-reading", new Highlight(range));
+  };
+  utterance.onend = utterance.onerror = () => {
+    CSS.highlights.delete("aui-reading");
+    button.textContent = "Read";
+  };
+  button.textContent = "Stop";
+  speechSynthesis.speak(utterance);
+  return true;
+}
+
+// Double-click a word in a reply to see a short dictionary definition.
+async function showDefinition(event) {
+  const word = window.getSelection()?.toString().trim();
+  if (!word || !/^[A-Za-z][A-Za-z'-]{1,30}$/.test(word) || !event.target.closest(".assistantMessage .messageContent")) return;
+  document.querySelector(".definitionPop")?.remove();
+  const pop = element("div", "definitionPop");
+  pop.setAttribute("role", "status");
+  pop.style.left = `${Math.min(event.clientX, innerWidth - 300)}px`;
+  pop.style.top = `${event.clientY + 14}px`;
+  pop.textContent = `Looking up “${word}”…`;
+  document.body.append(pop);
+  const close = () => pop.remove();
+  setTimeout(() => document.addEventListener("pointerdown", close, { once: true }));
+  try {
+    const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word.toLowerCase())}`);
+    const data = await response.json();
+    const meaning = data?.[0]?.meanings?.[0];
+    const definition = meaning?.definitions?.[0]?.definition;
+    pop.innerHTML = definition
+      ? `<strong>${escapeHtml(word)}</strong> <em>${escapeHtml(meaning.partOfSpeech || "")}</em><br>${escapeHtml(definition)}`
+      : `No definition found for “${escapeHtml(word)}”.`;
+  } catch {
+    pop.textContent = "Definitions need an internet connection.";
+  }
+}
+
 let appInitialized = false;
 
 if (document.readyState === "loading") {
@@ -2136,6 +2484,7 @@ async function init() {
   setupSidebarExtras();
   setupFooterMenu();
   setupComposerExtras();
+  DOM.chatArea.addEventListener("dblclick", showDefinition);
   applyPreferences();
   updateShortcutLabels();
   updateNetworkStatus();
@@ -2406,6 +2755,8 @@ function normalizeChats(chats) {
         comparisonLabel: message.comparisonLabel || "",
         tokensPerSecond: Number(message.tokensPerSecond) || 0,
         firstTokenMs: Number(message.firstTokenMs) || 0,
+        durationMs: Number(message.durationMs) || 0,
+        ...(message.tldr ? { tldr: String(message.tldr), tldrHidden: Boolean(message.tldrHidden) } : {}),
         feedback: message.feedback === "up" || message.feedback === "down" ? message.feedback : "",
         starred: Boolean(message.starred),
         ...(Array.isArray(message.versions) && message.versions.length > 1
@@ -2936,6 +3287,7 @@ async function sendMessage(options = {}) {
     if (loadingShown) assistantMessage.content = priorContent;
     const seconds = firstTokenAt ? (performance.now() - firstTokenAt) / 1000 : 0;
     if (tokenCount > 1 && seconds > 0) assistantMessage.tokensPerSecond = Math.round(tokenCount / seconds * 10) / 10;
+    assistantMessage.durationMs = modelWasLoading ? 0 : Math.round(performance.now() - requestedAt);
 
     assistantMessage.status = assistantMessage.content ? "complete" : "error";
     if (assistantMessage.versions && assistantMessage.content) {
@@ -3451,6 +3803,9 @@ function captureMessageRenderState(message) {
     comparisonId: message.comparisonId,
     comparisonLabel: message.comparisonLabel,
     versionIndex: message.versionIndex,
+    tldr: message.tldr,
+    tldrHidden: message.tldrHidden,
+    starred: message.starred,
     searchResults: message.searchResults,
     attachments: message.attachments,
     timestampsEnabled: state.settings.timestamps,
@@ -3514,6 +3869,11 @@ function createMessageElement(message, index, { animate = true } = {}) {
   }
 
   const body = element("div", "messageContent");
+  if (message.tldr && !message.tldrHidden) {
+    const tldr = element("div", "tldrBox");
+    tldr.innerHTML = `<strong>TL;DR</strong> ${escapeHtml(message.tldr)}`;
+    inner.append(tldr);
+  }
 
   if (message.status === "streaming" && !message.content) {
     body.append(createTypingIndicator());
@@ -3580,7 +3940,8 @@ function createMessageFooter(message, index) {
   if (message.role === "assistant" && message.content) {
     metrics.textContent = getReadingMetrics(message.content)
       + (message.tokensPerSecond ? ` · ${message.tokensPerSecond} tokens/s` : "")
-      + (message.firstTokenMs ? ` · first word in ${(message.firstTokenMs / 1000).toFixed(1)} s` : "");
+      + (message.firstTokenMs ? ` · first word in ${(message.firstTokenMs / 1000).toFixed(1)} s` : "")
+      + (message.durationMs ? ` · answered in ${(message.durationMs / 1000).toFixed(1)} s` : "");
   }
   footer.append(metrics);
 
@@ -3594,12 +3955,16 @@ function createMessageFooter(message, index) {
   if (message.role === "assistant") {
     actions.append(
       actionButton("Copy", "copy"),
+      actionButton("Copy text", "copy-plain"),
       actionButton("Read", "speak"),
       actionButton("Download", "download"),
       actionButton("Link", "permalink")
     );
     if (message.status === "complete") {
       actions.append(feedbackButton(message, "up"), feedbackButton(message, "down"));
+      if (message.content.length > 1200) actions.append(actionButton(message.tldr ? (message.tldrHidden ? "Show TL;DR" : "Hide TL;DR") : "TL;DR", "tldr"));
+      if (message.versions?.length > 1) actions.append(actionButton("Changes", "diff"));
+      actions.append(actionButton("Image", "image"));
       actions.append(actionButton("Regenerate", "regenerate"), actionButton("Continue", "continue"));
       if (getUserTier() !== "guest" && MODEL_NAMES[message.model]) {
         if (Object.keys(MODEL_NAMES).length > 1) actions.append(actionButton("Compare model", "compare"));
@@ -3686,11 +4051,12 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b6");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b7");
   return markdownModulePromise;
 }
 
 async function handleChatAction(event) {
+  if (handleRichContentClick(event)) return;
   const suggestion = event.target.closest("[data-suggestion]");
   if (suggestion) {
     DOM.input.value = suggestion.dataset.suggestion;
@@ -3783,6 +4149,18 @@ async function handleChatAction(event) {
       break;
     case "compare":
       compareMessageWithAnotherModel(message);
+      break;
+    case "copy-plain":
+      copyText(stripMarkdown(message.content)).then(() => toast("Copied as plain text")).catch(() => toast("Couldn’t copy.", "error"));
+      break;
+    case "tldr":
+      makeTldr(message, article);
+      break;
+    case "diff":
+      showVersionDiff(message);
+      break;
+    case "image":
+      exportMessageImage(article);
       break;
     case "star":
       message.starred = !message.starred;
@@ -3930,9 +4308,11 @@ function toggleSpeech(message, button) {
   }
   if (speechSynthesis.speaking) {
     speechSynthesis.cancel();
+    window.CSS?.highlights?.delete("aui-reading");
     document.querySelectorAll('[data-message-action="speak"]').forEach(item => { item.textContent = "Read"; });
     return;
   }
+  if (speakWithHighlight(message, button, button.closest("[data-message-id]"))) return;
   const utterance = new SpeechSynthesisUtterance(stripMarkdown(message.content));
   utterance.rate = Number(state.settings.speechRate) || 1;
   utterance.onend = utterance.onerror = () => { button.textContent = "Read"; };
