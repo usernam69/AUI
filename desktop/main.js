@@ -23,7 +23,8 @@ const isInside = url => {
 app.commandLine.appendSwitch("enable-unsafe-webgpu");
 app.commandLine.appendSwitch("enable-features", "Vulkan,WebGPU");
 
-if (!app.requestSingleInstanceLock()) {
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
   app.quit();
 } else {
   app.on("second-instance", () => {
@@ -95,7 +96,7 @@ function createWindow() {
   return window;
 }
 
-app.whenReady().then(() => {
+if (gotLock) app.whenReady().then(() => {
   // Google refuses sign-in from windows that call themselves "Electron".
   const agent = session.defaultSession.getUserAgent().replace(/\s(Electron|aui-desktop)\/\S+/g, "");
   session.defaultSession.setUserAgent(agent);

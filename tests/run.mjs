@@ -449,6 +449,10 @@ await test("skills: validation, SKILL.md round trip and prompt", async () => {
   assert.equal(made.command, "pirate-talk");
   assert.ok(normalizeSkill({ name: "Pirate Talk", instructions: "x" }, [made]).error, "duplicate custom command");
   assert.ok(!normalizeSkill({ id: made.id, name: "Pirate Talk", instructions: "x" }, [made]).error, "editing keeps its own command");
+  const hebrew = normalizeSkill({ name: "סיכום", instructions: "סכם בקצרה." }).skill;
+  assert.ok(/^skill-[a-z0-9]+$/.test(hebrew.command), "a name with no Latin letters still gets a command");
+  assert.ok(!normalizeSkill({ name: "תרגום", instructions: "x" }, [hebrew]).error, "different Hebrew names get different commands");
+  assert.ok(normalizeSkill({ name: "סיכום", instructions: "x" }, [hebrew]).error, "the same Hebrew name is a duplicate");
   const file = toSkillFile(made);
   assert.deepEqual(parseSkillFile(file), { name: "Pirate Talk", description: "Arr", instructions: "Talk like a pirate." });
   assert.equal(parseSkillFile("just some text").instructions, "just some text");

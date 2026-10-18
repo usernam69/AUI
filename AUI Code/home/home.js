@@ -1,6 +1,7 @@
 // Home page. Links that carry a sign-in, invite or other app state still go to the chat.
-const params = location.search || location.hash;
-if (/[?&#](code|access_token|refresh_token|type|error|error_description|invite|recovery|beta|auth|signup-confirmed|login-confirmed|chat)=?/.test(params) || /^#msg-/.test(location.hash)) {
+// The home page has no query string and only its own section anchors; anything else is an app link.
+const HOME_ANCHORS = ["", "#privacy", "#skills", "#plans", "#desktop", "#main"];
+if (location.search || !HOME_ANCHORS.includes(location.hash)) {
   location.replace("/chat/" + location.search + location.hash);
 }
 

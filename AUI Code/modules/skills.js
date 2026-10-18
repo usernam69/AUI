@@ -39,8 +39,8 @@ export function normalizeSkill(raw, existing = []) {
   if (!name) return { error: "Give the skill a name." };
   if (!instructions) return { error: "Write what the skill should do." };
   if (instructions.length > MAX_INSTRUCTIONS) return { error: `Keep the instructions under ${MAX_INSTRUCTIONS} characters. Smaller models follow short instructions better.` };
-  const command = slugify(raw?.command || name);
-  if (!command) return { error: "Use letters or numbers in the name." };
+  // Names with no Latin letters (Hebrew, Arabic, Chinese...) get a short code so they still work with "/".
+  const command = slugify(raw?.command || name) || `skill-${hashText(name).slice(0, 5)}`;
   const taken = [...BUILTIN_SKILLS, ...existing].some(skill => (skill.command || skill.id) === command && skill.id !== raw?.id);
   if (taken) return { error: `The command /${command} is already used. Pick another name.` };
   const id = raw?.id && !isBuiltin(raw.id) ? String(raw.id) : `custom-${command}`;

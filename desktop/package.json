@@ -18,7 +18,7 @@
   "build": {
     "appId": "io.github.usernam69.aui",
     "productName": "AUI",
-    "files": ["main.js", "offline.html", "package.json"],
+    "files": ["main.js", "offline.html", "package.json", "build/icon.png"],
     "directories": { "buildResources": "build", "output": "dist" },
     "win": { "target": ["nsis"] },
     "mac": { "target": ["dmg"], "category": "public.app-category.productivity" },
