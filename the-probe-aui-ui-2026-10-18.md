@@ -1067,3 +1067,9 @@ Skipped: 137 (conflicts with 81, always-dark code blocks), 142 (splitting the st
 Built: 153, 154, 155, 156, 157, 159, 160, 161, 162, 164, 165, 166, 167, 168, 169, 171, 172, 173, 174, 175, 176, 179, 181, 182, 184, 186, 187, 190, 191, 192, 193, 194, 196, 197, 199 (a PIN screen; chats stay unencrypted in the browser), 200.
 Already in AUI: 151, 152, 158, 163, 170, 177, 178, 180, 183, 185, 188, 189, 198.
 Skipped: 195 (hiding the sidebar on a first visit conflicts with 166's always-available rail and makes chats harder to find).
+
+### Batch 6 - category 5 (composer & input)
+Built: 201, 202 (/save plus templates), 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 221 (rotating placeholder hint), 222, 225, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 239, 241, 244, 245, 246, 249, 250.
+Already in AUI: 220, 223, 224, 226, 238, 248.
+Not applicable: 240 (only a few tools remain), 242, 243 (web search and image generation are off on GitHub Pages).
+Skipped: 247 (conflicts with 51 and 52: the composer starts centered and drops down on send).

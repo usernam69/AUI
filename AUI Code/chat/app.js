@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b5";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b6";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b5";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS } from "../modules/slm.js?v=20261018-b5";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b5";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b5";
+} from "../modules/uploads.js?v=20261018-b6";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS } from "../modules/slm.js?v=20261018-b6";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b6";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b6";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -523,7 +523,7 @@ function setupQuickWins() {
 // --- ChatGPT-style layout polish from The Probe (category 2) ---
 
 const SETTINGS_TABS = [
-  ["general", "General", ["enterToSendToggle", "timestampsToggle", "autoScrollToggle", "notifyToggle", "soundToggle"]],
+  ["general", "General", ["enterToSendToggle", "counterSelect", "composerStyleSelect", "spellcheckToggle", "voiceAutoSendToggle", "typingSoundToggle", "timestampsToggle", "autoScrollToggle", "notifyToggle", "soundToggle"]],
   ["appearance", "Appearance", ["themeSelect", "themeSwatches", "accentSwatches", "fontSelect", "fontWeightInput", "lineHeightSelect", "contentWidthSelect", "bubbleSelect", "bubbleColorInput", "iconWeightSelect", "fontScaleInput", "densitySelect", "seasonalToggle", "effectsToggle"]],
   ["personal", "Personalization", ["speedSelect", "customInstructionsInput", "aiTitlesToggle", "memoryToggle", "markdownToggle", "voiceOutputToggle", "speechRateInput"]],
   ["data", "Data controls", ["preloadModelBtn", "exportAllBtn", "storageMeter", "autoArchiveToggle", "archivedChatsList", "trashList", "resetSettingsBtn"]]
@@ -794,6 +794,7 @@ function applyAppearance() {
   root.dataset.bubble = appearanceSetting("bubble");
   root.dataset.iconWeight = appearanceSetting("iconWeight");
   root.dataset.effects = String(appearanceSetting("effects"));
+  root.dataset.composerStyle = state.settings.composerStyle || "pill";
   root.style.setProperty("--chat-weight", String(Number(appearanceSetting("fontWeight")) || 400));
   if (appearanceSetting("bubble") === "custom") root.style.setProperty("--bubble-custom", appearanceSetting("bubbleColor"));
   if (appearanceSetting("font") === "readable" && !readableFontLoaded) {
@@ -1602,6 +1603,500 @@ function setupEdgeSwipe() {
   }, { passive: true });
 }
 
+// --- Composer & input from The Probe (category 5) ---
+
+const DRAFTS_KEY = "aui.drafts";
+function readDrafts() {
+  try { return JSON.parse(localStorage.getItem(DRAFTS_KEY) || "{}") || {}; } catch { return {}; }
+}
+function writeDrafts(drafts) {
+  try { localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts)); } catch {}
+}
+// Called whenever the open chat changes: show that chat's own unsent draft.
+function loadDraftForChat(chatId) {
+  const draft = readDrafts()[chatId] || "";
+  if (DOM.input.value === draft) return;
+  DOM.input.value = draft;
+  scheduleTextareaResize();
+  updateComposerState();
+  if (draft) toast("Draft restored");
+}
+
+const SLASH_COMMANDS = [
+  ["/new", "Start a new chat", () => createChat()],
+  ["/temp", "Start a temporary chat", () => startTemporaryChat()],
+  ["/clear", "Clear this conversation", () => clearConversation()],
+  ["/explore", "Browse prompt ideas", () => openPromptGallery()],
+  ["/settings", "Open settings", () => openSettings()],
+  ["/theme", "Switch to the next theme", () => cycleTheme()],
+  ["/fast", "Use the fastest model", () => switchSpeed("fast")],
+  ["/balanced", "Use the balanced model", () => switchSpeed("balanced")],
+  ["/smart", "Use the smartest model", () => switchSpeed("smart")],
+  ["/export", "Download this chat as Markdown", () => getChat()?.messages.length && exportChatMarkdown(getChat())],
+  ["/copy", "Copy this chat", () => copyWholeChat()],
+  ["/star", "Show starred messages", () => openStarredMessages()],
+  ["/save", "Save what you typed as a template", () => saveComposerAsTemplate()],
+  ["/improve", "Improve what you typed", () => improvePrompt()],
+  ["/help", "Keyboard shortcuts", () => byId("shortcutsDialog")?.showModal()]
+];
+
+function switchSpeed(speed) {
+  setSlmSpeed(speed);
+  preloadPromise = null;
+  showModelName();
+  toast(`Model speed: ${SLM_SPEEDS[speed].label}`);
+}
+
+function saveComposerAsTemplate() {
+  const text = DOM.input.value.trim();
+  if (!text) return toast("Type a prompt first, then use /save.", "error");
+  state.templates = [...(state.templates || []), { id: createId("template"), title: text.slice(0, 40), prompt: text }].slice(-30);
+  persist();
+  toast("Prompt saved. Find it under Explore prompts.");
+}
+
+let composerMenu = null;
+let composerMenuItems = [];
+let composerMenuIndex = 0;
+
+function showComposerMenu(items, onPick) {
+  if (!composerMenu) {
+    composerMenu = element("div", "composerMenu");
+    composerMenu.setAttribute("role", "listbox");
+    composerMenu.addEventListener("mousedown", event => {
+      const option = event.target.closest("[data-index]");
+      if (!option) return;
+      event.preventDefault();
+      composerMenuItems[Number(option.dataset.index)]?.pick();
+    });
+    DOM.composer.append(composerMenu);
+  }
+  composerMenuItems = items.map(item => ({ ...item, pick: () => { hideComposerMenu(); onPick(item); } }));
+  composerMenuIndex = 0;
+  if (!items.length) return hideComposerMenu();
+  composerMenu.innerHTML = items.map((item, index) => `<div role="option" data-index="${index}" class="composerMenuItem" aria-selected="${index === 0}"><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.hint || "")}</small></div>`).join("");
+  composerMenu.hidden = false;
+}
+
+function hideComposerMenu() {
+  if (composerMenu) composerMenu.hidden = true;
+  composerMenuItems = [];
+}
+
+function moveComposerMenu(step) {
+  if (!composerMenuItems.length) return false;
+  composerMenuIndex = (composerMenuIndex + step + composerMenuItems.length) % composerMenuItems.length;
+  composerMenu.querySelectorAll(".composerMenuItem").forEach((item, index) => item.setAttribute("aria-selected", String(index === composerMenuIndex)));
+  return true;
+}
+
+// "/" at the start opens commands; "@" lists attached files to reference.
+function updateComposerMenu() {
+  const value = DOM.input.value;
+  const caret = DOM.input.selectionStart;
+  const before = value.slice(0, caret);
+  if (/^\/\w*$/.test(before)) {
+    const typed = before.toLowerCase();
+    showComposerMenu(
+      SLASH_COMMANDS.filter(([command]) => command.startsWith(typed)).map(([command, hint, run]) => ({ label: command, hint, run })),
+      item => {
+        DOM.input.value = value.slice(caret).trimStart();
+        scheduleTextareaResize();
+        updateComposerState();
+        item.run();
+      }
+    );
+    return;
+  }
+  const mention = /(^|\s)@([^\s@]*)$/.exec(before);
+  if (mention && state.pendingAttachments.length) {
+    const typed = mention[2].toLowerCase();
+    showComposerMenu(
+      state.pendingAttachments.filter(file => file.name.toLowerCase().includes(typed)).map(file => ({ label: `@${file.name}`, hint: "Attached file", name: file.name })),
+      item => {
+        const start = caret - mention[2].length - 1;
+        DOM.input.value = `${value.slice(0, start)}@${item.name} ${value.slice(caret)}`;
+        DOM.input.focus();
+        updateComposerState();
+      }
+    );
+    return;
+  }
+  const completion = findPromptCompletion(before);
+  if (completion) {
+    showComposerMenu([{ label: `Tab ↹ ${completion}`, hint: "Finish with a prompt you used before", completion }], item => {
+      DOM.input.value = item.completion;
+      DOM.input.setSelectionRange(item.completion.length, item.completion.length);
+      updateComposerState();
+    });
+    return;
+  }
+  hideComposerMenu();
+}
+
+// Suggest finishing the prompt with one of your earlier messages that starts the same way.
+function findPromptCompletion(typed) {
+  if (typed.length < 4 || typed.includes("\n")) return "";
+  const lower = typed.toLowerCase();
+  for (const chat of state.chats) {
+    for (const message of chat.messages) {
+      if (message.role === "user" && message.content.length > typed.length && message.content.length < 200 && message.content.toLowerCase().startsWith(lower)) {
+        return message.content;
+      }
+    }
+  }
+  return "";
+}
+
+function handleComposerMenuKeys(event) {
+  if (!composerMenuItems.length || composerMenu?.hidden) return false;
+  if (event.key === "ArrowDown") return moveComposerMenu(1) && (event.preventDefault(), true);
+  if (event.key === "ArrowUp") return moveComposerMenu(-1) && (event.preventDefault(), true);
+  if (event.key === "Escape") {
+    hideComposerMenu();
+    event.preventDefault();
+    return true;
+  }
+  const isCompletion = Boolean(composerMenuItems[0]?.completion);
+  if ((event.key === "Enter" && !event.shiftKey && !isCompletion) || event.key === "Tab") {
+    event.preventDefault();
+    composerMenuItems[composerMenuIndex]?.pick();
+    return true;
+  }
+  return false;
+}
+
+// Paste: long text becomes a file attachment; code gets fenced.
+function looksLikeCode(text) {
+  const lines = text.split("\n");
+  if (lines.length < 3 || /^```/m.test(text)) return false;
+  const codeLines = lines.filter(line => /[;{}()=<>]|^\s{2,}\S|^(def|class|import|from|function|const|let|var|return|if|for|while|#include|public|private)\b/.test(line));
+  return codeLines.length / lines.length > 0.6;
+}
+
+function handleSmartPaste(event) {
+  const text = event.clipboardData?.getData("text/plain") || "";
+  if (!text || event.clipboardData?.files?.length) return;
+  if (text.length > 6000) {
+    event.preventDefault();
+    const file = new File([text], `Pasted text ${new Date().toLocaleTimeString().replace(/:/g, "-")}.txt`, { type: "text/plain" });
+    addFiles([file]);
+    toast("Long paste added as a file so the message stays readable");
+    return;
+  }
+  if (looksLikeCode(text)) {
+    event.preventDefault();
+    const fenced = `\n\`\`\`\n${text.replace(/\n+$/, "")}\n\`\`\`\n`;
+    const { selectionStart: start, selectionEnd: end, value } = DOM.input;
+    DOM.input.value = `${value.slice(0, start)}${fenced}${value.slice(end)}`;
+    DOM.input.setSelectionRange(start + fenced.length, start + fenced.length);
+    scheduleTextareaResize();
+    updateComposerState();
+    saveDraft();
+  }
+}
+
+const PLACEHOLDERS = [
+  "Message AUI or attach files",
+  "Ask anything… try “explain recursion with pizza”",
+  "Type / for commands",
+  "Shift + Enter for a new line",
+  "Paste code and ask what it does",
+  "Ask for a plan, a poem, or a pun"
+];
+function rotatePlaceholder() {
+  let index = 0;
+  setInterval(() => {
+    if (document.activeElement === DOM.input || DOM.input.value) return;
+    index = (index + 1) % PLACEHOLDERS.length;
+    DOM.input.placeholder = PLACEHOLDERS[index];
+  }, 6000);
+}
+
+let markdownPreviewOn = false;
+async function toggleMarkdownPreview() {
+  markdownPreviewOn = !markdownPreviewOn;
+  byId("previewBtn")?.setAttribute("aria-pressed", String(markdownPreviewOn));
+  await renderComposerPreview();
+}
+async function renderComposerPreview() {
+  let preview = document.querySelector(".composerPreview");
+  if (!markdownPreviewOn || !DOM.input.value.trim()) {
+    preview?.remove();
+    return;
+  }
+  if (!preview) {
+    preview = element("div", "composerPreview messageContent");
+    DOM.composer.prepend(preview);
+  }
+  await renderMessageBody(preview, DOM.input.value, false);
+}
+
+const EMOJIS = "😀 😂 🙂 😉 😍 🤔 😅 😎 🥳 😭 😡 👍 👎 👏 🙏 💪 🔥 ✨ 🎉 ❤️ 💡 ✅ ❌ ⚠️ 📌 📎 🧠 🤖 🚀 🌟 🍕 ☕ 🎵 📚 💻 🐛 🧪 📈 🗓️ 🌈".split(" ");
+function toggleEmojiPicker() {
+  let picker = document.querySelector(".emojiPicker");
+  if (picker) return picker.remove();
+  picker = element("div", "emojiPicker");
+  picker.setAttribute("role", "dialog");
+  picker.setAttribute("aria-label", "Emoji");
+  picker.innerHTML = EMOJIS.map(emoji => `<button type="button" data-emoji="${emoji}" aria-label="${emoji}">${emoji}</button>`).join("");
+  picker.addEventListener("click", event => {
+    const emoji = event.target.closest("[data-emoji]")?.dataset.emoji;
+    if (!emoji) return;
+    const { selectionStart: start, selectionEnd: end, value } = DOM.input;
+    DOM.input.value = `${value.slice(0, start)}${emoji}${value.slice(end)}`;
+    DOM.input.focus();
+    DOM.input.setSelectionRange(start + emoji.length, start + emoji.length);
+    updateComposerState();
+    saveDraft();
+  });
+  DOM.composer.append(picker);
+}
+
+// Rewrite the typed prompt more clearly with the on-device model.
+async function improvePrompt() {
+  const original = DOM.input.value.trim();
+  if (!original) return toast("Type a prompt first.", "error");
+  if (state.loading) return;
+  const button = byId("improveBtn");
+  button?.classList.add("working");
+  let improved = "";
+  try {
+    await backgroundModelTask;
+    for await (const token of streamSlm([
+      { role: "system", content: "Rewrite the user's request as a clearer, more specific prompt for an AI assistant. Keep the same intent and language. Reply with only the rewritten prompt." },
+      { role: "user", content: original.slice(0, 3000) }
+    ])) improved += token;
+  } catch (error) {
+    toast(error.message || "Couldn’t improve the prompt.", "error");
+    return;
+  } finally {
+    button?.classList.remove("working");
+  }
+  improved = improved.trim().replace(/^["“]|["”]$/g, "");
+  if (!improved) return;
+  DOM.input.value = improved;
+  scheduleTextareaResize();
+  updateComposerState();
+  saveDraft();
+  toast("Prompt improved", "success", { label: "Undo", duration: 8000, onClick: () => { DOM.input.value = original; updateComposerState(); saveDraft(); } });
+}
+
+// How full the model's context will be with this chat plus what you typed.
+function updateContextMeter() {
+  const meter = byId("contextMeter");
+  if (!meter) return;
+  const chat = getChat();
+  const history = (chat?.messages || []).reduce((total, message) => total + message.content.length, 0);
+  const used = Math.min(1, (history + DOM.input.value.length + 900) / SLM_PROMPT_CHAR_BUDGET);
+  meter.style.setProperty("--fill", String(used));
+  meter.title = used >= 1
+    ? "This chat is longer than the model can see at once; the oldest messages are left out"
+    : `About ${Math.round(used * 100)}% of what the model can see at once`;
+  meter.classList.toggle("full", used >= 1);
+}
+
+const followUpChips = [
+  ["Shorter", "Make your last answer shorter."],
+  ["Longer", "Expand your last answer with more detail."],
+  ["Simpler", "Explain your last answer like I'm five."],
+  ["Example", "Give a concrete example of that."],
+  ["Formal", "Rewrite your last answer in a formal tone."],
+  ["Casual", "Rewrite your last answer in a casual, friendly tone."],
+  ["Funnier", "Rewrite your last answer to be funnier."],
+  ["Summarize", "Summarize our conversation so far in 3 bullet points."],
+  ["Translate…", ""]
+];
+
+function renderFollowUps() {
+  document.querySelector(".followUps")?.remove();
+  const chat = getChat();
+  const last = chat?.messages.at(-1);
+  if (!last || last.role !== "assistant" || last.status !== "complete" || state.loading) return;
+  const article = DOM.chatArea.querySelector(`[data-message-id="${CSS.escape(last.id)}"]`);
+  if (!article) return;
+  const bar = element("div", "followUps");
+  bar.setAttribute("aria-label", "Quick follow-ups");
+  bar.innerHTML = followUpChips.map(([label, prompt]) => `<button type="button" class="followUpChip" data-follow-up="${escapeHtml(prompt)}">${label}</button>`).join("");
+  bar.addEventListener("click", async event => {
+    const chip = event.target.closest("[data-follow-up]");
+    if (!chip || state.loading) return;
+    let prompt = chip.dataset.followUp;
+    if (!prompt) {
+      const language = await askForText({ eyebrow: "Translate", title: "Translate the last answer", label: "Into which language?", value: "Hebrew", submitLabel: "Translate" });
+      if (!language) return;
+      prompt = `Translate your last answer into ${language}.`;
+    }
+    DOM.input.value = prompt;
+    sendMessage();
+  });
+  article.after(bar);
+}
+
+// Ctrl/Cmd + ↑/↓ walk through prompts you sent before.
+let promptHistoryIndex = -1;
+function recallPrompt(step) {
+  const sent = state.chats.flatMap(chat => chat.messages.filter(message => message.role === "user").map(message => ({ text: message.content, time: message.timestamp })))
+    .sort((a, b) => b.time - a.time).map(item => item.text);
+  if (!sent.length) return;
+  promptHistoryIndex = Math.max(-1, Math.min(sent.length - 1, promptHistoryIndex + step));
+  DOM.input.value = promptHistoryIndex < 0 ? "" : sent[promptHistoryIndex];
+  scheduleTextareaResize();
+  updateComposerState();
+}
+
+// Real microphone level bars while dictating.
+let voiceMeter = null;
+async function startVoiceMeter() {
+  stopVoiceMeter();
+  if (!navigator.mediaDevices?.getUserMedia || !window.AudioContext) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const context = new AudioContext();
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 64;
+    context.createMediaStreamSource(stream).connect(analyser);
+    const bars = element("div", "voiceBars");
+    bars.setAttribute("aria-hidden", "true");
+    bars.innerHTML = "<i></i>".repeat(12);
+    DOM.composer.append(bars);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    let frame = 0;
+    const draw = () => {
+      analyser.getByteFrequencyData(data);
+      [...bars.children].forEach((bar, index) => { bar.style.transform = `scaleY(${0.15 + (data[index + 2] / 255) * 0.85})`; });
+      frame = requestAnimationFrame(draw);
+    };
+    draw();
+    voiceMeter = { stream, context, bars, stop: () => cancelAnimationFrame(frame) };
+  } catch {}
+}
+function stopVoiceMeter() {
+  if (!voiceMeter) return;
+  voiceMeter.stop();
+  voiceMeter.stream.getTracks().forEach(track => track.stop());
+  voiceMeter.context.close().catch(() => {});
+  voiceMeter.bars.remove();
+  voiceMeter = null;
+}
+
+let typingAudio = null;
+function playTypingClick() {
+  if (!state.settings.typingSound) return;
+  try {
+    typingAudio ||= new AudioContext();
+    const oscillator = typingAudio.createOscillator();
+    const gain = typingAudio.createGain();
+    oscillator.frequency.value = 1800 + Math.random() * 400;
+    gain.gain.setValueAtTime(0.015, typingAudio.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, typingAudio.currentTime + 0.03);
+    oscillator.connect(gain).connect(typingAudio.destination);
+    oscillator.start();
+    oscillator.stop(typingAudio.currentTime + 0.035);
+  } catch {}
+}
+
+function setupComposerExtras() {
+  DOM.input.setAttribute("enterkeyhint", "send");
+  DOM.input.setAttribute("dir", "auto");
+  DOM.input.spellcheck = state.settings.spellcheck !== false;
+  rotatePlaceholder();
+  DOM.input.addEventListener("paste", handleSmartPaste);
+  DOM.input.addEventListener("input", () => {
+    updateComposerMenu();
+    updateContextMeter();
+    if (markdownPreviewOn) renderComposerPreview();
+    promptHistoryIndex = -1;
+    byId("composerClearBtn").hidden = !DOM.input.value;
+  });
+  DOM.input.addEventListener("keydown", playTypingClick);
+  DOM.input.addEventListener("blur", () => setTimeout(hideComposerMenu, 150));
+
+  const tools = document.querySelector(".composerTools");
+  const make = (id, label, html, onClick) => {
+    const button = element("button", "toolBtn");
+    button.id = id;
+    button.type = "button";
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.innerHTML = html;
+    button.addEventListener("click", onClick);
+    return button;
+  };
+  tools?.append(
+    make("emojiBtn", "Emoji", "🙂", toggleEmojiPicker),
+    make("improveBtn", "Improve my prompt (/improve)", "✨", improvePrompt),
+    make("previewBtn", "Preview formatting", "Md", toggleMarkdownPreview)
+  );
+  byId("previewBtn")?.setAttribute("aria-pressed", "false");
+  const clear = make("composerClearBtn", "Clear message", "×", () => {
+    DOM.input.value = "";
+    saveDraft();
+    updateComposerState();
+    scheduleTextareaResize();
+    byId("composerClearBtn").hidden = true;
+    DOM.input.focus();
+  });
+  clear.classList.add("composerClearBtn");
+  clear.hidden = !DOM.input.value;
+  document.querySelector(".composerInputRow")?.append(clear);
+
+  const meter = element("div", "contextMeter");
+  meter.id = "contextMeter";
+  meter.setAttribute("aria-hidden", "true");
+  DOM.composer.append(meter);
+  setTimeout(() => {
+    updateContextMeter();
+    renderFollowUps();
+  });
+
+  // "/" anywhere focuses the composer; hold Ctrl + Space to talk.
+  document.addEventListener("keydown", event => {
+    const typing = event.target.closest?.("input, textarea, select, [contenteditable=true]");
+    if (event.key === "/" && !typing && !event.ctrlKey && !event.metaKey && !event.altKey && !document.querySelector("dialog[open]")) {
+      event.preventDefault();
+      DOM.input.focus();
+    }
+    if (event.code === "Space" && event.ctrlKey && !event.repeat && !recognition) {
+      event.preventDefault();
+      toggleVoiceInput();
+      pushToTalkActive = true;
+    }
+  });
+  document.addEventListener("keyup", event => {
+    if (pushToTalkActive && (event.code === "Space" || event.key === "Control")) {
+      pushToTalkActive = false;
+      if (recognition) toggleVoiceInput();
+    }
+  });
+  DOM.composer.addEventListener("focusout", event => {
+    if (!DOM.composer.contains(event.relatedTarget)) document.querySelector(".emojiPicker")?.remove();
+  });
+  DOM.input.addEventListener("invalid", () => toast("That message is too long. Attach long text as a file instead.", "error"));
+  DOM.input.addEventListener("beforeinput", () => {
+    if (DOM.input.value.length >= 32000) toast("You’ve reached the 32,000 character limit. Paste long text as a file instead.", "error");
+  });
+}
+let pushToTalkActive = false;
+
+// Messages typed while AUI is replying wait their turn.
+const messageQueue = [];
+function queueMessage() {
+  const text = DOM.input.value.trim();
+  if (!text) return false;
+  messageQueue.push(text);
+  DOM.input.value = "";
+  saveDraft();
+  updateComposerState();
+  toast(`Queued. AUI will send it after this reply (${messageQueue.length} waiting).`);
+  return true;
+}
+function sendQueuedMessage() {
+  if (state.loading || !messageQueue.length) return;
+  DOM.input.value = messageQueue.shift();
+  sendMessage();
+}
+
 let appInitialized = false;
 
 if (document.readyState === "loading") {
@@ -1640,6 +2135,7 @@ async function init() {
   setupAppearanceControls();
   setupSidebarExtras();
   setupFooterMenu();
+  setupComposerExtras();
   applyPreferences();
   updateShortcutLabels();
   updateNetworkStatus();
@@ -2054,6 +2550,7 @@ function bindEvents() {
   byId("themeSelect").addEventListener("change", saveSettingsFromDialog);
   byId("timestampsToggle").addEventListener("change", saveSettingsFromDialog);
   byId("speedSelect").addEventListener("change", saveSettingsFromDialog);
+  ["counterSelect", "composerStyleSelect", "spellcheckToggle", "voiceAutoSendToggle", "typingSoundToggle"].forEach(id => byId(id).addEventListener("change", saveSettingsFromDialog));
   byId("customInstructionsInput").addEventListener("change", saveSettingsFromDialog);
   byId("autoScrollToggle").addEventListener("change", saveSettingsFromDialog);
   byId("memoryToggle").addEventListener("change", saveSettingsFromDialog);
@@ -2182,6 +2679,7 @@ function createChat() {
 
 async function sendMessage(options = {}) {
   if (state.loading) return;
+  document.querySelector(".followUps")?.remove();
 
   const attachments = options.attachments ?? state.pendingAttachments;
   const enteredText = (options.text ?? DOM.input.value).trim();
@@ -2480,6 +2978,9 @@ async function sendMessage(options = {}) {
     updateStats();
     updateComposerState();
     renderMessages({ focusMessageId: assistantMessage.id, preserveScroll: userPausedScroll });
+    renderFollowUps();
+    updateContextMeter();
+    if (messageQueue.length) setTimeout(sendQueuedMessage, 400);
     if (assistantMessage.status === "complete") {
       notifyReplyFinished(assistantMessage);
       if (chat.id !== state.currentChatId) {
@@ -2843,6 +3344,7 @@ function renderMessages(options = {}) {
   const chat = getChat();
   const previousScrollTop = DOM.chatViewport.scrollTop;
   const sameChat = DOM.chatArea.dataset.chatId === chat?.id;
+  if (!sameChat && DOM.chatArea.dataset.chatId && chat) loadDraftForChat(chat.id);
   const isEmpty = !chat?.messages.length;
   DOM.app.classList.toggle("isEmpty", isEmpty);
   document.body.classList.toggle("landingMode", isEmpty);
@@ -3184,7 +3686,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b5");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b6");
   return markdownModulePromise;
 }
 
@@ -3617,6 +4119,8 @@ async function handleChatListAction(event) {
       renderAttachmentTray();
       closeMobileSidebar();
       jumpToSearchMatch(DOM.chatSearchInput.value.trim());
+      renderFollowUps();
+      updateContextMeter();
       break;
     case "menu":
       closeAllChatMenus(item);
@@ -4256,6 +4760,7 @@ function toggleVoiceInput() {
   let finalTranscript = DOM.input.value;
 
   recognition.onstart = () => {
+    startVoiceMeter();
     DOM.voiceBtn.classList.add("recording");
     DOM.voiceBtn.setAttribute("aria-pressed", "true");
     announce("Voice input started");
@@ -4271,7 +4776,9 @@ function toggleVoiceInput() {
     updateComposerState();
   };
   recognition.onend = () => {
+    stopVoiceMeter();
     recognition = null;
+    if (state.settings.voiceAutoSend && DOM.input.value.trim() && !state.loading) setTimeout(() => sendMessage(), 300);
     DOM.voiceBtn.classList.remove("recording");
     DOM.voiceBtn.setAttribute("aria-pressed", "false");
     announce("Voice input stopped");
@@ -4299,6 +4806,11 @@ function openSettings() {
   byId("densitySelect").value = state.settings.density;
   byId("speedSelect").value = getSlmSpeed();
   fillAppearanceControls();
+  byId("counterSelect").value = state.settings.counter || "words";
+  byId("composerStyleSelect").value = state.settings.composerStyle || "pill";
+  byId("spellcheckToggle").checked = state.settings.spellcheck !== false;
+  byId("voiceAutoSendToggle").checked = Boolean(state.settings.voiceAutoSend);
+  byId("typingSoundToggle").checked = Boolean(state.settings.typingSound);
   byId("customInstructionsInput").value = state.settings.customInstructions || "";
   if (!DOM.settingsDialog.open) DOM.settingsDialog.showModal();
 }
@@ -4319,6 +4831,13 @@ function saveSettingsFromDialog() {
   byId("fontScaleValue").textContent = `${Math.round(state.settings.fontScale * 100)}%`;
   state.settings.density = byId("densitySelect").value === "compact" ? "compact" : "comfortable";
   state.settings.customInstructions = String(byId("customInstructionsInput").value || "").slice(0, 1500);
+  state.settings.counter = byId("counterSelect").value;
+  state.settings.composerStyle = byId("composerStyleSelect").value;
+  state.settings.spellcheck = byId("spellcheckToggle").checked;
+  state.settings.voiceAutoSend = byId("voiceAutoSendToggle").checked;
+  state.settings.typingSound = byId("typingSoundToggle").checked;
+  DOM.input.spellcheck = state.settings.spellcheck;
+  updateComposerState();
   const speed = byId("speedSelect").value;
   if (SLM_SPEEDS[speed] && speed !== getSlmSpeed()) {
     setSlmSpeed(speed);
@@ -5330,12 +5849,22 @@ function updateComposerState() {
   const words = DOM.input.value.trim() ? DOM.input.value.trim().split(/\s+/).length : 0;
   DOM.charCount.classList.toggle("nearMax", DOM.input.value.length > 24000);
   DOM.charCount.classList.toggle("atMax", DOM.input.value.length >= 31000);
-  DOM.charCount.textContent = words
-    ? `${words} ${words === 1 ? "word" : "words"}${DOM.input.value.length > 2000 ? ` · ${DOM.input.value.length.toLocaleString()} chars` : ""}`
-    : "";
+  const counter = state.settings.counter || "words";
+  const length = DOM.input.value.length;
+  DOM.charCount.textContent = !words ? "" : counter === "characters"
+    ? `${length.toLocaleString()} chars`
+    : counter === "tokens"
+      ? `~${Math.ceil(length / 4).toLocaleString()} tokens`
+      : `${words} ${words === 1 ? "word" : "words"}${length > 2000 ? ` · ${length.toLocaleString()} chars` : ""}`;
 }
 
 function handleComposerKeydown(event) {
+  if (handleComposerMenuKeys(event)) return;
+  if ((event.ctrlKey || event.metaKey) && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+    event.preventDefault();
+    recallPrompt(event.key === "ArrowUp" ? 1 : -1);
+    return;
+  }
   if (isMessageSubmitKey(event, { enterToSend: state.settings.enterToSend })) {
     event.preventDefault();
     if (typeof DOM.composer.requestSubmit === "function") {
@@ -5373,9 +5902,13 @@ let lastEscapeAt = 0;
 function handleComposerSubmit(event) {
   event.preventDefault();
   if (state.loading) {
+    // Enter with text queues it; the stop button (or Enter on an empty box) stops the reply.
+    if (event.submitter !== DOM.sendBtn && queueMessage()) return;
     stopGeneration();
     return;
   }
+  hideComposerMenu();
+  if (matchMedia("(pointer: coarse)").matches) navigator.vibrate?.(10);
   if (DOM.input.value.trim() || state.pendingAttachments.length) {
     countSendForHint();
     animateSend();
@@ -5478,11 +6011,15 @@ function saveDraft() {
     if (DOM.input.value) localStorage.setItem(DRAFT_KEY, DOM.input.value);
     else localStorage.removeItem(DRAFT_KEY);
   } catch {}
+  const drafts = readDrafts();
+  if (DOM.input.value) drafts[state.currentChatId] = DOM.input.value;
+  else delete drafts[state.currentChatId];
+  writeDrafts(drafts);
 }
 
 function restoreDraft() {
   try {
-    const draft = localStorage.getItem(DRAFT_KEY);
+    const draft = readDrafts()[state.currentChatId] ?? localStorage.getItem(DRAFT_KEY);
     if (draft && !DOM.input.value) {
       DOM.input.value = draft;
       resizeTextarea();

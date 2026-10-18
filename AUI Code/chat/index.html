@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css">
-  <link rel="stylesheet" href="/style.css?v=20261018-b5">
+  <link rel="stylesheet" href="/style.css?v=20261018-b6">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -143,13 +143,13 @@
 
           <div class="composerToolbar">
             <div class="composerTools">
-              <button class="toolBtn ripple" id="toolsBtn" type="button" aria-label="Open attachment menu" aria-expanded="false" title="Attachments and tools">＋</button>
+              <button class="toolBtn ripple" id="toolsBtn" type="button" aria-label="Open attachment menu" aria-expanded="false" title="Attachments and tools (type / for commands)">＋</button>
               <button class="toolBtn ripple" id="searchBtn" type="button" aria-pressed="false" aria-label="Search the web" title="Search the web">⌕</button>
               <button class="toolBtn ripple compareToggleBtn" id="compareBtn" type="button" aria-pressed="false" aria-label="Compare two AI models" title="Compare two AI models">⇄</button>
               <button class="toolBtn ripple imageGenerateBtn" id="imageGenerateBtn" type="button" aria-label="Generate an image" title="Generate an image">✦</button>
               <button class="toolBtn ripple" id="imageUploadBtn" type="button" aria-label="Add images" title="Add images">▧</button>
               <button class="toolBtn ripple" id="attachmentBtn" type="button" aria-label="Attach files" title="Attach files">⌁</button>
-              <button class="toolBtn ripple" id="voiceBtn" type="button" aria-pressed="false" aria-label="Start voice input" title="Voice input">●</button>
+              <button class="toolBtn ripple" id="voiceBtn" type="button" aria-pressed="false" aria-label="Start voice input" title="Voice input (or hold Ctrl + Space)">●</button>
             </div>
 
             <div class="composerActions">
@@ -222,6 +222,11 @@
         <label class="settingRow"><span><strong>Icons</strong><small>Line thickness of icons</small></span><select id="iconWeightSelect"><option value="regular">Regular</option><option value="bold">Bold</option></select></label>
         <label class="settingRow"><span><strong>Seasonal touches</strong><small>Snow in December, leaves in autumn</small></span><input id="seasonalToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow"><span><strong>Celebrations</strong><small>Small sparkles for milestones</small></span><input id="effectsToggle" type="checkbox" role="switch" checked></label>
+        <label class="settingRow"><span><strong>Composer counter</strong><small>What the counter under the message box shows</small></span><select id="counterSelect"><option value="words">Words</option><option value="characters">Characters</option><option value="tokens">Estimated tokens</option></select></label>
+        <label class="settingRow"><span><strong>Message box style</strong><small>Rounded pill or a flat box</small></span><select id="composerStyleSelect"><option value="pill">Pill</option><option value="flat">Flat</option></select></label>
+        <label class="settingRow"><span><strong>Spell check</strong><small>Underline misspelled words while you type</small></span><input id="spellcheckToggle" type="checkbox" role="switch" checked></label>
+        <label class="settingRow"><span><strong>Send after dictation</strong><small>Send automatically when voice input stops</small></span><input id="voiceAutoSendToggle" type="checkbox" role="switch"></label>
+        <label class="settingRow"><span><strong>Typing sounds</strong><small>Soft clicks as you type</small></span><input id="typingSoundToggle" type="checkbox" role="switch"></label>
         <label class="settingRow"><span><strong>Enter sends</strong><small>Off: Ctrl + Enter sends, Enter adds a line</small></span><input id="enterToSendToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow rangeRow"><span><strong>Text size</strong><small id="fontScaleValue">100%</small></span><input id="fontScaleInput" type="range" min="0.9" max="1.3" step="0.05" value="1"></label>
         <label class="settingRow"><span><strong>Density</strong><small>Space between messages</small></span><select id="densitySelect"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
@@ -391,6 +396,6 @@
       navigator.serviceWorker.register("/chat/sw.js").catch(() => {});
     }
   </script>
-  <script type="module" src="/chat/app.js?v=20261018-b5"></script>
+  <script type="module" src="/chat/app.js?v=20261018-b6"></script>
 </body>
 </html>
