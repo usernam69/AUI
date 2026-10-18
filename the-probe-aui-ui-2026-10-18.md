@@ -1062,3 +1062,8 @@ Not applicable: 91 (web search is off on GitHub Pages).
 Built: 101, 102, 104, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116 (Atkinson Hyperlegible as the readable font), 117, 118, 119, 120, 121, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 136, 138, 140, 143, 144, 145, 148, 149, 150.
 Already in AUI: 103, 105, 122, 133, 134, 135, 139, 141, 147.
 Skipped: 137 (conflicts with 81, always-dark code blocks), 142 (splitting the stylesheet adds requests and slows loading), 146 (chats load instantly from the browser, so there is no wait to cover).
+
+### Batch 5 - category 4 (sidebar & chat history)
+Built: 153, 154, 155, 156, 157, 159, 160, 161, 162, 164, 165, 166, 167, 168, 169, 171, 172, 173, 174, 175, 176, 179, 181, 182, 184, 186, 187, 190, 191, 192, 193, 194, 196, 197, 199 (a PIN screen; chats stay unencrypted in the browser), 200.
+Already in AUI: 151, 152, 158, 163, 170, 177, 178, 180, 183, 185, 188, 189, 198.
+Skipped: 195 (hiding the sidebar on a first visit conflicts with 166's always-available rail and makes chats harder to find).

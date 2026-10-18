@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b4";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b5";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b4";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS } from "../modules/slm.js?v=20261018-b4";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b4";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b4";
+} from "../modules/uploads.js?v=20261018-b5";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS } from "../modules/slm.js?v=20261018-b5";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b5";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b5";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -292,6 +292,10 @@ const SVG_ICONS = {
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
   temporary: '<path d="M21 12a9 9 0 0 1-13.5 7.8L3 21l1.2-4.5A9 9 0 1 1 21 12Z" stroke-dasharray="3 2.5"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  compass: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/>',
+  star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
   share: '<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v13M7 8l5-5 5 5"/>'
 };
 
@@ -521,8 +525,8 @@ function setupQuickWins() {
 const SETTINGS_TABS = [
   ["general", "General", ["enterToSendToggle", "timestampsToggle", "autoScrollToggle", "notifyToggle", "soundToggle"]],
   ["appearance", "Appearance", ["themeSelect", "themeSwatches", "accentSwatches", "fontSelect", "fontWeightInput", "lineHeightSelect", "contentWidthSelect", "bubbleSelect", "bubbleColorInput", "iconWeightSelect", "fontScaleInput", "densitySelect", "seasonalToggle", "effectsToggle"]],
-  ["personal", "Personalization", ["speedSelect", "customInstructionsInput", "memoryToggle", "markdownToggle", "voiceOutputToggle", "speechRateInput"]],
-  ["data", "Data controls", ["preloadModelBtn", "exportAllBtn", "archivedChatsList", "resetSettingsBtn"]]
+  ["personal", "Personalization", ["speedSelect", "customInstructionsInput", "aiTitlesToggle", "memoryToggle", "markdownToggle", "voiceOutputToggle", "speechRateInput"]],
+  ["data", "Data controls", ["preloadModelBtn", "exportAllBtn", "storageMeter", "autoArchiveToggle", "archivedChatsList", "trashList", "resetSettingsBtn"]]
 ];
 
 // Group the long settings list into ChatGPT-style tabs with a left-hand nav.
@@ -579,7 +583,13 @@ function selectSettingsTab(id) {
   document.querySelectorAll(".settingsPanel").forEach(panel => {
     panel.hidden = panel.id !== `settings-panel-${id}`;
   });
-  if (id === "data") renderArchivedChats();
+  if (id === "data") {
+    renderArchivedChats();
+    renderTrash();
+    renderStorageMeter();
+    if (byId("autoArchiveToggle")) byId("autoArchiveToggle").checked = Boolean(state.settings.autoArchive);
+  }
+  if (id === "personal" && byId("aiTitlesToggle")) byId("aiTitlesToggle").checked = state.settings.aiTitles !== false;
 }
 
 function renderArchivedChats() {
@@ -651,6 +661,12 @@ function openPromptGallery() {
       }
     });
     document.body.append(dialog);
+  }
+  dialog.querySelector(".templateSection")?.remove();
+  if (state.templates?.length) {
+    const section = element("section", "templateSection");
+    section.innerHTML = `<h3>Your templates</h3><div>${state.templates.map(template => `<button type="button" class="promptPreset" data-preset="${escapeHtml(template.prompt)}">${escapeHtml(template.title)}</button>`).join("")}</div>`;
+    dialog.querySelector(".promptGallery").prepend(section);
   }
   dialog.showModal();
 }
@@ -916,6 +932,676 @@ function syncThemeSwatches() {
   });
 }
 
+// --- Sidebar & chat history from The Probe (category 4) ---
+
+const CHAT_COLORS = ["", "#4f8cff", "#8b5cf6", "#14b8a6", "#22c55e", "#f5a524", "#ef4444"];
+const TRASH_DAYS = 30;
+let chatSelectMode = false;
+const selectedChatIds = new Set();
+let activeTagFilter = "";
+
+// Typo-tolerant match: substring, or all query letters in order within a word span.
+function fuzzyMatch(text, query) {
+  const haystack = String(text || "").toLowerCase();
+  const needle = String(query || "").toLowerCase().trim();
+  if (!needle) return true;
+  if (haystack.includes(needle)) return true;
+  if (needle.length < 3) return false;
+  let position = 0;
+  let gaps = 0;
+  for (const char of needle) {
+    const found = haystack.indexOf(char, position);
+    if (found < 0) return false;
+    if (position && found - position > 2) gaps += 1;
+    position = found + 1;
+  }
+  return gaps <= Math.max(1, Math.floor(needle.length / 4));
+}
+
+function highlightText(text, query) {
+  const safe = escapeHtml(text);
+  const needle = String(query || "").trim();
+  if (!needle) return safe;
+  const index = text.toLowerCase().indexOf(needle.toLowerCase());
+  if (index < 0) return safe;
+  return `${escapeHtml(text.slice(0, index))}<mark>${escapeHtml(text.slice(index, index + needle.length))}</mark>${escapeHtml(text.slice(index + needle.length))}`;
+}
+
+function chatMatchesQuery(chat, query) {
+  return fuzzyMatch(chat.title, query)
+    || (chat.tags || []).some(tag => fuzzyMatch(tag, query))
+    || (!chat.lock && chat.messages.some(message => message.content.toLowerCase().includes(query)));
+}
+
+function chatHasCode(chat) {
+  return chat.messages.some(message => message.content.includes("```"));
+}
+
+function sortChats(chats) {
+  const sort = state.settings.chatSort || "recent";
+  const pinOrder = (a, b) => (a.pinOrder ?? 1e9) - (b.pinOrder ?? 1e9);
+  return [...chats].sort((a, b) => {
+    if (a.pinned !== b.pinned) return Number(b.pinned) - Number(a.pinned);
+    if (a.pinned && b.pinned) return pinOrder(a, b);
+    if (sort === "created") return (b.createdAt || 0) - (a.createdAt || 0);
+    if (sort === "name") return a.title.localeCompare(b.title);
+    return Number(b.favorite) - Number(a.favorite) || b.updatedAt - a.updatedAt;
+  });
+}
+
+function getAllTags() {
+  const tags = new Set();
+  state.chats.forEach(chat => (chat.tags || []).forEach(tag => tags.add(tag)));
+  return [...tags].sort();
+}
+
+function renderTagFilters() {
+  let bar = document.querySelector(".tagFilterBar");
+  if (!bar) {
+    bar = element("div", "tagFilterBar");
+    DOM.chatList.before(bar);
+  }
+  const tags = getAllTags();
+  const hasCode = state.chats.some(chat => !chat.archived && chatHasCode(chat));
+  const chips = [...(hasCode ? ["#code"] : []), ...tags];
+  bar.hidden = !chips.length;
+  bar.innerHTML = chips.map(tag => `<button type="button" class="tagChip" data-tag="${escapeHtml(tag)}" aria-pressed="${tag === activeTagFilter}">${escapeHtml(tag)}</button>`).join("");
+}
+
+function filterByTag(chats) {
+  if (!activeTagFilter) return chats;
+  if (activeTagFilter === "#code") return chats.filter(chatHasCode);
+  return chats.filter(chat => (chat.tags || []).includes(activeTagFilter));
+}
+
+function decorateChatItem(item, chat, query) {
+  const open = item.querySelector(".chatSelectBtn");
+  const title = open?.querySelector("span");
+  if (title) {
+    const label = chat.lock ? "Locked chat" : chat.title;
+    title.innerHTML = `${chat.emoji ? `<i class="chatEmoji">${escapeHtml(chat.emoji)}</i>` : ""}${highlightText(label, query)}`;
+  }
+  if (chat.color) item.style.setProperty("--chat-color", chat.color);
+  item.classList.toggle("hasColor", Boolean(chat.color));
+  item.classList.toggle("isUnread", Boolean(chat.unread) && chat.id !== state.currentChatId);
+  item.classList.toggle("isLocked", Boolean(chat.lock));
+  if (open && !chat.lock) {
+    const firstUser = chat.messages.find(message => message.role === "user");
+    if (firstUser) open.title = `${chat.title}\n${firstUser.content.slice(0, 140)}`;
+  }
+  if (chat.pinned) {
+    item.draggable = true;
+    item.classList.add("draggablePin");
+  }
+  if (chatSelectMode) {
+    const box = element("input", "chatSelectBox");
+    box.type = "checkbox";
+    box.checked = selectedChatIds.has(chat.id);
+    box.setAttribute("aria-label", `Select ${chat.title}`);
+    box.dataset.selectChat = chat.id;
+    item.prepend(box);
+    item.classList.add("selecting");
+  }
+  const menu = item.querySelector(".chatMenu");
+  if (menu && !menu.querySelector("[data-chat-action=folder]")) {
+    menu.querySelector("[data-chat-action=delete]")?.insertAdjacentHTML("beforebegin", `
+      <button type="button" data-chat-action="folder">${chat.folder ? "Change folder" : "Move to folder"}</button>
+      <button type="button" data-chat-action="tags">Tags</button>
+      <button type="button" data-chat-action="color">Color</button>
+      <button type="button" data-chat-action="emoji">Emoji</button>
+      <button type="button" data-chat-action="duplicate">Duplicate</button>
+      <button type="button" data-chat-action="template">Save as template</button>
+      <button type="button" data-chat-action="json">Export as JSON</button>
+      <button type="button" data-chat-action="print">Print or save as PDF</button>
+      <button type="button" data-chat-action="regenTitle">Better title</button>
+      <button type="button" data-chat-action="stats">Chat info</button>
+      <button type="button" data-chat-action="lock">${chat.lock ? "Remove lock" : "Lock with PIN"}</button>`);
+  }
+}
+
+async function handleExtraChatAction(action, chat) {
+  switch (action) {
+    case "folder": {
+      const folder = await askForText({ eyebrow: "Folders", title: "Move to folder", label: "Folder name (type - to remove)", value: chat.folder || "", submitLabel: "Save" });
+      if (folder === null || folder === undefined) return true;
+      chat.folder = folder.trim() === "-" ? "" : folder.trim().slice(0, 40);
+      break;
+    }
+    case "tags": {
+      const value = await askForText({ eyebrow: "Tags", title: "Tags for this chat", label: "Comma-separated tags", value: (chat.tags || []).join(", "), submitLabel: "Save" });
+      if (value === null || value === undefined) return true;
+      chat.tags = [...new Set(value.split(",").map(tag => tag.trim().toLowerCase().slice(0, 24)).filter(Boolean))].slice(0, 8);
+      break;
+    }
+    case "color":
+      chat.color = CHAT_COLORS[(CHAT_COLORS.indexOf(chat.color || "") + 1) % CHAT_COLORS.length];
+      break;
+    case "emoji": {
+      const emoji = await askForText({ eyebrow: "Chat icon", title: "Pick an emoji", label: "One emoji (type - to remove)", value: chat.emoji || "", submitLabel: "Save" });
+      if (emoji === null || emoji === undefined) return true;
+      chat.emoji = emoji.trim() === "-" ? "" : [...emoji.trim()].slice(0, 2).join("");
+      break;
+    }
+    case "duplicate": {
+      const copy = normalizeChats([JSON.parse(JSON.stringify({ ...chat, id: undefined, title: `${chat.title} (copy)`, pinned: false, lock: "" }))])[0];
+      copy.messages.forEach(message => { message.id = createId("message"); });
+      copy.createdAt = copy.updatedAt = Date.now();
+      state.chats.unshift(copy);
+      state.currentChatId = copy.id;
+      persistChatChange();
+      renderChats();
+      renderMessages();
+      toast("Chat duplicated");
+      return true;
+    }
+    case "template": {
+      const firstUser = chat.messages.find(message => message.role === "user");
+      if (!firstUser) return toast("This chat has no message to save.", "error"), true;
+      state.templates = [...(state.templates || []), { id: createId("template"), title: chat.title, prompt: firstUser.content }].slice(-30);
+      persist();
+      toast("Saved as a template. Find it under Explore prompts.");
+      return true;
+    }
+    case "json":
+      downloadFile(`${slugify(chat.title)}.json`, JSON.stringify({ chats: [chat] }, null, 2), "application/json");
+      return true;
+    case "print":
+      printChat(chat);
+      return true;
+    case "regenTitle":
+      await generateAiTitle(chat, { force: true });
+      return true;
+    case "stats":
+      showChatStats(chat);
+      return true;
+    case "lock":
+      await toggleChatLock(chat);
+      return true;
+    default:
+      return false;
+  }
+  chat.updatedAt = Date.now();
+  persistChatChange();
+  renderChats();
+  return true;
+}
+
+function showChatStats(chat) {
+  const words = chat.messages.reduce((total, message) => total + (message.content.trim() ? message.content.trim().split(/\s+/).length : 0), 0);
+  const replies = chat.messages.filter(message => message.role === "assistant");
+  const speeds = replies.map(message => message.tokensPerSecond).filter(Boolean);
+  const average = speeds.length ? (speeds.reduce((a, b) => a + b, 0) / speeds.length).toFixed(1) : "—";
+  askForConfirmation({
+    eyebrow: "Chat info",
+    title: chat.title,
+    message: `${chat.messages.length} messages · ${words.toLocaleString()} words · ${replies.length} replies · average ${average} tokens/s · started ${new Date(chat.createdAt).toLocaleString()}`,
+    submitLabel: "OK",
+    cancelLabel: "Close"
+  });
+}
+
+function printChat(chat) {
+  const win = window.open("", "_blank");
+  if (!win) return toast("Allow pop-ups to print this chat.", "error");
+  const body = chat.messages.map(message => `<section><h3>${message.role === "user" ? "You" : "AUI"}</h3><pre>${escapeHtml(message.content)}</pre></section>`).join("");
+  win.document.write(`<!doctype html><title>${escapeHtml(chat.title)}</title><style>body{font:15px/1.6 system-ui,sans-serif;max-width:720px;margin:40px auto;padding:0 16px}pre{white-space:pre-wrap;font:inherit}h3{margin:24px 0 4px;color:#2563eb}</style><h1>${escapeHtml(chat.title)}</h1>${body}`);
+  win.document.close();
+  win.focus();
+  win.print();
+}
+
+// A PIN screen only: chats still live unencrypted in this browser's storage.
+async function hashPin(pin) {
+  const bytes = new TextEncoder().encode(`aui-pin:${pin}`);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+const unlockedChats = new Set();
+async function toggleChatLock(chat) {
+  if (chat.lock) {
+    const pin = await askForText({ eyebrow: "Chat lock", title: "Enter the PIN to remove the lock", label: "PIN", submitLabel: "Unlock" });
+    if (!pin) return;
+    if (await hashPin(pin) !== chat.lock) return toast("Wrong PIN.", "error");
+    chat.lock = "";
+    toast("Lock removed");
+  } else {
+    const pin = await askForText({ eyebrow: "Chat lock", title: "Choose a PIN for this chat", label: "4 or more digits. This hides the chat on this device; it is not encryption.", submitLabel: "Lock" });
+    if (!pin || pin.trim().length < 4) return pin && toast("Use at least 4 characters.", "error");
+    chat.lock = await hashPin(pin.trim());
+    unlockedChats.delete(chat.id);
+    toast("Chat locked");
+  }
+  persistChatChange();
+  renderChats();
+  renderMessages();
+}
+
+async function ensureChatUnlocked(chat) {
+  if (!chat?.lock || unlockedChats.has(chat.id)) return true;
+  const pin = await askForText({ eyebrow: "Locked chat", title: "Enter PIN", label: "PIN", submitLabel: "Open" });
+  if (pin && await hashPin(pin.trim()) === chat.lock) {
+    unlockedChats.add(chat.id);
+    return true;
+  }
+  if (pin) toast("Wrong PIN.", "error");
+  return false;
+}
+
+// Generate a short title with the on-device model once the first reply is in.
+let backgroundModelTask = Promise.resolve();
+async function generateAiTitle(chat, { force = false } = {}) {
+  if (!chat || (!force && (chat.aiTitled || state.settings.aiTitles === false))) return;
+  const firstUser = chat.messages.find(message => message.role === "user");
+  if (!firstUser || state.loading) return;
+  const task = (async () => {
+    let title = "";
+    try {
+      const messages = [
+        { role: "system", content: "You write chat titles. Reply with only a 2 to 5 word title. No quotes, no punctuation at the end." },
+        { role: "user", content: firstUser.content.slice(0, 600) }
+      ];
+      for await (const token of streamSlm(messages)) {
+        title += token;
+        if (title.length > 60) break;
+      }
+    } catch {
+      return;
+    }
+    title = title.split("\n")[0].replace(/^["'“”\s]+|["'“”.\s]+$/g, "").slice(0, 50);
+    if (title.length >= 3) {
+      chat.title = title;
+      chat.aiTitled = true;
+      persistChatChange();
+      renderChats();
+      if (chat.id === state.currentChatId) DOM.conversationTitle.textContent = title;
+      if (force) toast(`Renamed to “${title}”`);
+    }
+  })();
+  backgroundModelTask = task.catch(() => {});
+  await task;
+}
+
+function moveToTrash(chat) {
+  state.trash = [{ chat, deletedAt: Date.now() }, ...(state.trash || []).filter(entry => entry.chat?.id !== chat.id)].slice(0, 200);
+}
+
+function purgeTrash() {
+  const cutoff = Date.now() - TRASH_DAYS * 86_400_000;
+  state.trash = (state.trash || []).filter(entry => entry.deletedAt >= cutoff && entry.chat?.id);
+}
+
+function renderTrash() {
+  const list = byId("trashList");
+  if (!list) return;
+  purgeTrash();
+  list.replaceChildren();
+  if (!state.trash.length) {
+    list.textContent = "Trash is empty.";
+    return;
+  }
+  state.trash.forEach(entry => {
+    const row = element("div", "archivedRow");
+    const name = element("span");
+    const days = Math.max(0, TRASH_DAYS - Math.floor((Date.now() - entry.deletedAt) / 86_400_000));
+    name.textContent = `${entry.chat.title} · ${days}d left`;
+    const restore = element("button", "secondaryBtn");
+    restore.type = "button";
+    restore.textContent = "Restore";
+    restore.addEventListener("click", () => {
+      state.trash = state.trash.filter(item => item !== entry);
+      state.chats = dedupeChatsById([entry.chat, ...state.chats]);
+      persistChatChange();
+      renderChats();
+      renderTrash();
+      toast("Chat restored");
+    });
+    row.append(name, restore);
+    list.append(row);
+  });
+}
+
+async function renderStorageMeter() {
+  const meter = byId("storageMeter");
+  if (!meter) return;
+  let chatsBytes = 0;
+  try { chatsBytes = (localStorage.getItem("aui") || "").length * 2; } catch {}
+  let text = `Chats and settings: ${formatBytes(chatsBytes)}`;
+  try {
+    const estimate = await navigator.storage?.estimate?.();
+    if (estimate?.usage) text += ` · everything AUI stores, including the model: ${formatBytes(estimate.usage)} of ${formatBytes(estimate.quota)}`;
+  } catch {}
+  meter.textContent = text;
+}
+
+function formatBytes(bytes) {
+  const value = Number(bytes) || 0;
+  if (value >= 1024 ** 3) return `${(value / 1024 ** 3).toFixed(1)} GB`;
+  if (value >= 1024 ** 2) return `${(value / 1024 ** 2).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(value / 1024))} KB`;
+}
+
+function autoArchiveOldChats() {
+  if (!state.settings.autoArchive) return;
+  const cutoff = Date.now() - 90 * 86_400_000;
+  let count = 0;
+  state.chats.forEach(chat => {
+    if (!chat.archived && !chat.pinned && chat.messages.length && (chat.updatedAt || 0) < cutoff) {
+      chat.archived = true;
+      count += 1;
+    }
+  });
+  if (count) {
+    persistChatChange();
+    toast(`Archived ${count} chat${count === 1 ? "" : "s"} older than 90 days`);
+  }
+}
+
+// Turn a ChatGPT data export (conversations.json) into AUI chats.
+function convertChatGptExport(data) {
+  if (!Array.isArray(data) || !data.some(item => item?.mapping)) return null;
+  return data.map(conversation => {
+    const nodes = conversation.mapping || {};
+    let nodeId = conversation.current_node;
+    const ordered = [];
+    while (nodeId && nodes[nodeId]) {
+      const message = nodes[nodeId].message;
+      const role = message?.author?.role;
+      const text = (message?.content?.parts || []).filter(part => typeof part === "string").join("\n").trim();
+      if ((role === "user" || role === "assistant") && text) {
+        ordered.unshift({ role, content: text, timestamp: Math.round((message.create_time || conversation.create_time || Date.now() / 1000) * 1000), status: "complete", model: "ChatGPT import" });
+      }
+      nodeId = nodes[nodeId].parent;
+    }
+    return {
+      id: `gpt-${conversation.id || conversation.conversation_id || createId("chat")}`,
+      title: conversation.title || "Imported chat",
+      createdAt: Math.round((conversation.create_time || Date.now() / 1000) * 1000),
+      updatedAt: Math.round((conversation.update_time || conversation.create_time || Date.now() / 1000) * 1000),
+      tags: ["chatgpt"],
+      messages: ordered
+    };
+  }).filter(chat => chat.messages.length);
+}
+
+function setupSidebarExtras() {
+  state.trash = Array.isArray(state.trash) ? state.trash : [];
+  state.templates = Array.isArray(state.templates) ? state.templates : [];
+  state.recentSearches = Array.isArray(state.recentSearches) ? state.recentSearches : [];
+  purgeTrash();
+  autoArchiveOldChats();
+
+  // Toolbar: sort, select mode, starred.
+  const tools = element("div", "sidebarTools");
+  tools.innerHTML = `
+    <label class="srOnly" for="chatSortSelect">Sort chats</label>
+    <select id="chatSortSelect" aria-label="Sort chats"><option value="recent">Recent</option><option value="created">Created</option><option value="name">Name</option></select>
+    <button type="button" class="miniBtn" id="selectChatsBtn" aria-pressed="false">Select</button>
+    <button type="button" class="miniBtn" id="starredBtn">★ Starred</button>`;
+  DOM.chatList.before(tools);
+  byId("chatSortSelect").value = state.settings.chatSort || "recent";
+  byId("chatSortSelect").addEventListener("change", event => {
+    state.settings.chatSort = event.target.value;
+    persist();
+    renderChats();
+  });
+  byId("selectChatsBtn").addEventListener("click", () => setChatSelectMode(!chatSelectMode));
+  byId("starredBtn").addEventListener("click", openStarredMessages);
+
+  const bulk = element("div", "bulkBar");
+  bulk.hidden = true;
+  bulk.innerHTML = `<span id="bulkCount">0 selected</span><button type="button" class="miniBtn" data-bulk="archive">Archive</button><button type="button" class="miniBtn" data-bulk="export">Export</button><button type="button" class="miniBtn" data-bulk="merge">Merge</button><button type="button" class="miniBtn dangerAction" data-bulk="delete">Delete</button>`;
+  tools.after(bulk);
+  bulk.addEventListener("click", event => {
+    const action = event.target.closest("[data-bulk]")?.dataset.bulk;
+    if (action) runBulkAction(action);
+  });
+
+  const count = element("p", "chatCount");
+  count.id = "chatCount";
+  DOM.chatListSentinel.after(count);
+
+  // Recent searches suggestions.
+  const list = element("datalist");
+  list.id = "recentSearchList";
+  document.body.append(list);
+  DOM.chatSearchInput.setAttribute("list", "recentSearchList");
+  DOM.chatSearchInput.addEventListener("change", () => {
+    const query = DOM.chatSearchInput.value.trim();
+    if (query.length < 2) return;
+    state.recentSearches = [query, ...state.recentSearches.filter(item => item !== query)].slice(0, 5);
+    persist();
+    list.innerHTML = state.recentSearches.map(item => `<option value="${escapeHtml(item)}"></option>`).join("");
+  });
+  list.innerHTML = state.recentSearches.map(item => `<option value="${escapeHtml(item)}"></option>`).join("");
+
+  DOM.chatList.addEventListener("click", event => {
+    const box = event.target.closest("[data-select-chat]");
+    if (box) {
+      box.checked ? selectedChatIds.add(box.dataset.selectChat) : selectedChatIds.delete(box.dataset.selectChat);
+      updateBulkBar();
+      event.stopPropagation();
+    }
+  }, true);
+  document.addEventListener("click", event => {
+    const chip = event.target.closest(".tagFilterBar .tagChip");
+    if (!chip) return;
+    activeTagFilter = activeTagFilter === chip.dataset.tag ? "" : chip.dataset.tag;
+    renderChats();
+  });
+
+  // Right-click a chat to open its menu.
+  DOM.chatList.addEventListener("contextmenu", event => {
+    const item = event.target.closest(".chatItem");
+    if (!item) return;
+    event.preventDefault();
+    closeAllChatMenus(item);
+    item.querySelector(".chatMenu").hidden = false;
+  });
+
+  // Arrow keys move between chats.
+  DOM.chatList.addEventListener("keydown", event => {
+    if (!["ArrowDown", "ArrowUp"].includes(event.key) || !event.target.closest(".chatSelectBtn")) return;
+    const buttons = [...DOM.chatList.querySelectorAll(".chatSelectBtn")];
+    const next = buttons[buttons.indexOf(event.target.closest(".chatSelectBtn")) + (event.key === "ArrowDown" ? 1 : -1)];
+    if (next) {
+      event.preventDefault();
+      next.focus();
+    }
+  });
+
+  setupPinDragging();
+  setupSidebarResize();
+  setupSidebarRail();
+  setupEdgeSwipe();
+  byId("autoArchiveToggle")?.addEventListener("change", event => {
+    state.settings.autoArchive = event.target.checked;
+    persist();
+    autoArchiveOldChats();
+    renderChats();
+  });
+  byId("aiTitlesToggle")?.addEventListener("change", event => {
+    state.settings.aiTitles = event.target.checked;
+    persist();
+  });
+}
+
+function setChatSelectMode(on) {
+  chatSelectMode = on;
+  selectedChatIds.clear();
+  byId("selectChatsBtn")?.setAttribute("aria-pressed", String(on));
+  document.querySelector(".bulkBar").hidden = !on;
+  updateBulkBar();
+  renderChats();
+}
+
+function updateBulkBar() {
+  const label = byId("bulkCount");
+  if (label) label.textContent = `${selectedChatIds.size} selected`;
+}
+
+async function runBulkAction(action) {
+  const chats = state.chats.filter(chat => selectedChatIds.has(chat.id));
+  if (!chats.length) return toast("Select some chats first.", "error");
+  if (action === "archive") {
+    chats.forEach(chat => { chat.archived = true; });
+    toast(`Archived ${chats.length} chats`);
+  } else if (action === "export") {
+    downloadFile(`aui-${chats.length}-chats.json`, JSON.stringify({ chats }, null, 2), "application/json");
+  } else if (action === "merge") {
+    if (chats.length < 2) return toast("Select at least two chats to merge.", "error");
+    const [target, ...rest] = [...chats].sort((a, b) => a.createdAt - b.createdAt);
+    target.messages = [...target.messages, ...rest.flatMap(chat => chat.messages)].sort((a, b) => a.timestamp - b.timestamp);
+    target.updatedAt = Date.now();
+    rest.forEach(moveToTrash);
+    state.chats = state.chats.filter(chat => !rest.includes(chat));
+    state.currentChatId = target.id;
+    toast(`Merged into “${target.title}”. The others are in Trash.`);
+  } else if (action === "delete") {
+    const confirmed = await askForConfirmation({ eyebrow: "Delete chats", title: `Delete ${chats.length} chats?`, message: `They move to Trash for ${TRASH_DAYS} days.`, submitLabel: "Delete", cancelLabel: "Cancel" });
+    if (!confirmed) return;
+    chats.forEach(moveToTrash);
+    state.chats = state.chats.filter(chat => !selectedChatIds.has(chat.id));
+    if (!state.chats.length) state.chats = [makeChat()];
+    if (!state.chats.some(chat => chat.id === state.currentChatId)) state.currentChatId = state.chats[0].id;
+    toast(`Moved ${chats.length} chats to Trash`);
+  }
+  persistChatChange();
+  setChatSelectMode(false);
+  renderMessages();
+}
+
+function openStarredMessages() {
+  let dialog = byId("starredDialog");
+  if (!dialog) {
+    dialog = element("dialog", "dialog");
+    dialog.id = "starredDialog";
+    dialog.setAttribute("aria-labelledby", "starredTitle");
+    document.body.append(dialog);
+    dialog.addEventListener("click", event => {
+      const link = event.target.closest("[data-open-message]");
+      if (link) {
+        const [chatId, messageId] = link.dataset.openMessage.split("|");
+        dialog.close();
+        state.currentChatId = chatId;
+        renderChats();
+        renderMessages();
+        requestAnimationFrame(() => {
+          const article = DOM.chatArea.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+          article?.scrollIntoView({ block: "center" });
+          article?.classList.add("linkedMessage");
+          setTimeout(() => article?.classList.remove("linkedMessage"), 2400);
+        });
+      } else if (event.target.closest("[data-close-dialog]") || event.target === dialog) {
+        dialog.close();
+      }
+    });
+  }
+  const starred = state.chats.flatMap(chat => chat.lock ? [] : chat.messages.filter(message => message.starred).map(message => ({ chat, message })));
+  dialog.innerHTML = `<div class="dialogPanel"><header><div><p class="eyebrow">Saved</p><h2 id="starredTitle">Starred messages</h2></div><button class="iconBtn" type="button" data-close-dialog aria-label="Close starred messages">×</button></header><div class="dialogContent starredList">${starred.length ? starred.map(({ chat, message }) => `<button type="button" class="starredItem" data-open-message="${escapeHtml(chat.id)}|${escapeHtml(message.id)}"><small>${escapeHtml(chat.title)}</small><span>${escapeHtml(stripMarkdown(message.content).slice(0, 180))}</span></button>`).join("") : "<p>No starred messages yet. Use Star under any message.</p>"}</div></div>`;
+  dialog.showModal();
+}
+
+function setupPinDragging() {
+  let dragged = null;
+  DOM.chatList.addEventListener("dragstart", event => {
+    dragged = event.target.closest(".draggablePin");
+    if (dragged) event.dataTransfer.effectAllowed = "move";
+  });
+  DOM.chatList.addEventListener("dragover", event => {
+    if (dragged && event.target.closest(".draggablePin")) event.preventDefault();
+  });
+  DOM.chatList.addEventListener("drop", event => {
+    const target = event.target.closest(".draggablePin");
+    if (!dragged || !target || target === dragged) return;
+    event.preventDefault();
+    const pinned = sortChats(state.chats.filter(chat => chat.pinned));
+    const from = pinned.findIndex(chat => chat.id === dragged.dataset.chatId);
+    const to = pinned.findIndex(chat => chat.id === target.dataset.chatId);
+    const [moved] = pinned.splice(from, 1);
+    pinned.splice(to, 0, moved);
+    pinned.forEach((chat, index) => { chat.pinOrder = index; });
+    persistChatChange();
+    renderChats();
+    dragged = null;
+  });
+}
+
+const SIDEBAR_WIDTH_KEY = "aui.sidebarWidth";
+function setupSidebarResize() {
+  try {
+    const saved = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
+    if (saved >= 220 && saved <= 420) document.documentElement.style.setProperty("--sidebar-width", `${saved}px`);
+  } catch {}
+  const handle = element("div", "sidebarResizer");
+  handle.setAttribute("role", "separator");
+  handle.setAttribute("aria-orientation", "vertical");
+  handle.setAttribute("aria-label", "Resize sidebar");
+  handle.tabIndex = 0;
+  DOM.sidebar.append(handle);
+  const setWidth = width => {
+    const clamped = Math.max(220, Math.min(420, Math.round(width)));
+    document.documentElement.style.setProperty("--sidebar-width", `${clamped}px`);
+    try { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(clamped)); } catch {}
+  };
+  handle.addEventListener("pointerdown", event => {
+    event.preventDefault();
+    handle.setPointerCapture(event.pointerId);
+    DOM.app.classList.add("resizing");
+    const move = moveEvent => setWidth(moveEvent.clientX);
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", () => {
+      handle.removeEventListener("pointermove", move);
+      DOM.app.classList.remove("resizing");
+    }, { once: true });
+  });
+  handle.addEventListener("keydown", event => {
+    const current = DOM.sidebar.getBoundingClientRect().width;
+    if (event.key === "ArrowLeft") setWidth(current - 16);
+    if (event.key === "ArrowRight") setWidth(current + 16);
+  });
+}
+
+function setupSidebarRail() {
+  const rail = element("nav", "sidebarRail");
+  rail.setAttribute("aria-label", "Collapsed sidebar");
+  const item = (label, icon, onClick) => {
+    const button = element("button", "iconBtn");
+    button.type = "button";
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.innerHTML = svgIcon(icon, 19);
+    button.addEventListener("click", onClick);
+    return button;
+  };
+  const expand = () => { if (state.sidebarCollapsed) toggleSidebarCollapse(); };
+  rail.append(
+    item("Open sidebar", "sidebar", expand),
+    item("New chat", "pencil", createChat),
+    item("Search chats", "search", () => { expand(); DOM.chatSearchInput.focus(); }),
+    item("Explore prompts", "compass", openPromptGallery),
+    item("Settings", "settings", openSettings)
+  );
+  DOM.app.prepend(rail);
+}
+
+// Swipe right from the left edge on touch screens to open the sidebar.
+function setupEdgeSwipe() {
+  let startX = null;
+  let startY = 0;
+  document.addEventListener("touchstart", event => {
+    const touch = event.touches[0];
+    startX = touch && touch.clientX < 24 ? touch.clientX : null;
+    startY = touch?.clientY || 0;
+  }, { passive: true });
+  document.addEventListener("touchend", event => {
+    if (startX === null) return;
+    const touch = event.changedTouches[0];
+    if (touch && touch.clientX - startX > 60 && Math.abs(touch.clientY - startY) < 50) openMobileSidebar();
+    startX = null;
+  }, { passive: true });
+}
+
 let appInitialized = false;
 
 if (document.readyState === "loading") {
@@ -952,6 +1638,8 @@ async function init() {
   setupQuickWins();
   setupLayoutPolish();
   setupAppearanceControls();
+  setupSidebarExtras();
+  setupFooterMenu();
   applyPreferences();
   updateShortcutLabels();
   updateNetworkStatus();
@@ -1200,6 +1888,14 @@ function normalizeChats(chats) {
     favorite: Boolean(chat.favorite),
     archived: Boolean(chat.archived),
     temporary: Boolean(chat.temporary),
+    folder: typeof chat.folder === "string" ? chat.folder : "",
+    color: typeof chat.color === "string" ? chat.color : "",
+    emoji: typeof chat.emoji === "string" ? chat.emoji : "",
+    tags: Array.isArray(chat.tags) ? chat.tags.map(String) : [],
+    unread: Boolean(chat.unread),
+    lock: typeof chat.lock === "string" ? chat.lock : "",
+    aiTitled: Boolean(chat.aiTitled),
+    ...(Number.isFinite(chat.pinOrder) ? { pinOrder: chat.pinOrder } : {}),
     messages: Array.isArray(chat.messages)
       ? chat.messages.map(message => ({
         id: message.id || createId("message"),
@@ -1215,6 +1911,7 @@ function normalizeChats(chats) {
         tokensPerSecond: Number(message.tokensPerSecond) || 0,
         firstTokenMs: Number(message.firstTokenMs) || 0,
         feedback: message.feedback === "up" || message.feedback === "down" ? message.feedback : "",
+        starred: Boolean(message.starred),
         ...(Array.isArray(message.versions) && message.versions.length > 1
           ? { versions: message.versions.map(String), versionIndex: Math.min(Number(message.versionIndex) || 0, message.versions.length - 1) }
           : {})
@@ -1708,6 +2405,7 @@ async function sendMessage(options = {}) {
       history,
       buildSlmUserText(text, attachments)
     );
+    await backgroundModelTask;
     for await (const token of streamSlm(slmMessages, {
       signal: abortController.signal,
       onProgress: (report, model) => {
@@ -1782,7 +2480,16 @@ async function sendMessage(options = {}) {
     updateStats();
     updateComposerState();
     renderMessages({ focusMessageId: assistantMessage.id, preserveScroll: userPausedScroll });
-    if (assistantMessage.status === "complete") notifyReplyFinished(assistantMessage);
+    if (assistantMessage.status === "complete") {
+      notifyReplyFinished(assistantMessage);
+      if (chat.id !== state.currentChatId) {
+        chat.unread = true;
+        renderChats();
+      }
+      if (!chat.temporary && chat.messages.filter(item => item.role === "assistant").length === 1) {
+        setTimeout(() => generateAiTitle(chat), 50);
+      }
+    }
     if (!matchMedia("(pointer: coarse)").matches && !document.querySelector("dialog[open]")) {
       DOM.input.focus({ preventScroll: true });
     }
@@ -2404,6 +3111,7 @@ function createMessageFooter(message, index) {
   } else {
     actions.append(actionButton("Copy", "copy"), actionButton("Edit", "edit"), actionButton("Link", "permalink"));
   }
+  actions.append(actionButton(message.starred ? "★ Starred" : "☆ Star", "star"));
   footer.append(actions);
   return footer;
 }
@@ -2476,7 +3184,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b4");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b5");
   return markdownModulePromise;
 }
 
@@ -2573,6 +3281,12 @@ async function handleChatAction(event) {
       break;
     case "compare":
       compareMessageWithAnotherModel(message);
+      break;
+    case "star":
+      message.starred = !message.starred;
+      persist();
+      button.textContent = message.starred ? "★ Starred" : "☆ Star";
+      toast(message.starred ? "Starred. Find it under ★ Starred in the sidebar." : "Unstarred");
       break;
     case "version-prev":
     case "version-next": {
@@ -2741,10 +3455,15 @@ function updateMessageMetrics(article, message) {
 
 function renderChats() {
   const query = DOM.chatSearchInput.value.trim().toLowerCase();
-  const filtered = state.chats
+  const filtered = sortChats(filterByTag(state.chats
     .filter(chat => query || !chat.archived)
-    .filter(chat => !query || chat.title.toLowerCase().includes(query) || chat.messages.some(message => message.content.toLowerCase().includes(query)))
-    .sort((a, b) => Number(b.pinned) - Number(a.pinned) || Number(b.favorite) - Number(a.favorite) || b.updatedAt - a.updatedAt);
+    .filter(chat => !query || chatMatchesQuery(chat, query))));
+  renderTagFilters();
+  const countLabel = byId("chatCount");
+  if (countLabel) {
+    const total = state.chats.filter(chat => !chat.archived && chat.messages.length).length;
+    countLabel.textContent = `${total} chat${total === 1 ? "" : "s"}`;
+  }
   const visible = filtered.slice(0, visibleChatCount);
   DOM.chatList.replaceChildren();
 
@@ -2758,8 +3477,12 @@ function renderChats() {
   }
 
   const pinned = visible.filter(chat => chat.pinned);
-  const recent = visible.filter(chat => !chat.pinned);
+  const foldered = query ? [] : visible.filter(chat => !chat.pinned && chat.folder);
+  const recent = visible.filter(chat => !chat.pinned && !foldered.includes(chat));
   if (pinned.length) DOM.chatList.append(createChatGroup("Pinned", pinned));
+  [...new Set(foldered.map(chat => chat.folder))].sort().forEach(folder => {
+    DOM.chatList.append(createChatGroup(`📁 ${folder}`, foldered.filter(chat => chat.folder === folder)));
+  });
   if (query) {
     if (recent.length) DOM.chatList.append(createChatGroup("Results", recent));
   } else {
@@ -2786,6 +3509,31 @@ function groupChatsByDate(chats, now = new Date()) {
     groups.get(label).push(chat);
   }
   return [...groups];
+}
+
+function jumpToSearchMatch(query) {
+  if (!query) return;
+  const chat = getChat();
+  const match = chat?.messages.find(message => message.content.toLowerCase().includes(query.toLowerCase()));
+  if (!match) return;
+  requestAnimationFrame(() => {
+    const article = DOM.chatArea.querySelector(`[data-message-id="${CSS.escape(match.id)}"]`);
+    article?.scrollIntoView({ block: "center" });
+    article?.classList.add("linkedMessage");
+    setTimeout(() => article?.classList.remove("linkedMessage"), 2400);
+  });
+}
+
+// Fold the less-used links into a "More" disclosure to keep the sidebar calm.
+function setupFooterMenu() {
+  const nav = document.querySelector(".sidebarBottom");
+  if (!nav || nav.querySelector(".moreLinks")) return;
+  const more = element("details", "moreLinks");
+  more.innerHTML = "<summary>More</summary>";
+  const inner = element("div", "moreLinksInner");
+  [...nav.querySelectorAll(":scope > a[href='/'], :scope > a[href$='/AUI/'], :scope > a[href*='about'], :scope > #supportBtn")].forEach(link => inner.append(link));
+  more.append(inner);
+  nav.querySelector("#settingsBtn")?.after(more);
 }
 
 function scheduleChatSearchRender() {
@@ -2841,6 +3589,7 @@ function createChatItem(chat) {
     <button type="button" class="dangerAction" data-chat-action="delete">Delete</button>`;
 
   item.append(open, favorite, menu, actions);
+  decorateChatItem(item, chat, DOM.chatSearchInput.value.trim());
   return item;
 }
 
@@ -2853,10 +3602,13 @@ async function handleChatListAction(event) {
   const action = button.dataset.chatAction;
 
   if (action !== "menu") closeAllChatMenus(item);
+  if (await handleExtraChatAction(action, chat)) return;
 
   switch (action) {
     case "open":
+      if (!(await ensureChatUnlocked(chat))) return;
       if (state.loading) stopGeneration();
+      chat.unread = false;
       state.currentChatId = chat.id;
       state.pendingAttachments = [];
       persist();
@@ -2864,6 +3616,7 @@ async function handleChatListAction(event) {
       renderMessages();
       renderAttachmentTray();
       closeMobileSidebar();
+      jumpToSearchMatch(DOM.chatSearchInput.value.trim());
       break;
     case "menu":
       closeAllChatMenus(item);
@@ -2918,6 +3671,7 @@ async function renameChat(chat) {
     submitLabel: "Save"
   });
   if (!name) return;
+  const previousTitle = chat.title;
   const nextTitle = name.slice(0, 80);
   const renamedAt = Date.now();
   state.chats = dedupeChatsById(state.chats.map(candidate => (
@@ -2928,6 +3682,18 @@ async function renameChat(chat) {
   persistChatChange();
   renderChats();
   if (chat.id === state.currentChatId) DOM.conversationTitle.textContent = nextTitle;
+  toast("Chat renamed", "success", {
+    label: "Undo",
+    duration: 8000,
+    onClick: () => {
+      const current = state.chats.find(candidate => candidate.id === chat.id);
+      if (!current) return;
+      current.title = previousTitle;
+      persistChatChange();
+      renderChats();
+      if (current.id === state.currentChatId) DOM.conversationTitle.textContent = previousTitle;
+    }
+  });
 }
 
 function chatToMarkdown(chat) {
@@ -2962,7 +3728,7 @@ async function importChats(file) {
   if (!file) return;
   try {
     const data = JSON.parse(await file.text());
-    const incoming = normalizeChats(Array.isArray(data) ? data : data?.chats);
+    const incoming = normalizeChats(convertChatGptExport(data) || (Array.isArray(data) ? data : data?.chats));
     if (!incoming.length) throw new Error("No chats found in that file.");
     const known = new Set(state.chats.map(chat => chat.id));
     const added = incoming.filter(chat => !known.has(chat.id));
@@ -2976,7 +3742,7 @@ async function importChats(file) {
     updateStats();
     toast(added.length ? `Imported ${added.length} chats` : "Those chats are already here");
   } catch (error) {
-    toast(error instanceof SyntaxError ? "That file isn’t an AUI backup." : (error.message || "Import failed."), "error");
+    toast(error instanceof SyntaxError ? "That file isn’t an AUI or ChatGPT backup." : (error.message || "Import failed."), "error");
   }
 }
 
@@ -3012,6 +3778,7 @@ function deleteChat(chatId) {
   if (index < 0) return;
   const removed = state.chats[index];
   const wasCurrent = state.currentChatId === chatId;
+  moveToTrash(removed);
   state.chats = state.chats.filter(chat => chat.id !== chatId);
   if (!state.chats.length) state.chats = [makeChat()];
   if (!state.chats.some(chat => chat.id === state.currentChatId)) state.currentChatId = state.chats[0].id;
@@ -3025,6 +3792,7 @@ function deleteChat(chatId) {
     onClick: () => {
       if (pendingUndo?.chat !== removed) return;
       pendingUndo = null;
+      state.trash = (state.trash || []).filter(entry => entry.chat !== removed);
       state.chats = state.chats.filter(chat => chat.messages.length || chat.id === state.currentChatId);
       state.chats.splice(Math.min(index, state.chats.length), 0, removed);
       state.chats = dedupeChatsById(state.chats);
@@ -4935,7 +5703,6 @@ function updateViewportHeight() {
 function toggleSidebarCollapse() {
   state.sidebarCollapsed = !state.sidebarCollapsed;
   DOM.app.classList.toggle("sidebarCollapsed", state.sidebarCollapsed);
-  DOM.sidebarCollapseBtn.textContent = state.sidebarCollapsed ? "›" : "‹";
   DOM.sidebarCollapseBtn.setAttribute("aria-label", state.sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar");
   persist();
 }
