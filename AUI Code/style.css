@@ -3750,3 +3750,49 @@
   .receiptPeople input { width: 70px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
   .lightbox [data-image-tools] { display: block; margin: 6px auto 0; }
 }
+
+/* --- Beta Lab & accounts from The Probe (category 15) --- */
+@layer components {
+  .strengthMeter { margin-top: -4px; }
+  .strengthMeter span { display: block; height: 5px; border-radius: 5px; background: linear-gradient(to right, var(--meter-color, #ef4444) calc(var(--strength, 0) * 100%), var(--surface-hover) 0); }
+  .strengthMeter[data-score="2"] { --meter-color: #f59e0b; }
+  .strengthMeter[data-score="3"] { --meter-color: #22c55e; }
+  .strengthMeter[data-score="4"] { --meter-color: #15803d; }
+  .strengthMeter small { color: var(--muted); font-size: 12px; }
+  .oauthRow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .rememberRow { font-size: 14px; }
+  .profileExtras { display: grid; gap: 10px; }
+  .profileExtras label { display: inline-flex; gap: 6px; align-items: center; }
+  #usernameCheck[data-state="ok"] { color: var(--success); }
+  #usernameCheck[data-state="taken"] { color: var(--danger); }
+  .avatarColors { display: inline-flex; gap: 6px; }
+  .avatarColor { width: 22px; height: 22px; border: 2px solid transparent; border-radius: 50%; background: var(--c); cursor: pointer; }
+  .avatarColor[aria-pressed="true"] { border-color: var(--text); }
+  .profileSecurity .secondaryBtn { font-size: 13px; }
+  .avatar, .profileAvatarPreview { background: var(--avatar-color, var(--accent)); }
+  #profileDialog header.hasBanner { color: #fff; }
+  #profileDialog header.hasBanner .eyebrow { color: rgb(255 255 255 / 0.8); }
+  .achievementRow { display: flex; flex-wrap: wrap; gap: 4px; }
+  .achievement { filter: grayscale(1); opacity: 0.35; font-size: 16px; cursor: help; }
+  .achievement.earned { filter: none; opacity: 1; }
+  .verifyBanner { display: flex; gap: 12px; align-items: center; justify-content: center; padding: 8px 16px; background: var(--accent-soft); color: var(--text); font-size: 14px; }
+  .tierTable { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .tierTable th, .tierTable td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+  .betaTour { display: grid; gap: 10px; padding-left: 20px; }
+  :root[data-beta="true"][data-accent="blue"] { --accent: #7c3aed; --accent-hover: #6d28d9; --accent-soft: rgb(124 58 237 / 0.14); --accent-border: rgb(124 58 237 / 0.4); }
+}
+@layer components {
+
+/* Beta page and admin additions (The Probe, category 15) */
+.betaExtras { display: grid; gap: 8px; margin-top: 12px; }
+.betaInviteForm { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.betaInviteForm input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; text-transform: uppercase; }
+.betaInviteForm p { flex-basis: 100%; margin: 0; }
+.bulkBar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
+.bulkBar button { padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+}
+@layer components {
+  #profileDashboard .achievementRow { display: flex !important; flex-direction: row; flex-wrap: wrap; gap: 4px; }
+  #profileDashboard .achievement { display: inline-block; }
+  .avatar, .profileAvatarPreview { color: #fff; }
+}

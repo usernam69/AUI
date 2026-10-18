@@ -159,6 +159,7 @@ function requestMatchesSearch(request, query) {
 }
 
 function renderRequests() {
+  setupBulkActions();
   requestList.replaceChildren();
   const filtered = getFilteredRequests();
   if (!filtered.length) {
@@ -251,6 +252,13 @@ function createAdminRequestCard(request) {
   title.textContent = request.title;
   const requester = document.createElement("p");
   requester.textContent = `${request.requester_name} · ${request.user_email}`;
+  if (request.status === "pending") {
+    const pick = document.createElement("input");
+    pick.type = "checkbox";
+    pick.dataset.bulkId = request.id;
+    pick.setAttribute("aria-label", `Select ${request.title}`);
+    identity.prepend(pick);
+  }
   identity.append(feature, title, requester);
 
   const badge = document.createElement("span");
@@ -386,6 +394,36 @@ function actionButton(label, nextStatus, className) {
   button.dataset.reviewStatus = nextStatus;
   button.textContent = label;
   return button;
+}
+
+// 710: approve or decline several pending requests at once.
+function setupBulkActions() {
+  if (document.getElementById("bulkBar")) return;
+  const bar = document.createElement("div");
+  bar.id = "bulkBar";
+  bar.className = "bulkBar";
+  bar.innerHTML = '<label><input type="checkbox" id="bulkAll"> Select all pending</label><button type="button" data-bulk="approved">Approve selected</button><button type="button" data-bulk="declined">Decline selected</button><span id="bulkStatus" role="status"></span>';
+  requestList.before(bar);
+  bar.querySelector("#bulkAll").addEventListener("change", event => {
+    document.querySelectorAll("[data-bulk-id]").forEach(box => { box.checked = event.target.checked; });
+  });
+  bar.addEventListener("click", async event => {
+    const status = event.target.closest("[data-bulk]")?.dataset.bulk;
+    if (!status) return;
+    const ids = [...document.querySelectorAll("[data-bulk-id]:checked")].map(box => box.dataset.bulkId);
+    if (!ids.length) return;
+    const note = document.getElementById("bulkStatus");
+    note.textContent = "Saving…";
+    // Bulk approvals get the standard 30 days; one-by-one approvals can still set a custom length.
+    const { error } = await supabase.from("beta_requests").update({
+      status,
+      reviewed_by: reviewerEmail || "admin",
+      reviewed_at: new Date().toISOString(),
+      access_expires_at: status === "approved" ? new Date(Date.now() + 30 * 86_400_000).toISOString() : null
+    }).in("id", ids).eq("status", "pending");
+    note.textContent = error ? `Couldn't save: ${error.message}` : `${ids.length} ${ids.length === 1 ? "request" : "requests"} ${status}.`;
+    if (!error) loadRequests();
+  });
 }
 
 async function handleRequestAction(event) {

@@ -1124,3 +1124,11 @@ Built: 651 (PDF text with pdf.js), 653 (exact column summaries for CSV and sprea
 Already in AUI: 652, 656, 658, 665, 691, 693.
 Skipped: 671 and 672 (image generation needs the image server, which isn't part of the GitHub Pages site), 688 (reading any web page needs a CORS proxy service), 689 (YouTube transcripts need a server or proxy).
 Checked in Chromium with real files: PDF text, CSV table and chart, JSON tree, notebook, zip tree, file diff, OCR on a receipt, captions, background removal, upscaling and an audio transcript.
+
+### Batch 16 - category 15 (Beta Lab & accounts)
+Built: 702 (days left), 704 and 732 (feedback and bug reports with optional chat context, sent through your email app or a GitHub issue), 706, 707, 710 (bulk approve or decline in the admin dashboard), 713 (email sign-in link), 714 and 715 (Google and GitHub buttons), 716, 717, 718, 719, 720, 721, 723 (two-factor with an authenticator app), 725, 728 (no daily message cap: replies come from the on-device model), 730, 736, 737, 738, 739 (10 achievements), 740, 741, 742, 743, 744, 745 (strength meter and plain-language errors in the reset flow too), 746 (choose whether chats and memories sync), 748, 749, 750.
+Needs the owner: 706, 707, 716, 719 and the 744 fixes need supabase/account_extras.sql run once in the Supabase SQL Editor. 714 and 715 need the Google and GitHub providers turned on in Supabase; until then the buttons explain that.
+Already in AUI: 701, 703, 705, 709, 711, 724, 729, 731, 747.
+Skipped: 708 (emails need a server or an email service), 712 (needs usage collected on a server; each account's chats are private), 722 (Supabase has no browser API to list sessions), 726 and 727 (no daily limit is left to explain or count down after 728), 733 (needs a Discord server), 734 (needs somewhere to collect the answers), 735 (needs data about testers that AUI doesn't collect).
+Bug fixed along the way: the chat and the Beta page asked /api/beta-status, a Vercel function that no longer exists, so Beta status never loaded on GitHub Pages. Both now read the account's own approved requests from Supabase directly.
+Security review (744): the user_data update policy had no "with check", so a signed-in user could move their row onto another account's id; staff powers relied only on the email claim in the token. account_extras.sql fixes both.

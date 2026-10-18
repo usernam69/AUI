@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b17";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b18";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b17";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b17";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b17";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b17";
+} from "../modules/uploads.js?v=20261018-b18";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b18";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b18";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b18";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -1702,6 +1702,9 @@ const SLASH_COMMANDS = [
   ["/tiny", "Use the tiny model", () => switchSpeed("tiny")],
   ["/context", "See exactly what the model reads", () => openContextViewer()],
   ["/gallery", "All pictures from your chats", () => openImageGallery()],
+  ["/feedback", "Send feedback or report a bug", () => openFeedback()],
+  ["/bug", "Report a bug", () => openFeedback("bug")],
+  ["/plans", "Compare account types", () => openTierTable()],
   ["/files", "Attach a file from an earlier chat", () => openRecentFiles()],
   ["/reset", "Reset what the model sees in this chat", () => resetContext()],
   ["/memory", "Open memory", () => openMemory()],
@@ -4788,7 +4791,7 @@ function setupMemoryFeatures() {
 
 let filesModulePromise = null;
 function loadFilesModule() {
-  filesModulePromise ||= import("../modules/files.js?v=20261018-b17");
+  filesModulePromise ||= import("../modules/files.js?v=20261018-b18");
   return filesModulePromise;
 }
 
@@ -5350,6 +5353,489 @@ function setupFileFeatures() {
   }
 }
 
+// --- Beta Lab & accounts from The Probe (category 15) ---
+
+// 742: "Keep me signed in" off means the sign-in ends with the browser session.
+// This runs before Supabase loads, so a session that shouldn't survive is never restored.
+(() => {
+  try {
+    if (localStorage.getItem("aui.rememberMe") !== "0" || sessionStorage.getItem("aui.sessionAlive")) return;
+    Object.keys(localStorage).filter(key => /^sb-.*-auth-token$/.test(key)).forEach(key => localStorage.removeItem(key));
+  } catch {}
+})();
+
+// 720: a simple password strength estimate.
+function passwordStrength(password) {
+  const value = String(password || "");
+  if (!value) return { score: 0, label: "" };
+  if (/^(password|qwerty|letmein|123456|12345678|111111|abc123)/i.test(value) || new Set(value).size < 4) return { score: 0, label: "Too easy to guess" };
+  let score = 0;
+  if (value.length >= 8) score += 1;
+  if (value.length >= 12) score += 1;
+  if (/[a-z]/.test(value) && /[A-Z]/.test(value)) score += 1;
+  if (/\d/.test(value) && /[^A-Za-z0-9]/.test(value)) score += 1;
+  return { score, label: ["Weak", "Weak", "Fair", "Good", "Strong"][score] };
+}
+
+function attachStrengthMeter(input) {
+  if (!input || input.dataset.strengthMeter) return;
+  input.dataset.strengthMeter = "1";
+  const meter = element("div", "strengthMeter");
+  meter.innerHTML = '<span></span><small aria-live="polite"></small>';
+  input.closest("label")?.after(meter);
+  input.addEventListener("input", () => {
+    const { score, label } = passwordStrength(input.value);
+    meter.dataset.score = String(score);
+    meter.querySelector("span").style.setProperty("--strength", String(input.value ? (score + 1) / 5 : 0));
+    meter.querySelector("small").textContent = input.value ? `Password strength: ${label}` : "";
+  });
+}
+
+// 741: plain-language sign-in errors.
+function friendlyAuthError(message) {
+  const text = String(message || "");
+  if (/invalid login credentials/i.test(text)) return "That email and password don't match. Check for typos, or reset your password.";
+  if (/user already registered|already been registered/i.test(text)) return "There's already an account with this email. Log in instead.";
+  if (/rate limit|too many|security purposes/i.test(text)) return "Too many tries in a short time. Wait a minute, then try again.";
+  if (/failed to fetch|network|load failed/i.test(text)) return "Can't reach the sign-in service. Check your connection and try again.";
+  if (/password should be at least|weak password/i.test(text)) return "Use a longer password: at least 8 characters.";
+  if (/provider is not enabled|unsupported provider/i.test(text)) return "That sign-in option isn't turned on for AUI yet. Use email instead.";
+  if (/invalid email|unable to validate email/i.test(text)) return "That email address doesn't look right.";
+  return text;
+}
+
+// 740: slow down repeated failed sign-ins in this browser.
+const LOGIN_LOCK_KEY = "aui.loginLock";
+function loginLockRemaining() {
+  try {
+    const lock = JSON.parse(localStorage.getItem(LOGIN_LOCK_KEY) || "{}");
+    return Math.max(0, (lock.until || 0) - Date.now());
+  } catch {
+    return 0;
+  }
+}
+function recordLoginFailure() {
+  try {
+    const lock = JSON.parse(localStorage.getItem(LOGIN_LOCK_KEY) || "{}");
+    const failures = (lock.failures || 0) + 1;
+    const until = failures >= 5 ? Date.now() + 30_000 * 2 ** Math.min(5, failures - 5) : 0;
+    localStorage.setItem(LOGIN_LOCK_KEY, JSON.stringify({ failures, until }));
+  } catch {}
+}
+function clearLoginFailures() {
+  try { localStorage.removeItem(LOGIN_LOCK_KEY); } catch {}
+}
+
+function isRealAccount() {
+  return Boolean(state.loggedIn && state.user && state.user.id !== PLACEHOLDER_OWNER_USER.id);
+}
+
+// 713/714/715: passwordless and one-click sign-in.
+async function sendMagicLink() {
+  const email = DOM.authEmail.value.trim();
+  if (!/^\S+@\S+\.\S+$/.test(email)) return setAuthMessage("Type your email first, then ask for a sign-in link.");
+  try {
+    const supabase = await getSupabase();
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: `${location.origin}${location.pathname}` } });
+    if (error) throw error;
+    setAuthMessage(`Check ${email} for a sign-in link. It works once.`, "success");
+  } catch (error) {
+    setAuthMessage(friendlyAuthError(error.message) || "Couldn't send the link.");
+  }
+}
+async function signInWithProvider(provider) {
+  try {
+    const supabase = await getSupabase();
+    const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: `${location.origin}${location.pathname}` } });
+    if (error) throw error;
+  } catch (error) {
+    setAuthMessage(friendlyAuthError(error.message) || "Couldn't start that sign-in.");
+  }
+}
+
+// 723: optional two-factor authentication with an authenticator app.
+async function completeTwoFactor(supabase) {
+  const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (!data || data.nextLevel !== "aal2" || data.currentLevel === "aal2") return;
+  const { data: factors } = await supabase.auth.mfa.listFactors();
+  const factor = factors?.totp?.find(item => item.status === "verified");
+  if (!factor) return;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const code = (await askForText({ eyebrow: "Two-factor", title: "Enter your code", label: "6-digit code from your authenticator app", value: "", submitLabel: "Verify" }))?.replace(/\s/g, "");
+    if (!code) break;
+    const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: factor.id, code });
+    if (!error) return;
+    toast("That code didn't work. Try the newest one.", "error");
+  }
+  await supabase.auth.signOut({ scope: "local" });
+  throw new Error("Two-factor check not completed, so you weren't signed in.");
+}
+
+async function openTwoFactorSettings() {
+  if (!isRealAccount()) return toast("Sign in with an email account first.", "error");
+  const supabase = await getSupabase();
+  const { data: factors, error } = await supabase.auth.mfa.listFactors();
+  if (error) return toast(friendlyAuthError(error.message), "error");
+  const verified = factors?.totp?.filter(item => item.status === "verified") || [];
+  if (verified.length) {
+    const dialog = simpleDialog("twoFactorDialog", "Security", "Two-factor is on", '<p>Signing in asks for a code from your authenticator app.</p><div class="setupActions"><button type="button" class="secondaryBtn dangerButton" data-mfa-off>Turn off</button></div>');
+    dialog.querySelector("[data-mfa-off]").addEventListener("click", async () => {
+      for (const factor of verified) await supabase.auth.mfa.unenroll({ factorId: factor.id });
+      dialog.close();
+      toast("Two-factor turned off");
+    });
+    return;
+  }
+  const { data, error: enrollError } = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: `AUI ${new Date().toISOString().slice(0, 10)}` });
+  if (enrollError) return toast(friendlyAuthError(enrollError.message), "error");
+  const dialog = simpleDialog("twoFactorDialog", "Security", "Turn on two-factor", `<p>Scan this with an authenticator app (like Google Authenticator or 1Password), then type the 6-digit code.</p><div class="handoffBody"><img alt="QR code for your authenticator app" src="${escapeHtml(data.totp.qr_code)}"><small>Or type this key: <code>${escapeHtml(data.totp.secret)}</code></small></div><label class="setupBody">Code <input inputmode="numeric" autocomplete="one-time-code" maxlength="6" data-mfa-code></label><p class="formError" data-mfa-error></p><div class="setupActions"><button type="button" class="primaryBtn" data-mfa-verify>Turn on</button></div>`);
+  dialog.querySelector("[data-mfa-verify]").addEventListener("click", async () => {
+    const code = dialog.querySelector("[data-mfa-code]").value.replace(/\s/g, "");
+    const { error: verifyError } = await supabase.auth.mfa.challengeAndVerify({ factorId: data.id, code });
+    if (verifyError) {
+      dialog.querySelector("[data-mfa-error]").textContent = "That code didn't match. Wait for a new one and try again.";
+      return;
+    }
+    dialog.close();
+    toast("Two-factor is on");
+  });
+  dialog.addEventListener("close", () => {
+    supabase.auth.mfa.listFactors().then(({ data: latest }) => {
+      (latest?.totp || []).filter(item => item.id === data.id && item.status !== "verified").forEach(item => supabase.auth.mfa.unenroll({ factorId: item.id }));
+    }).catch(() => {});
+  }, { once: true });
+}
+
+// 743: sign out on every device.
+async function signOutEverywhere() {
+  if (!isRealAccount()) return logoutFromProfile();
+  const confirmed = await askForConfirmation({ eyebrow: "Security", title: "Sign out everywhere?", message: "Every device signed in to your account is signed out, including this one.", submitLabel: "Sign out everywhere", cancelLabel: "Cancel" });
+  if (!confirmed) return;
+  try {
+    const supabase = await getSupabase();
+    const { error } = await supabase.auth.signOut({ scope: "global" });
+    if (error) throw error;
+    toast("Signed out on all devices");
+    setTimeout(() => location.reload(), 700);
+  } catch (error) {
+    toast(friendlyAuthError(error.message) || "Couldn't sign out everywhere.", "error");
+  }
+}
+
+// 717: everything AUI holds about you, in one file.
+async function exportAccountData() {
+  const local = JSON.parse(JSON.stringify({ chats: state.chats, memory: state.memory, settings: state.settings, trash: state.trash || [] }));
+  let cloud = null;
+  if (isRealAccount()) {
+    try { cloud = await loadCloudData(await getSupabase(), state.user.id); } catch {}
+  }
+  downloadFile(`aui-my-data-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({
+    app: "AUI",
+    kind: "account-export",
+    exportedAt: new Date().toISOString(),
+    account: state.user ? { id: state.user.id, email: state.user.email, created_at: state.user.created_at, metadata: state.user.user_metadata } : null,
+    local,
+    cloud
+  }, null, 2), "application/json");
+  toast("Your data was downloaded");
+}
+
+// 716: delete the account (needs supabase/account_extras.sql on the server).
+async function deleteAccount() {
+  if (!isRealAccount()) return toast("There's no online account to delete. Your chats live only in this browser.", "info");
+  const typed = await askForText({ eyebrow: "Delete account", title: "Delete your account?", label: "This removes your account and its synced chats for good. Type delete to confirm.", placeholder: "delete", submitLabel: "Delete account" });
+  if (typed?.trim().toLowerCase() !== "delete") return;
+  try {
+    const supabase = await getSupabase();
+    const { error } = await supabase.rpc("delete_my_account");
+    if (error) throw error;
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+    toast("Your account was deleted. Chats in this browser are kept.");
+    setTimeout(() => location.reload(), 900);
+  } catch (error) {
+    toast(/function|not find|schema cache/i.test(error.message || "") ? "Account deletion isn't set up on the server yet. Email support to delete it." : friendlyAuthError(error.message), "error");
+  }
+}
+
+// 719: check that a username is free (needs supabase/account_extras.sql).
+let usernameCheckTimer = null;
+function checkUsernameLive() {
+  const input = DOM.profileUsername;
+  const note = byId("usernameCheck");
+  if (!input || !note || !isRealAccount()) return;
+  clearTimeout(usernameCheckTimer);
+  const name = input.value.trim();
+  if (name.length < 2 || name === getProfileName(state.user)) {
+    note.textContent = "";
+    return;
+  }
+  usernameCheckTimer = setTimeout(async () => {
+    try {
+      const { data, error } = await (await getSupabase()).rpc("username_available", { p_username: name });
+      if (error) throw error;
+      note.textContent = data ? "✓ Available" : "Someone already uses this name";
+      note.dataset.state = data ? "ok" : "taken";
+    } catch {
+      note.textContent = "";
+    }
+  }, 450);
+}
+
+// 721: remind people to confirm their email.
+function updateVerifyBanner() {
+  let banner = byId("verifyBanner");
+  const needed = isRealAccount() && !state.user.email_confirmed_at && !state.user.confirmed_at;
+  if (!needed) {
+    banner?.remove();
+    return;
+  }
+  if (banner) return;
+  banner = element("div", "verifyBanner");
+  banner.id = "verifyBanner";
+  banner.setAttribute("role", "status");
+  banner.innerHTML = `<span>Please confirm your email (${escapeHtml(state.user.email || "")}) to keep your account safe.</span><button type="button" class="linkBtn">Resend email</button>`;
+  banner.querySelector("button").addEventListener("click", async () => {
+    try {
+      const { error } = await (await getSupabase()).auth.resend({ type: "signup", email: state.user.email });
+      if (error) throw error;
+      toast("Confirmation email sent");
+    } catch (error) {
+      toast(friendlyAuthError(error.message), "error");
+    }
+  });
+  document.querySelector(".main")?.prepend(banner);
+}
+
+// 738/739: your numbers and some fun milestones, worked out from this browser.
+function accountStats() {
+  const messages = state.chats.flatMap(chat => chat.messages);
+  const mine = messages.filter(message => message.role === "user");
+  const days = new Set(messages.map(message => new Date(message.timestamp).toDateString()));
+  const longest = Math.max(0, ...state.chats.map(chat => chat.messages.length));
+  return {
+    sent: mine.length,
+    chats: state.chats.filter(chat => chat.messages.length).length,
+    days: days.size,
+    longest,
+    words: mine.reduce((total, message) => total + (message.content.match(/\S+/g) || []).length, 0),
+    starred: messages.filter(message => message.starred).length,
+    memories: state.memory.length,
+    voice: Boolean(state.settings.voiceUsed),
+    code: messages.some(message => message.role === "assistant" && /```/.test(message.content))
+  };
+}
+const ACHIEVEMENTS = [
+  ["first", "🌱", "First words", "Send your first message", stats => stats.sent >= 1],
+  ["ten", "💬", "Chatterbox", "Send 10 messages", stats => stats.sent >= 10],
+  ["hundred", "🏆", "Centurion", "Send 100 messages", stats => stats.sent >= 100],
+  ["chats", "🗂️", "Collector", "Start 10 chats", stats => stats.chats >= 10],
+  ["streak", "📅", "Regular", "Chat on 7 different days", stats => stats.days >= 7],
+  ["long", "🧵", "Deep dive", "Have a chat with 30 messages", stats => stats.longest >= 30],
+  ["novel", "📚", "Novelist", "Write 10,000 words to AUI", stats => stats.words >= 10_000],
+  ["star", "⭐", "Curator", "Star a message", stats => stats.starred >= 1],
+  ["memory", "🧠", "Elephant", "Save 5 memories", stats => stats.memories >= 5],
+  ["code", "💻", "Coder", "Get a reply with code", stats => stats.code]
+];
+function profileExtrasHtml() {
+  const stats = accountStats();
+  const earned = ACHIEVEMENTS.filter(([, , , , test]) => test(stats));
+  return `
+    <article><span>Messages you sent</span><strong>${stats.sent.toLocaleString()}</strong><small>${stats.words.toLocaleString()} words · ${stats.days} active ${stats.days === 1 ? "day" : "days"}</small></article>
+    <article><span>Achievements</span><strong>${earned.length} / ${ACHIEVEMENTS.length}</strong><small class="achievementRow">${ACHIEVEMENTS.map(([id, icon, name, hint, test]) => `<span class="achievement${test(stats) ? " earned" : ""}" title="${escapeHtml(`${name}: ${hint}`)}">${icon}</span>`).join("")}</small></article>`;
+}
+
+// 718/737: a banner and an avatar color.
+const PROFILE_BANNERS = { none: "", ocean: "linear-gradient(120deg, #1d4ed8, #0ea5e9)", sunset: "linear-gradient(120deg, #f97316, #db2777)", forest: "linear-gradient(120deg, #15803d, #84cc16)", night: "linear-gradient(120deg, #1e1b4b, #7c3aed)" };
+const AVATAR_COLORS = ["#2563eb", "#7c3aed", "#db2777", "#ea580c", "#16a34a", "#0891b2", "#475569"];
+function applyProfileLook() {
+  const root = document.documentElement;
+  root.style.setProperty("--avatar-color", state.settings.avatarColor || "#2563eb");
+  const banner = PROFILE_BANNERS[state.settings.profileBanner || "none"];
+  const header = document.querySelector("#profileDialog header");
+  if (header) header.style.background = banner || "";
+  header?.classList.toggle("hasBanner", Boolean(banner));
+}
+
+// 725/703/728: what each kind of account gets.
+function openTierTable() {
+  simpleDialog("tierDialog", "Plans", "What each account gets", `
+    <div class="tableWrap"><table class="tierTable">
+      <thead><tr><th></th><th>Guest</th><th>Free account</th><th>Beta Lab</th></tr></thead>
+      <tbody>
+        <tr><td>On-device AI chat</td><td>Unlimited</td><td>Unlimited</td><td>Unlimited</td></tr>
+        <tr><td>All model sizes</td><td>✓</td><td>✓</td><td>✓</td></tr>
+        <tr><td>Chats and memory</td><td>This browser</td><td>Synced to your account</td><td>Synced to your account</td></tr>
+        <tr><td>Early features</td><td>Labs tab</td><td>Labs tab</td><td>Labs tab and Beta-only tests</td></tr>
+        <tr><td>Request new features</td><td>–</td><td>✓</td><td>✓, with priority</td></tr>
+        <tr><td>Dev Access (staff approval)</td><td>–</td><td>–</td><td>Can request</td></tr>
+      </tbody>
+    </table></div>
+    <p class="toolHint">Replies are written by a model running on your own device, so there's no daily message limit for anyone.</p>
+    <div class="setupActions"><a class="secondaryBtn" href="../beta/">Open Beta Lab</a></div>`, { wide: true });
+}
+
+// 704/732: feedback and bug reports, with the chat attached if you want.
+function openFeedback(kind = "idea") {
+  const dialog = simpleDialog("feedbackDialog", "Feedback", "Tell us what you think", `
+    <div class="setupBody">
+      <fieldset><legend>What is it?</legend>
+        <label><input type="radio" name="feedbackKind" value="idea"> An idea</label>
+        <label><input type="radio" name="feedbackKind" value="bug"> Something is broken</label>
+        <label><input type="radio" name="feedbackKind" value="praise"> Something I like</label>
+      </fieldset>
+      <label>Details <textarea rows="5" data-feedback-text placeholder="What happened? What did you expect?"></textarea></label>
+      <label class="checkRow"><input type="checkbox" data-feedback-chat> Include the last 6 messages of this chat</label>
+      <label class="checkRow"><input type="checkbox" data-feedback-device checked> Include browser and device details</label>
+      <div class="setupActions"><button type="button" class="secondaryBtn" data-feedback-send="email">Send by email</button><button type="button" class="primaryBtn" data-feedback-send="github">Open a GitHub issue</button></div>
+      <p class="toolHint">Nothing is sent until you press send in your email app or on GitHub.</p>
+    </div>`);
+  dialog.querySelector(`[name="feedbackKind"][value="${kind}"]`).checked = true;
+  dialog.querySelectorAll("[data-feedback-send]").forEach(button => button.addEventListener("click", () => {
+    const type = dialog.querySelector('[name="feedbackKind"]:checked').value;
+    const details = dialog.querySelector("[data-feedback-text]").value.trim();
+    if (!details) return toast("Write a few words first.", "error");
+    const parts = [details];
+    if (dialog.querySelector("[data-feedback-chat]").checked) {
+      const recent = (getChat()?.messages || []).slice(-6).map(message => `${message.role === "user" ? "You" : "AUI"}: ${message.content.slice(0, 500)}`).join("\n\n");
+      if (recent) parts.push(`--- Chat ---\n${recent}`);
+    }
+    if (dialog.querySelector("[data-feedback-device]").checked) {
+      parts.push(`--- Device ---\nAUI ${APP_VERSION} · ${navigator.userAgent} · WebGPU: ${"gpu" in navigator ? "yes" : "no"} · model: ${getSlmSpeed()} · ${screen.width}×${screen.height}`);
+    }
+    const title = `${{ idea: "Idea", bug: "Bug", praise: "Praise" }[type]}: ${details.split("\n")[0].slice(0, 70)}`;
+    const body = parts.join("\n\n").slice(0, 6000);
+    const url = button.dataset.feedbackSend === "github"
+      ? `https://github.com/usernam69/AUI/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}${type === "bug" ? "&labels=bug" : ""}`
+      : `mailto:supportaton@gmail.com?subject=${encodeURIComponent(`[AUI] ${title}`)}&body=${encodeURIComponent(body)}`;
+    window.open(url, "_blank", "noopener");
+    dialog.close();
+  }));
+}
+
+// 730: Beta members get a violet accent.
+function applyBetaTheme() {
+  document.documentElement.dataset.beta = String(Boolean(betaApproved));
+  maybeShowBetaTour();
+}
+
+// 750: a short tour the first time Beta Lab is active.
+function maybeShowBetaTour() {
+  if (!betaApproved) return;
+  try {
+    if (localStorage.getItem("aui.betaTourSeen")) return;
+    localStorage.setItem("aui.betaTourSeen", "1");
+  } catch {
+    return;
+  }
+  simpleDialog("betaTourDialog", "Beta Lab", "Welcome to Beta Lab", `<ol class="betaTour">
+    <li><strong>A violet accent</strong> shows Beta is active on this device.</li>
+    <li><strong>Labs</strong> in Settings has early features to try. Turn them on and off any time.</li>
+    <li><strong>Send feedback</strong> (in More) goes straight to the team, with your chat attached if you want.</li>
+    <li><strong>Invite up to three friends</strong> from the Beta page.</li>
+  </ol><div class="setupActions"><button type="button" class="primaryBtn" data-close-dialog>Let's go</button></div>`);
+}
+
+// 746: choose what goes to your account.
+function cloudPrivacyFilter(data) {
+  const filtered = { ...data };
+  if (state.settings.syncChats === false) filtered.chats = [];
+  if (state.settings.syncMemory === false) filtered.memory = [];
+  return filtered;
+}
+
+function setupAccountExtras() {
+  attachStrengthMeter(DOM.authPassword);
+  attachStrengthMeter(byId("newPassword"));
+  const help = document.querySelector("#authDialog .authHelpRow");
+  if (help && !byId("magicLinkBtn")) {
+    help.insertAdjacentHTML("beforeend", '<button class="textActionBtn" id="magicLinkBtn" type="button">Email me a sign-in link</button>');
+    byId("magicLinkBtn").addEventListener("click", sendMagicLink);
+    help.insertAdjacentHTML("afterend", `<label class="checkRow rememberRow"><input type="checkbox" id="rememberMeToggle" ${localStorage.getItem("aui.rememberMe") === "0" ? "" : "checked"}> Keep me signed in on this device</label>
+      <div class="oauthRow"><button class="secondaryBtn" type="button" data-oauth="google">Continue with Google</button><button class="secondaryBtn" type="button" data-oauth="github">Continue with GitHub</button></div>`);
+    byId("rememberMeToggle").addEventListener("change", event => {
+      try {
+        localStorage.setItem("aui.rememberMe", event.target.checked ? "1" : "0");
+        sessionStorage.setItem("aui.sessionAlive", "1");
+      } catch {}
+    });
+    document.querySelectorAll("[data-oauth]").forEach(button => button.addEventListener("click", () => signInWithProvider(button.dataset.oauth)));
+  }
+  // Profile: security, data and look.
+  const actions = document.querySelector("#profileDialog .profileActions");
+  if (actions && !byId("profileExtras")) {
+    actions.insertAdjacentHTML("beforebegin", `<div id="profileExtras" class="profileExtras">
+      <small id="usernameCheck" aria-live="polite"></small>
+      <div class="inlineControls"><label>Banner <select id="profileBannerSelect">${Object.keys(PROFILE_BANNERS).map(name => `<option value="${name}">${name[0].toUpperCase()}${name.slice(1)}</option>`).join("")}</select></label>
+      <span class="avatarColors" role="group" aria-label="Avatar color">${AVATAR_COLORS.map(color => `<button type="button" class="avatarColor" data-avatar-color="${color}" style="--c:${color}" aria-label="Avatar color ${color}"></button>`).join("")}</span>
+      <button class="textActionBtn" type="button" id="profileCropBtn">Crop photo</button></div>
+      <div class="inlineControls profileSecurity">
+        <button class="secondaryBtn" type="button" id="twoFactorBtn">Two-factor</button>
+        <button class="secondaryBtn" type="button" id="exportAccountBtn">Download my data</button>
+        <button class="secondaryBtn" type="button" id="tierTableBtn">Compare plans</button>
+        <button class="secondaryBtn" type="button" id="signOutEverywhereBtn">Sign out everywhere</button>
+        <button class="secondaryBtn dangerButton" type="button" id="deleteAccountBtn">Delete account</button>
+      </div>
+      <label class="checkRow"><input type="checkbox" id="syncChatsToggle"> Sync my chats to my account</label>
+      <label class="checkRow"><input type="checkbox" id="syncMemoryToggle"> Sync my memories to my account</label>
+    </div>`);
+    byId("twoFactorBtn").addEventListener("click", openTwoFactorSettings);
+    byId("exportAccountBtn").addEventListener("click", exportAccountData);
+    byId("tierTableBtn").addEventListener("click", openTierTable);
+    byId("signOutEverywhereBtn").addEventListener("click", signOutEverywhere);
+    byId("deleteAccountBtn").addEventListener("click", deleteAccount);
+    byId("profileBannerSelect").addEventListener("change", event => {
+      state.settings.profileBanner = event.target.value;
+      persist();
+      applyProfileLook();
+    });
+    document.querySelectorAll("[data-avatar-color]").forEach(button => button.addEventListener("click", () => {
+      state.settings.avatarColor = button.dataset.avatarColor;
+      persist();
+      applyProfileLook();
+      document.querySelectorAll("[data-avatar-color]").forEach(item => item.setAttribute("aria-pressed", String(item === button)));
+    }));
+    byId("profileCropBtn").addEventListener("click", () => {
+      if (!pendingProfileAvatar) return toast("Choose a photo first.", "error");
+      cropTool(pendingProfileAvatar, dataUrl => {
+        pendingProfileAvatar = dataUrl;
+        renderProfileAvatar(DOM.profileUsername.value);
+      });
+    });
+    ["syncChats", "syncMemory"].forEach(key => byId(`${key}Toggle`).addEventListener("change", event => {
+      state.settings[key] = event.target.checked;
+      persist();
+      cloudDirty = true;
+      toast(event.target.checked ? "Will sync to your account" : "Kept on this device only. Already-synced copies are cleared on the next sync.");
+    }));
+    DOM.profileUsername.addEventListener("input", checkUsernameLive);
+  }
+  const more = document.querySelector(".moreLinksInner");
+  if (more && !byId("feedbackBtn")) {
+    more.insertAdjacentHTML("afterbegin", '<button id="feedbackBtn" type="button"><span>Send feedback</span><span class="navHint">✎</span></button><button id="plansBtn" type="button"><span>Compare plans</span><span class="navHint">☰</span></button>');
+    byId("feedbackBtn").addEventListener("click", () => openFeedback());
+    byId("plansBtn").addEventListener("click", openTierTable);
+  }
+  applyProfileLook();
+  applyBetaTheme();
+  setInterval(() => {
+    applyBetaTheme();
+    updateVerifyBanner();
+  }, 5000);
+}
+
+function syncProfileExtras() {
+  const banner = byId("profileBannerSelect");
+  if (banner) banner.value = state.settings.profileBanner || "none";
+  document.querySelectorAll("[data-avatar-color]").forEach(item => item.setAttribute("aria-pressed", String(item.dataset.avatarColor === (state.settings.avatarColor || "#2563eb"))));
+  const chats = byId("syncChatsToggle");
+  if (chats) chats.checked = state.settings.syncChats !== false;
+  const memory = byId("syncMemoryToggle");
+  if (memory) memory.checked = state.settings.syncMemory !== false;
+  const real = isRealAccount();
+  ["twoFactorBtn", "signOutEverywhereBtn", "deleteAccountBtn"].forEach(id => { if (byId(id)) byId(id).hidden = !real; });
+  if (byId("usernameCheck")) byId("usernameCheck").textContent = "";
+}
+
 let appInitialized = false;
 
 if (document.readyState === "loading") {
@@ -5400,6 +5886,7 @@ async function init() {
   setupSettingsExtras();
   setupMemoryFeatures();
   setupFileFeatures();
+  setupAccountExtras();
   setTimeout(prefillFromUrl);
   setupBackgroundDownload();
   setInterval(updateReadyBadge, 3000);
@@ -5489,6 +5976,8 @@ function getTierDescription(tier = getUserTier()) {
 }
 
 function getDailyLimit() {
+  // 728: replies come from the on-device model, which costs nothing to run, so there's no daily cap.
+  if (state.model === SLM_MODEL) return Infinity;
   const tier = getUserTier();
   if (isUnlimitedTier(tier) || devAccessApproved) return Infinity;
   if (betaApproved) return CONFIG.BETA_DAILY_LIMITS.messages;
@@ -7039,7 +7528,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b17");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b18");
   return markdownModulePromise;
 }
 
@@ -8578,19 +9067,23 @@ async function refreshBetaAccess() {
     try {
       const supabase = await getSupabase();
       const { data } = await supabase.auth.getSession();
-      const accessToken = data?.session?.access_token;
-      if (accessToken) {
-        const response = await fetch("/api/beta-status", {
-          headers: { Authorization: `Bearer ${accessToken}` },
-          cache: "no-store"
-        });
-        if (response.ok) {
-          const result = await response.json();
-          betaApproved = result?.approved === true;
-          devAccessApproved = result?.devApproved === true;
-          betaAccessExpiresAt = result?.betaExpiresAt || "";
-          devAccessExpiresAt = result?.devExpiresAt || "";
-        }
+      const userId = data?.session?.user?.id;
+      if (userId) {
+        // GitHub Pages has no server for /api/beta-status, so read this account's own
+        // approved requests directly; row security already limits them to this user.
+        const { data: rows, error } = await supabase
+          .from("beta_requests")
+          .select("feature_key, access_expires_at")
+          .eq("user_id", userId)
+          .eq("status", "approved");
+        if (error) throw error;
+        const now = Date.now();
+        const active = key => (rows || []).filter(row => row.feature_key === key && (!row.access_expires_at || new Date(row.access_expires_at).getTime() > now));
+        const expiry = list => (list.some(row => !row.access_expires_at) ? "" : list.map(row => row.access_expires_at).sort().at(-1) || "");
+        betaApproved = active("beta_lab").length > 0;
+        devAccessApproved = active("dev_access").length > 0;
+        betaAccessExpiresAt = expiry(active("beta_lab"));
+        devAccessExpiresAt = expiry(active("dev_access"));
       }
     } catch (error) {
       console.warn("Beta access check unavailable:", error);
@@ -8719,11 +9212,19 @@ async function submitAuth(event) {
       return;
     }
 
+    const lockLeft = loginLockRemaining();
+    if (lockLeft) throw new Error(`Too many failed tries. Try again in ${Math.ceil(lockLeft / 1000)} seconds.`);
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
     });
-    if (error) throw error;
+    if (error) {
+      recordLoginFailure();
+      throw error;
+    }
+    clearLoginFailures();
+    try { sessionStorage.setItem("aui.sessionAlive", "1"); } catch {}
+    await completeTwoFactor(supabase);
 
     const user = data?.user || data?.session?.user || null;
     if (!user) throw new Error("Login succeeded without a user session. Please try again.");
@@ -8742,7 +9243,7 @@ async function submitAuth(event) {
     if (!isSignUp && isUnconfirmedEmailError(error)) {
       await resendConfirmationEmail({ emailOverride: email, automatic: true });
     } else {
-      setAuthMessage(message || (isSignUp ? "Sign up failed." : "Log in failed."));
+      setAuthMessage(friendlyAuthError(message) || (isSignUp ? "Sign up failed." : "Log in failed."));
     }
   } finally {
     submit.disabled = false;
@@ -8778,7 +9279,8 @@ function openProfile() {
     <article><span>Dev Access</span><strong>${devAccessApproved || isUnlimitedTier(tier) ? "Unlimited" : "Not approved"}</strong><small>${devAccessApproved ? `Infinite messages, images, and web searches${devExpiry ? ` · ${devExpiry}` : ""}` : isUnlimitedTier(tier) ? "Included with your staff role" : betaApproved ? "Request it from the Beta page" : "Available only to approved Beta members"}</small></article>
     <article><span>Messages left today</span><strong>${limitText}</strong><small>${tierLabel}</small></article>
     <article><span>Conversations</span><strong>${state.chats.length}</strong><small>${messageCount} messages in total</small></article>
-    <article><span>Saved memories</span><strong>${state.memory.length}</strong><small>${state.settings.memory ? "Memory is on" : "Memory is paused"}</small></article>`;
+    <article><span>Saved memories</span><strong>${state.memory.length}</strong><small>${state.settings.memory ? "Memory is on" : "Memory is paused"}</small></article>${profileExtrasHtml()}`;
+  syncProfileExtras();
 
   if (!DOM.profileDialog.open) DOM.profileDialog.showModal();
   requestAnimationFrame(() => DOM.profileUsername.focus());
@@ -10022,7 +10524,7 @@ async function syncToCloud() {
   cloudSyncInFlight = true;
   try {
     const supabase = await getSupabase();
-    const cloudData = serializeForCloud(state);
+    const cloudData = cloudPrivacyFilter(serializeForCloud(state));
     await saveCloudData(supabase, state.user.id, cloudData);
     lastCloudUpdateSeen = cloudData.updated_at || lastCloudUpdateSeen;
   } catch (error) {

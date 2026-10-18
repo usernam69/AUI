@@ -225,12 +225,27 @@ async function checkBetaAccess() {
   }
 
   try {
-    const response = await fetch("/api/beta-status", {
-      headers: { Authorization: `Bearer ${currentSession.access_token}` },
-      cache: "no-store"
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result?.error || "Beta access could not be checked.");
+    // GitHub Pages has no server, so read this account's own requests directly
+    // (row security limits them to this user).
+    const { data: rows, error } = await supabase
+      .from("beta_requests")
+      .select("feature_key, status, access_expires_at, created_at")
+      .eq("user_id", currentSession.user.id)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error("Beta access could not be checked.");
+    const now = Date.now();
+    const approvedOf = key => (rows || []).filter(row => row.feature_key === key && row.status === "approved");
+    const activeOf = key => approvedOf(key).filter(row => !row.access_expires_at || new Date(row.access_expires_at).getTime() > now);
+    const expiryOf = list => (list.some(row => !row.access_expires_at) ? "" : list.map(row => row.access_expires_at).sort().at(-1) || "");
+    const result = {
+      approved: activeOf("beta_lab").length > 0,
+      devApproved: activeOf("dev_access").length > 0,
+      betaExpiresAt: expiryOf(activeOf("beta_lab")),
+      devExpiresAt: expiryOf(activeOf("dev_access"))
+    };
+    const endedAt = !result.approved && approvedOf("beta_lab").length ? approvedOf("beta_lab").map(row => row.access_expires_at).filter(Boolean).sort().at(-1) : "";
+    const pending = (rows || []).some(row => row.feature_key === "beta_lab" && row.status === "pending");
+    renderBetaExtras({ approved: result.approved, pending });
     betaAccessApproved = result.approved === true;
     devAccessApproved = result.devApproved === true;
     updateDevRequestAvailability();
@@ -258,6 +273,23 @@ async function checkBetaAccess() {
         href: "/chat?beta=1",
         approved: true
       });
+      return;
+    }
+
+    // 748/749: a gentle note when access has ended, with an easy renewal.
+    if (endedAt) {
+      setAccessState({
+        label: "Beta ended",
+        title: "Thanks for testing Beta Lab",
+        detail: `Your access ended on ${formatDate(endedAt)}. Your chats and settings are untouched.`,
+        message: "Want to keep testing? Ask to renew below.",
+        action: "Ask to renew",
+        href: "#request"
+      });
+      typeInput.value = "beta_lab";
+      updateRequestTypeFields();
+      if (!titleInput.value) titleInput.value = "Renew Beta Lab access";
+      if (!reasonInput.value) reasonInput.value = "I tested Beta Lab before and would like to keep helping.";
       return;
     }
 
@@ -380,9 +412,74 @@ function formatDate(value) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "medium" }).format(date);
 }
 
+// 702: show how many days are left.
 function formatExpiry(value) {
   if (!value) return "";
-  return ` until ${formatDate(value)}`;
+  const days = Math.ceil((new Date(value).getTime() - Date.now()) / 86_400_000);
+  return ` until ${formatDate(value)}${days > 0 ? ` (${days} ${days === 1 ? "day" : "days"} left)` : ""}`;
+}
+
+// 706/707: place in line, invites to give, or an invite code to use.
+async function renderBetaExtras({ approved, pending }) {
+  let box = document.getElementById("betaExtras");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "betaExtras";
+    box.className = "betaExtras";
+    accessStatus.after(box);
+  }
+  box.replaceChildren();
+  const call = async (name, args) => {
+    const { data, error } = await supabase.rpc(name, args);
+    if (error) throw error;
+    return data;
+  };
+  if (approved) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "betaSecondaryBtn";
+    button.textContent = "Invite a friend";
+    const out = document.createElement("p");
+    button.addEventListener("click", async () => {
+      try {
+        const code = await call("create_beta_invite");
+        const link = `${location.origin}${location.pathname}?invite=${code}`;
+        out.textContent = `Invite code ${code}. Share this link: ${link}`;
+        navigator.clipboard?.writeText(link).catch(() => {});
+      } catch (error) {
+        out.textContent = /function|schema cache/i.test(error.message || "") ? "Invites aren't switched on yet." : error.message;
+      }
+    });
+    box.append(button, out);
+    return;
+  }
+  if (pending) {
+    try {
+      const position = await call("beta_waitlist_position");
+      if (position) {
+        const line = document.createElement("p");
+        line.textContent = `You're number ${position} in line for Beta Lab.`;
+        box.append(line);
+      }
+    } catch {}
+  }
+  const form = document.createElement("form");
+  form.className = "betaInviteForm";
+  form.innerHTML = '<label>Have an invite code? <input name="code" maxlength="12" autocomplete="off" placeholder="ABCD1234"></label><button type="submit" class="betaSecondaryBtn">Use code</button><p role="status"></p>';
+  const fromLink = new URLSearchParams(location.search).get("invite");
+  if (fromLink) form.code.value = fromLink;
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const status = form.querySelector("p");
+    try {
+      const ok = await call("redeem_beta_invite", { p_code: form.code.value });
+      status.textContent = ok ? "Welcome to Beta Lab!" : "That code isn't valid or was already used.";
+      if (ok) checkBetaAccess();
+    } catch (error) {
+      status.textContent = /function|schema cache/i.test(error.message || "") ? "Invites aren't switched on yet." : "That code couldn't be used.";
+    }
+  });
+  box.append(form);
 }
 
 async function applySession(session) {
