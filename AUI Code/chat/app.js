@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20260728-model-compare19";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-quickwins1";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20260728-model-compare19";
-import { streamSlm, describeProgress } from "../modules/slm.js?v=20260728-model-compare19";
-import { pickRelevantText } from "../modules/rag.js?v=20260728-model-compare19";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20260728-model-compare19";
+} from "../modules/uploads.js?v=20261018-quickwins1";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported } from "../modules/slm.js?v=20261018-quickwins1";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-quickwins1";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-quickwins1";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -96,7 +96,13 @@ const defaultState = {
     timestamps: false,
     autoScroll: true,
     theme: "system",
-    speechRate: 1,},
+    speechRate: 1,
+    enterToSend: true,
+    notify: false,
+    sound: false,
+    fontScale: 1,
+    density: "comfortable"
+  },
   sidebarCollapsed: false,
   pendingAttachments: [],
   dailyMessageCount: 0,
@@ -150,6 +156,12 @@ let lastCloudUpdateSeen = "";
 let lastMessageCheckpointAt = 0;
 let localMutationVersion = 0;
 
+let pendingUndo = null;
+let baseDocumentTitle = document.title;
+
+const APP_VERSION = "2026.10.18";
+const DRAFT_KEY = "auiDraft";
+const SCROLL_KEY = "auiScroll";
 const STREAM_PAINT_INTERVAL = 80;
 const MESSAGE_CHECKPOINT_INTERVAL = 1500;
 const CLOUD_SYNC_DELAY = 1000;
@@ -298,6 +310,13 @@ async function init() {
   updateComposerState();
   updateVisitorCounter();
   setupChatPagination();
+  restoreDraft();
+  openChatFromUrl();
+  showVersion();
+  showModelName();
+  if (!isSlmSupported()) {
+    toast("AUI needs WebGPU to run its model. Use a recent desktop Chrome, Edge or Safari.", "error");
+  }
   requestAnimationFrame(() => DOM.app.classList.add("appReady"));
 
   await restoreSession();
@@ -535,7 +554,8 @@ function normalizeChats(chats) {
         attachments: Array.isArray(message.attachments) ? message.attachments : [],
         generatedImage: message.generatedImage || "",
         comparisonId: message.comparisonId || "",
-        comparisonLabel: message.comparisonLabel || ""
+        comparisonLabel: message.comparisonLabel || "",
+        tokensPerSecond: Number(message.tokensPerSecond) || 0
       }))
       : []
   }));
@@ -587,7 +607,30 @@ function bindEvents() {
   DOM.input.addEventListener("input", () => {
     scheduleTextareaResize();
     updateComposerState();
+    saveDraft();
   });
+  DOM.chatList.addEventListener("dblclick", event => {
+    const item = event.target.closest(".chatSelectBtn")?.closest("[data-chat-id]");
+    const chat = state.chats.find(candidate => candidate.id === item?.dataset.chatId);
+    if (chat) renameChat(chat);
+  });
+  DOM.chatList.addEventListener("auxclick", event => {
+    if (event.button !== 1) return;
+    const item = event.target.closest(".chatSelectBtn")?.closest("[data-chat-id]");
+    if (!item) return;
+    event.preventDefault();
+    window.open(`/chat?chat=${encodeURIComponent(item.dataset.chatId)}`, "_blank", "noopener");
+  });
+  DOM.conversationTitle.addEventListener("dblclick", () => {
+    const chat = getChat();
+    if (chat?.messages.length) renameChat(chat);
+  });
+  DOM.conversationTitle.title = "Double-click to rename";
+  byId("exportAllBtn").addEventListener("click", exportAllChats);
+  byId("importChatsBtn").addEventListener("click", () => byId("importChatsInput").click());
+  byId("importChatsInput").addEventListener("change", event => importChats(event.target.files?.[0]));
+  byId("deleteAllChatsBtn").addEventListener("click", deleteAllChats);
+  byId("preloadModelBtn")?.addEventListener("click", preloadModel);
   DOM.input.addEventListener("keydown", handleComposerKeydown);
   DOM.modeSelect.addEventListener("change", event => {
     if (event.target.value === "Beta Lab" && !betaApproved) {
@@ -662,6 +705,16 @@ function bindEvents() {
   byId("markdownToggle").addEventListener("change", saveSettingsFromDialog);
   byId("voiceOutputToggle").addEventListener("change", saveSettingsFromDialog);
   byId("speechRateInput").addEventListener("input", saveSettingsFromDialog);
+  byId("enterToSendToggle").addEventListener("change", saveSettingsFromDialog);
+  byId("notifyToggle").addEventListener("change", event => {
+    if (event.target.checked && "Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+    saveSettingsFromDialog();
+  });
+  byId("soundToggle").addEventListener("change", saveSettingsFromDialog);
+  byId("fontScaleInput").addEventListener("input", saveSettingsFromDialog);
+  byId("densitySelect").addEventListener("change", saveSettingsFromDialog);
 
   DOM.authForm.addEventListener("submit", submitAuth);
   DOM.signInTab.addEventListener("click", () => setAuthMode("signIn"));
@@ -760,6 +813,7 @@ function createChat() {
   state.pendingAttachments = [];
   searchMode = false;
   DOM.input.value = "";
+  saveDraft();
   visibleChatCount = CONFIG.INITIAL_CHAT_BATCH;
   persistChatChange();
   renderChats();
@@ -825,6 +879,7 @@ async function sendMessage(options = {}) {
 
   if (!options.hiddenUser) {
     DOM.input.value = "";
+    saveDraft();
     state.pendingAttachments = [];
     renderAttachmentTray();
     resizeTextarea();
@@ -980,7 +1035,10 @@ async function sendMessage(options = {}) {
 
   let loadingShown = false;
   let sending = true;
+  let tokenCount = 0;
+  let firstTokenAt = 0;
   const priorContent = assistantMessage.content;
+  setFaviconBusy(true);
   try {
     const history = options.historyOverride
       || createHistory(chat, assistantMessage.id, Boolean(options.targetMessage));
@@ -994,19 +1052,25 @@ async function sendMessage(options = {}) {
       onProgress: (report, model) => {
         if (!sending) return;
         loadingShown = true;
+        showLoadPercentInTitle(report);
         assistantMessage.content = `${describeProgress(report, model)} (first time only). Stop cancels; downloaded parts are kept for next time.`;
         scheduleStreamingRender(assistantMessage);
       }
     })) {
       if (loadingShown) {
         loadingShown = false;
+        document.title = baseDocumentTitle;
         assistantMessage.content = priorContent;
       }
+      if (!firstTokenAt) firstTokenAt = performance.now();
+      tokenCount += 1;
       assistantMessage.content += token;
       checkpointMessages();
       scheduleStreamingRender(assistantMessage);
     }
     if (loadingShown) assistantMessage.content = priorContent;
+    const seconds = firstTokenAt ? (performance.now() - firstTokenAt) / 1000 : 0;
+    if (tokenCount > 1 && seconds > 0) assistantMessage.tokensPerSecond = Math.round(tokenCount / seconds * 10) / 10;
 
     assistantMessage.status = assistantMessage.content ? "complete" : "error";
     if (!assistantMessage.content) assistantMessage.error = "The model returned an empty response.";
@@ -1031,6 +1095,8 @@ async function sendMessage(options = {}) {
   } finally {
     sending = false;
     cancelStreamingRender();
+    document.title = baseDocumentTitle;
+    setFaviconBusy(false);
     state.loading = false;
     abortController = null;
     chat.updatedAt = Date.now();
@@ -1038,6 +1104,10 @@ async function sendMessage(options = {}) {
     updateStats();
     updateComposerState();
     renderMessages({ focusMessageId: assistantMessage.id, preserveScroll: userPausedScroll });
+    if (assistantMessage.status === "complete") notifyReplyFinished(assistantMessage);
+    if (!matchMedia("(pointer: coarse)").matches && !document.querySelector("dialog[open]")) {
+      DOM.input.focus({ preventScroll: true });
+    }
   }
 }
 
@@ -1461,7 +1531,12 @@ function renderMessages(options = {}) {
   } else if (options.focusMessageId) {
     requestAnimationFrame(() => scrollBottom({ force: true, behavior: "instant" }));
   } else if (!sameChat) {
-    requestAnimationFrame(() => scrollBottom({ force: true, behavior: "instant" }));
+    const savedTop = getSavedScroll(chat.id);
+    requestAnimationFrame(() => {
+      if (savedTop === null) scrollBottom({ force: true, behavior: "instant" });
+      else DOM.chatViewport.scrollTo({ top: savedTop, behavior: "instant" });
+      highlightLinkedMessage();
+    });
   } else if (didChange && state.settings.autoScroll && !userPausedScroll) {
     requestAnimationFrame(() => scrollBottom({ force: false, behavior: "instant" }));
   }
@@ -1514,7 +1589,12 @@ function createEmptyState() {
       <button type="button" data-suggestion="Explain a difficult concept to me using a simple analogy" aria-label="Start with: Make it click"><strong>Make it click</strong><span>Explain something without the jargon</span></button>
       <button type="button" data-suggestion="Review this idea and challenge my assumptions" aria-label="Start with: Pressure-test an idea"><strong>Pressure-test an idea</strong><span>Find the gaps before they find you</span></button>
       <button type="button" data-suggestion="Help me write something concise, clear, and human" aria-label="Start with: Write with me"><strong>Write with me</strong><span>Polish a draft or start from scratch</span></button>
-    </div>`;
+    </div>
+    <p class="preloadRow"><button type="button" class="secondaryBtn" data-preload-model>Download the model now</button> <small data-model-size>First load downloads the model once.</small></p>`;
+  pickModel().then(model => {
+    const size = wrapper.querySelector("[data-model-size]");
+    if (size) size.textContent = `${model.label} · about ${model.approxMB} MB, downloaded once and kept in your browser.`;
+  }).catch(() => {});
   return wrapper;
 }
 
@@ -1523,6 +1603,7 @@ function createMessageElement(message, index, { animate = true } = {}) {
   const article = element("article", `message ${isUser ? "userMessage" : "assistantMessage"}${animate ? " messageEnter" : ""}`);
   article.dataset.messageId = message.id;
   article.dataset.status = message.status || "complete";
+  article.title = new Date(message.timestamp).toLocaleString();
   article._auiRenderState = captureMessageRenderState(message);
 
   const inner = element("div", "messageInner");
@@ -1609,7 +1690,10 @@ function createMessageElement(message, index, { animate = true } = {}) {
 function createMessageFooter(message, index) {
   const footer = element("footer", "messageFooter");
   const metrics = element("span", "messageMetrics");
-  if (message.role === "assistant" && message.content) metrics.textContent = getReadingMetrics(message.content);
+  if (message.role === "assistant" && message.content) {
+    metrics.textContent = getReadingMetrics(message.content)
+      + (message.tokensPerSecond ? ` · ${message.tokensPerSecond} tokens/s` : "");
+  }
   footer.append(metrics);
 
   const actions = element("div", "messageActions");
@@ -1617,7 +1701,8 @@ function createMessageFooter(message, index) {
     actions.append(
       actionButton("Copy", "copy"),
       actionButton("Read", "speak"),
-      actionButton("Download", "download")
+      actionButton("Download", "download"),
+      actionButton("Link", "permalink")
     );
     if (message.status === "complete") {
       actions.append(actionButton("Regenerate", "regenerate"), actionButton("Continue", "continue"));
@@ -1631,7 +1716,7 @@ function createMessageFooter(message, index) {
     model.title = "Model used for this response";
     actions.append(model);
   } else {
-    actions.append(actionButton("Copy", "copy"), actionButton("Edit", "edit"));
+    actions.append(actionButton("Copy", "copy"), actionButton("Edit", "edit"), actionButton("Link", "permalink"));
   }
   footer.append(actions);
   return footer;
@@ -1696,7 +1781,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20260728-model-compare19");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-quickwins1");
   return markdownModulePromise;
 }
 
@@ -1715,18 +1800,32 @@ async function handleChatAction(event) {
     return;
   }
 
+  if (event.target.closest("[data-preload-model]")) {
+    preloadModel();
+    return;
+  }
+
+  const wrapButton = event.target.closest("[data-wrap-code]");
+  if (wrapButton) {
+    const block = wrapButton.closest(".codeBlock");
+    const wrapped = block?.classList.toggle("wrapCode");
+    wrapButton.textContent = wrapped ? "Scroll" : "Wrap";
+    wrapButton.setAttribute("aria-pressed", String(Boolean(wrapped)));
+    return;
+  }
+
   const codeButton = event.target.closest("[data-copy-code]");
   if (codeButton) {
     const code = codeButton.closest(".codeBlock")?.querySelector("code")?.textContent || "";
     try {
       await copyText(code);
-      codeButton.textContent = "Copied";
+      codeButton.textContent = "✓ Copied";
       codeButton.dataset.copied = "true";
       announce("Code copied to clipboard");
       setTimeout(() => {
         codeButton.textContent = "Copy";
         delete codeButton.dataset.copied;
-      }, 1400);
+      }, 2000);
     } catch {
       toast("Couldn’t copy the code. Please select it manually.", "error");
     }
@@ -1752,6 +1851,18 @@ async function handleChatAction(event) {
     case "download":
       downloadMessage(message);
       break;
+    case "permalink": {
+      const url = new URL("/chat", location.origin);
+      url.searchParams.set("chat", chat.id);
+      url.hash = `msg-${message.id}`;
+      try {
+        await copyText(url.href);
+        toast("Link to this message copied. It opens in this browser, where the chat is saved.");
+      } catch {
+        toast("Couldn’t copy the link.", "error");
+      }
+      break;
+    }
     case "speak":
       toggleSpeech(message, button);
       break;
@@ -1964,7 +2075,8 @@ function createChatItem(chat) {
   const open = element("button", "chatSelectBtn");
   open.type = "button";
   open.dataset.chatAction = "open";
-  open.innerHTML = `<span>${escapeHtml(chat.title)}</span><small>${formatRelativeTime(chat.updatedAt)}</small>`;
+  const count = chat.messages.length;
+  open.innerHTML = `<span>${escapeHtml(chat.title)}</span><small>${formatRelativeTime(chat.updatedAt)}${count ? ` · ${count} msg` : ""}</small>`;
   open.title = chat.title;
 
   const favorite = element("button", `chatIconBtn${chat.favorite ? " selected" : ""}`);
@@ -1985,6 +2097,8 @@ function createChatItem(chat) {
   actions.innerHTML = `
     <button type="button" data-chat-action="pin">${chat.pinned ? "Unpin" : "Pin"}</button>
     <button type="button" data-chat-action="rename">Rename</button>
+    <button type="button" data-chat-action="export">Export as Markdown</button>
+    <button type="button" data-chat-action="newtab">Open in new tab</button>
     <button type="button" class="dangerAction" data-chat-action="delete">Delete</button>`;
 
   item.append(open, favorite, menu, actions);
@@ -2029,40 +2143,110 @@ async function handleChatListAction(event) {
       renderChats();
       toast(chat.pinned ? "Chat pinned" : "Chat unpinned");
       break;
-    case "rename": {
-      const name = await askForText({
-        eyebrow: "Conversation",
-        title: "Rename chat",
-        label: "Chat name",
-        value: chat.title,
-        submitLabel: "Save"
-      });
-      if (!name) return;
-      const nextTitle = name.slice(0, 80);
-      const renamedAt = Date.now();
-      state.chats = dedupeChatsById(state.chats.map(candidate => (
-        candidate.id === chat.id
-          ? { ...candidate, title: nextTitle, updatedAt: renamedAt }
-          : candidate
-      )));
-      persistChatChange();
-      renderChats();
-      if (chat.id === state.currentChatId) DOM.conversationTitle.textContent = nextTitle;
+    case "rename":
+      await renameChat(chat);
       break;
-    }
-    case "delete": {
-      const confirmed = await askForConfirmation({
-        eyebrow: "Delete chat",
-        title: `Delete "${chat.title}"?`,
-        message: "This will permanently delete this chat and all its messages.",
-        submitLabel: "Delete",
-        cancelLabel: "Keep"
-      });
-      if (!confirmed) return;
+    case "export":
+      exportChatMarkdown(chat);
+      break;
+    case "newtab":
+      window.open(`/chat?chat=${encodeURIComponent(chat.id)}`, "_blank", "noopener");
+      break;
+    case "delete":
       deleteChat(chat.id);
       break;
-    }
   }
+}
+
+async function renameChat(chat) {
+  const name = await askForText({
+    eyebrow: "Conversation",
+    title: "Rename chat",
+    label: "Chat name",
+    value: chat.title,
+    submitLabel: "Save"
+  });
+  if (!name) return;
+  const nextTitle = name.slice(0, 80);
+  const renamedAt = Date.now();
+  state.chats = dedupeChatsById(state.chats.map(candidate => (
+    candidate.id === chat.id
+      ? { ...candidate, title: nextTitle, updatedAt: renamedAt }
+      : candidate
+  )));
+  persistChatChange();
+  renderChats();
+  if (chat.id === state.currentChatId) DOM.conversationTitle.textContent = nextTitle;
+}
+
+function chatToMarkdown(chat) {
+  const lines = [`# ${chat.title}`, "", `_Exported from AUI on ${new Date().toLocaleString()}_`, ""];
+  chat.messages.forEach(message => {
+    lines.push(`## ${message.role === "user" ? "You" : "AUI"} · ${new Date(message.timestamp).toLocaleString()}`, "", message.content, "");
+  });
+  return lines.join("\n");
+}
+
+function downloadFile(name, content, type) {
+  const blob = new Blob([content], { type });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
+function exportChatMarkdown(chat) {
+  downloadFile(`${slugify(chat.title || "aui-chat")}.md`, chatToMarkdown(chat), "text/markdown;charset=utf-8");
+}
+
+function exportAllChats() {
+  const backup = { app: "AUI", version: 1, exportedAt: new Date().toISOString(), chats: state.chats, memory: state.memory };
+  downloadFile(`aui-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(backup, null, 2), "application/json");
+  toast(`Exported ${state.chats.length} chats`);
+}
+
+async function importChats(file) {
+  byId("importChatsInput").value = "";
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    const incoming = normalizeChats(Array.isArray(data) ? data : data?.chats);
+    if (!incoming.length) throw new Error("No chats found in that file.");
+    const known = new Set(state.chats.map(chat => chat.id));
+    const added = incoming.filter(chat => !known.has(chat.id));
+    state.chats = dedupeChatsById([...state.chats.filter(chat => chat.messages.length), ...added]);
+    if (!state.chats.length) state.chats = [makeChat()];
+    if (!state.chats.some(chat => chat.id === state.currentChatId)) state.currentChatId = state.chats[0].id;
+    if (Array.isArray(data?.memory) && !state.memory.length) state.memory = data.memory.slice(-CONFIG.MAX_MEMORY);
+    persistChatChange();
+    renderChats();
+    renderMessages();
+    updateStats();
+    toast(added.length ? `Imported ${added.length} chats` : "Those chats are already here");
+  } catch (error) {
+    toast(error instanceof SyntaxError ? "That file isn’t an AUI backup." : (error.message || "Import failed."), "error");
+  }
+}
+
+async function deleteAllChats() {
+  const confirmation = await askForText({
+    eyebrow: "Delete everything",
+    title: "Delete all chats?",
+    label: "Type delete to confirm",
+    placeholder: "delete",
+    submitLabel: "Delete all"
+  });
+  if (confirmation?.trim().toLowerCase() !== "delete") return;
+  if (state.loading) stopGeneration();
+  const chat = makeChat();
+  state.chats = [chat];
+  state.currentChatId = chat.id;
+  persistChatChange();
+  renderChats();
+  renderMessages();
+  closeDialog(DOM.settingsDialog);
+  toast("All chats deleted");
 }
 
 function closeAllChatMenus(exceptItem) {
@@ -2073,13 +2257,33 @@ function closeAllChatMenus(exceptItem) {
 
 function deleteChat(chatId) {
   if (state.loading && chatId === state.currentChatId) stopGeneration();
+  const index = state.chats.findIndex(chat => chat.id === chatId);
+  if (index < 0) return;
+  const removed = state.chats[index];
+  const wasCurrent = state.currentChatId === chatId;
   state.chats = state.chats.filter(chat => chat.id !== chatId);
   if (!state.chats.length) state.chats = [makeChat()];
   if (!state.chats.some(chat => chat.id === state.currentChatId)) state.currentChatId = state.chats[0].id;
   persistChatChange();
   renderChats();
   renderMessages();
-  toast("Chat deleted");
+  pendingUndo = { chat: removed, index, wasCurrent };
+  toast("Chat deleted", "success", {
+    label: "Undo",
+    duration: 10000,
+    onClick: () => {
+      if (pendingUndo?.chat !== removed) return;
+      pendingUndo = null;
+      state.chats = state.chats.filter(chat => chat.messages.length || chat.id === state.currentChatId);
+      state.chats.splice(Math.min(index, state.chats.length), 0, removed);
+      state.chats = dedupeChatsById(state.chats);
+      if (wasCurrent) state.currentChatId = removed.id;
+      persistChatChange();
+      renderChats();
+      renderMessages();
+      toast("Chat restored");
+    }
+  });
 }
 
 async function clearConversation() {
@@ -2370,6 +2574,7 @@ function handlePaste(event) {
   const imageFiles = [...(event.clipboardData?.files || [])].filter(file => file.type.startsWith("image/"));
   if (imageFiles.length) {
     event.preventDefault();
+    toast("The on-device model can’t see images. It only gets the file name.", "error");
     addFiles(imageFiles);
   }
 }
@@ -2563,6 +2768,12 @@ function openSettings() {
   byId("voiceOutputToggle").checked = state.settings.voice;
   byId("speechRateInput").value = state.settings.speechRate;
   byId("speechRateValue").textContent = `${state.settings.speechRate}×`;
+  byId("enterToSendToggle").checked = state.settings.enterToSend;
+  byId("notifyToggle").checked = state.settings.notify;
+  byId("soundToggle").checked = state.settings.sound;
+  byId("fontScaleInput").value = state.settings.fontScale;
+  byId("fontScaleValue").textContent = `${Math.round(state.settings.fontScale * 100)}%`;
+  byId("densitySelect").value = state.settings.density;
   if (!DOM.settingsDialog.open) DOM.settingsDialog.showModal();
 }
 
@@ -2575,6 +2786,12 @@ function saveSettingsFromDialog() {
   state.settings.voice = byId("voiceOutputToggle").checked;
   state.settings.speechRate = Number(byId("speechRateInput").value);
   byId("speechRateValue").textContent = `${state.settings.speechRate}×`;
+  state.settings.enterToSend = byId("enterToSendToggle").checked;
+  state.settings.notify = byId("notifyToggle").checked;
+  state.settings.sound = byId("soundToggle").checked;
+  state.settings.fontScale = Number(byId("fontScaleInput").value) || 1;
+  byId("fontScaleValue").textContent = `${Math.round(state.settings.fontScale * 100)}%`;
+  state.settings.density = byId("densitySelect").value === "compact" ? "compact" : "comfortable";
   applyPreferences();
   persist();
   renderMessages();
@@ -2584,19 +2801,28 @@ function applyPreferences() {
   DOM.modeSelect.value = state.mode;
   DOM.modelSelect.value = state.model;
   DOM.app.classList.toggle("sidebarCollapsed", Boolean(state.sidebarCollapsed));
+  document.documentElement.style.setProperty("--chat-font-scale", String(state.settings.fontScale || 1));
+  document.documentElement.dataset.density = state.settings.density;
+  const hint = document.querySelector(".composerHint");
+  if (hint?.firstChild) {
+    hint.firstChild.textContent = state.settings.enterToSend
+      ? "Enter to send · Shift + Enter for a new line · AUI can make mistakes"
+      : "Ctrl + Enter to send · Enter for a new line · AUI can make mistakes";
+  }
   applyTheme();
 }
 
 function applyTheme() {
-  const theme = state.settings.theme === "system"
-    ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
-    : state.settings.theme;
+  const choice = state.settings.theme;
+  const systemDark = matchMedia("(prefers-color-scheme: dark)").matches;
+  const theme = choice === "system" ? (systemDark ? "dark" : "light") : (choice === "contrast" ? "dark" : choice);
   document.documentElement.dataset.theme = theme;
+  document.documentElement.dataset.contrast = choice === "contrast" ? "high" : "";
   document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? "#0b0b0c" : "#f7f7f8";
 }
 
 function cycleTheme() {
-  const order = ["system", "dark", "light"];
+  const order = ["system", "dark", "light", "contrast"];
   state.settings.theme = order[(order.indexOf(state.settings.theme) + 1) % order.length];
   applyTheme();
   persist();
@@ -3568,11 +3794,14 @@ function updateComposerState() {
   DOM.modeSelect.disabled = state.loading;
   DOM.compareBtn.disabled = state.loading;
   DOM.compareModelSelect.disabled = state.loading;
-  DOM.charCount.textContent = DOM.input.value.length > 2000 ? DOM.input.value.length.toLocaleString() : "";
+  const words = DOM.input.value.trim() ? DOM.input.value.trim().split(/\s+/).length : 0;
+  DOM.charCount.textContent = words
+    ? `${words} ${words === 1 ? "word" : "words"}${DOM.input.value.length > 2000 ? ` · ${DOM.input.value.length.toLocaleString()} chars` : ""}`
+    : "";
 }
 
 function handleComposerKeydown(event) {
-  if (isMessageSubmitKey(event)) {
+  if (isMessageSubmitKey(event, { enterToSend: state.settings.enterToSend })) {
     event.preventDefault();
     if (typeof DOM.composer.requestSubmit === "function") {
       DOM.composer.requestSubmit();
@@ -3613,10 +3842,21 @@ function handleGlobalShortcut(event) {
     openSettings();
     return;
   }
+  if (command && event.shiftKey && event.key.toLowerCase() === "c") {
+    event.preventDefault();
+    copyLastReply();
+    return;
+  }
 
   const target = event.target;
   const isEditable = target instanceof HTMLElement
     && Boolean(target.closest("input, textarea, select, button, [contenteditable='true']"));
+
+  if (event.key === "?" && !isEditable && !document.querySelector("dialog[open]")) {
+    event.preventDefault();
+    byId("shortcutsDialog").showModal();
+    return;
+  }
   const isPrintable = event.key.length === 1
     && !event.metaKey
     && !event.ctrlKey
@@ -3666,6 +3906,160 @@ function handleChatScroll() {
 
   lastChatScrollTop = scrollTop;
   DOM.scrollBottomBtn.hidden = distance < 240;
+  saveScroll(distance <= 8 ? null : scrollTop);
+}
+
+// Quick wins: drafts, scroll memory, deep links, favicon badge and finish alerts.
+function saveDraft() {
+  try {
+    if (DOM.input.value) localStorage.setItem(DRAFT_KEY, DOM.input.value);
+    else localStorage.removeItem(DRAFT_KEY);
+  } catch {}
+}
+
+function restoreDraft() {
+  try {
+    const draft = localStorage.getItem(DRAFT_KEY);
+    if (draft && !DOM.input.value) {
+      DOM.input.value = draft;
+      resizeTextarea();
+      updateComposerState();
+    }
+  } catch {}
+}
+
+function readScrollMap() {
+  try { return JSON.parse(sessionStorage.getItem(SCROLL_KEY) || "{}"); } catch { return {}; }
+}
+
+function saveScroll(top) {
+  const chatId = DOM.chatArea.dataset.chatId;
+  if (!chatId) return;
+  const map = readScrollMap();
+  if (top === null) delete map[chatId];
+  else map[chatId] = Math.round(top);
+  try { sessionStorage.setItem(SCROLL_KEY, JSON.stringify(map)); } catch {}
+}
+
+function getSavedScroll(chatId) {
+  const value = readScrollMap()[chatId];
+  return typeof value === "number" ? value : null;
+}
+
+function openChatFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const chatId = params.get("chat");
+  if (!chatId || !state.chats.some(chat => chat.id === chatId)) return;
+  if (state.currentChatId !== chatId) {
+    state.currentChatId = chatId;
+    renderChats();
+    renderMessages();
+  } else {
+    highlightLinkedMessage();
+  }
+}
+
+function highlightLinkedMessage() {
+  const match = /^#msg-(.+)$/.exec(location.hash);
+  if (!match) return;
+  const article = DOM.chatArea.querySelector(`[data-message-id="${CSS.escape(decodeURIComponent(match[1]))}"]`);
+  if (!article) return;
+  article.scrollIntoView({ block: "center" });
+  article.classList.add("linkedMessage");
+  setTimeout(() => article.classList.remove("linkedMessage"), 2400);
+}
+
+async function copyLastReply() {
+  const reply = [...(getChat()?.messages || [])].reverse().find(message => message.role === "assistant" && message.content);
+  if (!reply) {
+    toast("No reply to copy yet.", "error");
+    return;
+  }
+  try {
+    await copyText(reply.content);
+    toast("Last reply copied");
+  } catch {
+    toast("Couldn’t copy the reply.", "error");
+  }
+}
+
+function showLoadPercentInTitle(report) {
+  const percent = Math.round(Math.min(1, Math.max(0, report?.progress || 0)) * 100);
+  document.title = `${percent}% · Loading model · ${baseDocumentTitle}`;
+}
+
+function setFaviconBusy(busy) {
+  const links = document.querySelectorAll('link[rel~="icon"]');
+  links.forEach(link => {
+    if (!link.dataset.original) link.dataset.original = link.href;
+    link.href = busy
+      ? "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#0b0b0c"/><text x="32" y="44" font-family="sans-serif" font-size="36" font-weight="700" fill="#fff" text-anchor="middle">A</text><circle cx="52" cy="12" r="10" fill="#ef4444"/></svg>')
+      : link.dataset.original;
+  });
+}
+
+function notifyReplyFinished(message) {
+  if (state.settings.sound) playChime();
+  if (!state.settings.notify || !document.hidden || !("Notification" in window) || Notification.permission !== "granted") return;
+  try {
+    const note = new Notification("AUI replied", { body: stripMarkdown(message.content).slice(0, 140), icon: "/icons/icon-192.png" });
+    note.onclick = () => { window.focus(); note.close(); };
+  } catch {}
+}
+
+function playChime() {
+  try {
+    const context = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, context.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(1320, context.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.0001, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.12, context.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.35);
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.4);
+    oscillator.onended = () => context.close();
+  } catch {}
+}
+
+let preloadPromise = null;
+function preloadModel() {
+  if (preloadPromise) return preloadPromise;
+  const buttons = () => document.querySelectorAll("[data-preload-model], #preloadModelBtn");
+  buttons().forEach(button => { button.disabled = true; });
+  preloadPromise = loadSlm((report, model) => {
+    const line = describeProgress(report, model);
+    showLoadPercentInTitle(report);
+    buttons().forEach(button => { button.textContent = line.replace(/^Loading the AUI model/, "Downloading"); });
+  }).then(() => {
+    document.title = baseDocumentTitle;
+    buttons().forEach(button => { button.textContent = "Model ready ✓"; });
+    toast("The model is ready. Replies will start right away.");
+  }).catch(error => {
+    document.title = baseDocumentTitle;
+    preloadPromise = null;
+    buttons().forEach(button => { button.disabled = false; button.textContent = "Download the model now"; });
+    toast(error.message || "Couldn’t download the model.", "error");
+  });
+  return preloadPromise;
+}
+
+function showVersion() {
+  const hint = document.querySelector(".composerHint");
+  if (!hint || hint.querySelector(".appVersion")) return;
+  const version = element("span", "appVersion");
+  version.textContent = ` · v${APP_VERSION}`;
+  hint.append(version);
+}
+
+function showModelName() {
+  pickModel().then(model => {
+    const badge = byId("modelBadge");
+    if (badge) badge.textContent = `AUI SLM · ${model.label} · ~${model.approxMB} MB`;
+  }).catch(() => {});
 }
 
 function handleChatWheel(event) {
@@ -3905,15 +4299,26 @@ function addRipple(event) {
   setTimeout(() => ripple.remove(), 550);
 }
 
-function toast(message, type = "success") {
+function toast(message, type = "success", action = null) {
   const item = element("div", `toast ${type}`);
   item.textContent = message;
-  DOM.toastRegion.append(item);
-  requestAnimationFrame(() => item.classList.add("visible"));
-  setTimeout(() => {
+  const dismiss = () => {
     item.classList.remove("visible");
     setTimeout(() => item.remove(), 200);
-  }, 2800);
+  };
+  if (action) {
+    const button = element("button", "toastAction");
+    button.type = "button";
+    button.textContent = action.label;
+    button.addEventListener("click", () => {
+      dismiss();
+      action.onClick();
+    });
+    item.append(button);
+  }
+  DOM.toastRegion.append(item);
+  requestAnimationFrame(() => item.classList.add("visible"));
+  setTimeout(dismiss, action?.duration || 2800);
 }
 
 function announce(message) {
