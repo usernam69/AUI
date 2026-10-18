@@ -25,17 +25,13 @@ export function isSlmSupported() {
   return typeof navigator !== "undefined" && "gpu" in navigator;
 }
 
-// Pick the biggest model this device can comfortably hold.
+// Use the fast 1B model everywhere: the 3B one replies about three times slower.
 export async function pickModel() {
   if (plannedModel) return plannedModel;
   let choice = SLM_MODELS.small;
   try {
     const adapter = await navigator.gpu?.requestAdapter();
-    const hasF16 = Boolean(adapter?.features?.has("shader-f16"));
-    const bigBuffers = (adapter?.limits?.maxBufferSize || 0) >= 2 * 1024 ** 3;
-    const plentyOfMemory = (navigator.deviceMemory || 4) >= 8;
-    if (!hasF16) choice = SLM_MODELS.smallCompat;
-    else if (bigBuffers && plentyOfMemory) choice = SLM_MODELS.large;
+    if (!adapter?.features?.has("shader-f16")) choice = SLM_MODELS.smallCompat;
   } catch {
     // Keep the safe default.
   }
@@ -98,6 +94,23 @@ export function loadSlm(onProgress) {
       });
   }
   return enginePromise;
+}
+
+// True when the model files are already in the browser cache, so loading needs no download.
+export async function isModelCached() {
+  if (!isSlmSupported()) return false;
+  try {
+    const [webllm, model] = await Promise.all([importEngine(), pickModel()]);
+    return Boolean(await webllm.hasModelInCache(model.id));
+  } catch {
+    return false;
+  }
+}
+
+// Start loading in the background without reporting progress; a later reply picks it up.
+export function warmSlm() {
+  if (enginePromise || !isSlmSupported()) return;
+  loadSlm().catch(() => {});
 }
 
 function discardEngine(engine) {

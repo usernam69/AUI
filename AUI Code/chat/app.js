@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-quickwins1";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-blue1";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-quickwins1";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported } from "../modules/slm.js?v=20261018-quickwins1";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-quickwins1";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-quickwins1";
+} from "../modules/uploads.js?v=20261018-blue1";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm } from "../modules/slm.js?v=20261018-blue1";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-blue1";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-blue1";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -314,6 +314,7 @@ async function init() {
   openChatFromUrl();
   showVersion();
   showModelName();
+  warmCachedModel();
   if (!isSlmSupported()) {
     toast("AUI needs WebGPU to run its model. Use a recent desktop Chrome, Edge or Safari.", "error");
   }
@@ -604,6 +605,7 @@ function bindEvents() {
   DOM.folderInput.addEventListener("change", event => addFolder(event.target.files));
   DOM.chatSearchInput.addEventListener("input", scheduleChatSearchRender);
 
+  DOM.input.addEventListener("input", warmSlm, { once: true });
   DOM.input.addEventListener("input", () => {
     scheduleTextareaResize();
     updateComposerState();
@@ -1781,7 +1783,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-quickwins1");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-blue1");
   return markdownModulePromise;
 }
 
@@ -4053,6 +4055,13 @@ function showVersion() {
   const version = element("span", "appVersion");
   version.textContent = ` · v${APP_VERSION}`;
   hint.append(version);
+}
+
+// Returning visitors already have the model cached: load it while the page is idle
+// so the first reply starts right away instead of after a multi-second load.
+function warmCachedModel() {
+  const idle = window.requestIdleCallback || (callback => setTimeout(callback, 1500));
+  idle(() => isModelCached().then(cached => { if (cached) warmSlm(); }));
 }
 
 function showModelName() {

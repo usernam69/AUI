@@ -109,13 +109,13 @@ await test("SLM streams tokens and reports progress", async () => {
   assert.match(reports[1], /67%.*200 MB of about 880 MB.*MB\/s.*left/);
   assert.equal(globalThis.__modelId, "Llama-3.2-1B-Instruct-q4f16_1-MLC");
 });
-await test("SLM picks a model by device", async () => {
+await test("SLM picks the fast 1B model, with a compatibility build when f16 is missing", async () => {
   const pick = async (adapter, memory) => {
     setGpu({ deviceMemory: memory, gpu: { requestAdapter: async () => adapter } });
     return (await (await freshSlm("pick" + Math.random())).pickModel()).id;
   };
   assert.equal(await pick({ features: new Set(), limits: { maxBufferSize: 4 * 1024 ** 3 } }, 8), "Llama-3.2-1B-Instruct-q4f32_1-MLC");
-  assert.equal(await pick({ features: new Set(["shader-f16"]), limits: { maxBufferSize: 4 * 1024 ** 3 } }, 8), "Llama-3.2-3B-Instruct-q4f16_1-MLC");
+  assert.equal(await pick({ features: new Set(["shader-f16"]), limits: { maxBufferSize: 4 * 1024 ** 3 } }, 8), "Llama-3.2-1B-Instruct-q4f16_1-MLC");
   assert.equal(await pick({ features: new Set(["shader-f16"]), limits: { maxBufferSize: 4 * 1024 ** 3 } }, 4), "Llama-3.2-1B-Instruct-q4f16_1-MLC");
   assert.equal(await pick(null, 8), "Llama-3.2-1B-Instruct-q4f32_1-MLC");
 });

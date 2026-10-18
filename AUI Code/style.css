@@ -3033,3 +3033,55 @@ body { font-size: 16px; }
 /* Buttons/dialogs */
 .primaryBtn { background: var(--text); color: var(--bg); border-radius: 999px; }
 .dialogPanel { border-radius: 1rem; }
+
+/* Blue variant of the ChatGPT-style theme */
+:root,
+:root[data-theme="dark"] {
+  --accent: #4f8cff;
+  --accent-hover: #3b7bf5;
+  --accent-soft: rgb(79 140 255 / 0.14);
+  --accent-border: rgb(79 140 255 / 0.35);
+  --bg: #161b26;
+  --sidebar: #0f131c;
+  --surface: #222a3a;
+  --surface-raised: #222a3a;
+  --surface-hover: #1e2533;
+  --surface-active: #2a3448;
+  --border: #2a3345;
+  --border-strong: #354057;
+  --text: #e8edf7;
+  --text-secondary: #a9b4c8;
+  --muted: #7d889d;
+}
+:root[data-theme="light"] {
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: rgb(37 99 235 / 0.1);
+  --accent-border: rgb(37 99 235 / 0.3);
+  --bg: #f7f9fd;
+  --sidebar: #eef3fb;
+  --surface: #e8effb;
+  --surface-raised: #e8effb;
+  --surface-hover: #e1e9f7;
+  --surface-active: #d5e1f5;
+  --border: #d8e1f0;
+  --border-strong: #c3d0e6;
+  --text: #0f1a2e;
+  --text-secondary: #4a5a75;
+}
+::selection { background: rgb(79 140 255 / 0.3); }
+:focus-visible { outline-color: var(--accent); }
+.brandMark, .emptyBrand { background: linear-gradient(135deg, #4f8cff, #2563eb); color: #fff; }
+.newChatBtn > span:first-child, .heroTagline span, .eyebrow { color: var(--accent); }
+.chatItem.active,
+:root[data-theme="dark"] .chatItem.active,
+:root:not([data-theme]) .chatItem.active { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+.userMessage .messageContent { background: linear-gradient(135deg, #2f6df0, #2559d6); color: #fff; }
+.userMessage .messageContent a { color: #fff; }
+.messageContent a { color: var(--accent); }
+.composer:focus-within { box-shadow: 0 0 0 1px var(--accent-border), 0 4px 20px rgb(37 99 235 / 0.18); }
+.sendBtn { background: var(--accent); color: #fff; }
+.sendBtn:not(:disabled):hover { background: var(--accent-hover); }
+.primaryBtn { background: var(--accent); color: #fff; }
+.toolBtn.active, .toolBtn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.suggestionGrid button:hover { border-color: var(--accent-border); background: var(--accent-soft); }
