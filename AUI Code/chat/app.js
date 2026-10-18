@@ -1,14 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b15";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20261018-b16";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b15";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b15";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b15";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b15";
+} from "../modules/uploads.js?v=20261018-b16";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b16";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b16";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b16";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -556,7 +556,7 @@ const SETTINGS_TABS = [
   ["personal", "Personalization", ["userNameInput", "assistantNameInput", "assistantAvatarSelect", "answerLengthSelect", "emojiLevelSelect", "humorInput", "formalityInput", "customInstructionsInput", "aiTitlesToggle", "markdownToggle", "onlineLookupsToggle"]],
   ["model", "Model", ["speedSelect", "perfBtn", "preloadModelBtn", "deleteModelsBtn", "backgroundDownloadToggle", "unloadIdleToggle", "wifiOnlyToggle", "batterySaverToggle"]],
   ["voice", "Voice", ["voiceSelect", "voiceOutputToggle", "speechRateInput", "voiceAutoSendToggle", "voiceFirstToggle"]],
-  ["memory", "Memory", ["memoryToggle", "manageMemoryBtn"]],
+  ["memory", "Memory", ["memoryToggle", "memoryAutoSelect", "memoryExpirySelect", "manageMemoryBtn"]],
   ["keyboard", "Keyboard", ["shortcutNewChatInput", "keyboardListBtn"]],
   ["labs", "Labs", ["labsIntro", "coolModeToggle", "oneHandToggle"]],
   ["data", "Data controls", ["exportAllBtn", "storageMeter", "autoArchiveToggle", "archivedChatsList", "trashList", "resetSettingsBtn"]],
@@ -1700,6 +1700,9 @@ const SLASH_COMMANDS = [
   ["/stats", "Model speed and a speed test", () => openPerformancePanel()],
   ["/timer", "Start a 25-minute focus timer (or /timer 10)", () => startFocusTimer(25)],
   ["/tiny", "Use the tiny model", () => switchSpeed("tiny")],
+  ["/context", "See exactly what the model reads", () => openContextViewer()],
+  ["/reset", "Reset what the model sees in this chat", () => resetContext()],
+  ["/memory", "Open memory", () => openMemory()],
   ["/help", "Keyboard shortcuts", () => byId("shortcutsDialog")?.showModal()]
 ];
 
@@ -2535,7 +2538,7 @@ async function showDefinition(event) {
 // cached work on that prefix (new memories would otherwise change it every turn).
 const systemPromptSnapshots = new Map();
 function getChatSystemPrompt(chat) {
-  const key = `${chat?.id}|${state.settings.customInstructions || ""}|${state.settings.memory}|${Math.floor(Date.now() / 900_000)}|${chat?.style || ""}|${chat?.instructions || ""}`;
+  const key = `${chat?.id}|${state.settings.customInstructions || ""}|${state.settings.memory}|${Math.floor(Date.now() / 900_000)}|${chat?.style || ""}|${chat?.instructions || ""}|${(chat?.messages || []).filter(message => message.pinnedContext).map(message => message.id).join(",")}`;
   const cached = systemPromptSnapshots.get(chat?.id);
   if (cached?.key === key) return cached.prompt;
   const addition = chatPromptAddition(chat);
@@ -3983,6 +3986,8 @@ function chatPromptAddition(chat) {
   const style = chatStyleText(chat);
   if (style) parts.push(`Style for this chat: ${style}`);
   if (chat?.instructions) parts.push(`Notes for this chat only: ${String(chat.instructions).slice(0, 1500)}`);
+  const pinned = pinnedContext(chat);
+  if (pinned) parts.push(pinned);
   return parts.join("\n");
 }
 
@@ -4019,12 +4024,14 @@ function openChatSettings(chat) {
     <label>Style <select id="chatStyleSelect"><option value="">None</option>${styles.map(([id, label]) => `<option value="${escapeHtml(id)}">${escapeHtml(label)}</option>`).join("")}</select></label>
     <label>Model <select id="chatSpeedSelect"><option value="">My default</option>${Object.entries(SLM_SPEEDS).map(([id, speed]) => `<option value="${id}">${escapeHtml(speed.label)}</option>`).join("")}</select></label>
     <label>Notes the model sees in this chat <textarea id="chatInstructionsInput" rows="4" maxlength="1500" placeholder="For example: I'm planning a trip to Japan in April"></textarea></label>
+    <label class="checkRow"><input type="checkbox" id="chatMemoryToggle"> Use memory in this chat</label>
     <button class="linkBtn" type="button" id="saveStyleBtn">Save these notes as a reusable style</button>
     <div class="setupActions"><button class="secondaryBtn" value="cancel">Cancel</button><button class="primaryBtn" value="save">Save</button></div>
   </div></form>`;
   dialog.querySelector("#chatStyleSelect").value = chat.style || "";
   dialog.querySelector("#chatSpeedSelect").value = chat.speed || "";
   dialog.querySelector("#chatInstructionsInput").value = chat.instructions || "";
+  dialog.querySelector("#chatMemoryToggle").checked = !chat.memoryOff;
   dialog.querySelector("[data-close-dialog]").addEventListener("click", () => dialog.close());
   dialog.querySelector("#saveStyleBtn").addEventListener("click", async () => {
     const text = dialog.querySelector("#chatInstructionsInput").value.trim();
@@ -4044,6 +4051,7 @@ function openChatSettings(chat) {
     chat.style = dialog.querySelector("#chatStyleSelect").value;
     chat.speed = dialog.querySelector("#chatSpeedSelect").value;
     chat.instructions = dialog.querySelector("#chatInstructionsInput").value.trim().slice(0, 1500);
+    chat.memoryOff = !dialog.querySelector("#chatMemoryToggle").checked;
     systemPromptSnapshots.delete(chat.id);
     persistChatChange();
     renderChats();
@@ -4105,6 +4113,669 @@ function setupSettingsExtras() {
   window.addEventListener("hashchange", openSettingsFromHash);
 }
 
+// --- Memory & context from The Probe (category 13) ---
+
+// Memories are either facts ({ id, fact, category, time, source, uses, lastUsed, uncertain })
+// or older chat snippets ({ user, ai, time }) saved before facts existed.
+const MEMORY_STOP_WORDS = new Set(["the", "and", "for", "you", "are", "was", "what", "how", "can", "with", "that", "this", "have", "about", "your", "from", "please", "tell", "give", "make", "does", "will", "would", "could", "should", "just", "like", "want"]);
+const MEMORY_FACT_LIMIT = 300;
+
+function memoryText(item) {
+  if (item?.fact) return String(item.fact);
+  return `${String(item?.user || "").slice(0, 120)} → ${String(item?.ai || "").slice(0, 160)}`;
+}
+
+function memoryWords(text) {
+  return (String(text).toLowerCase().match(/[\p{L}\p{N}]+/gu) || []).filter(word => word.length > 2 && !MEMORY_STOP_WORDS.has(word));
+}
+
+// 616: pick the memories that fit this message instead of the last three saved.
+// Facts score above old snippets, preferences always come along, and newer wins ties.
+function selectMemories(items, query, limit = 4) {
+  const words = new Set(memoryWords(query));
+  return items
+    .map((item, index) => {
+      const overlap = memoryWords(memoryText(item)).filter(word => words.has(word)).length;
+      let score = overlap * 3 + index / Math.max(1, items.length);
+      if (item.fact) score += 1;
+      if (item.category === "preferences") score += 2;
+      if (item.uncertain) score -= 0.5;
+      return { item, score };
+    })
+    .filter(entry => entry.score >= 1)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(entry => entry.item);
+}
+
+function normalizeFact(text) {
+  return String(text).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+// 630: "My job is X" against an older "My job is Y".
+function memorySubject(text) {
+  const match = /^(?:my|i)\s+((?:[\p{L}'-]+\s+){0,3}?)(?:is|am|are|was|live|work)\b/iu.exec(String(text).trim());
+  return match ? normalizeFact(match[0]) : "";
+}
+
+// "Remember that I like tea" → "I like tea"; null when the text isn't a remember command.
+function parseRememberCommand(text) {
+  const match = /^(?:please\s+)?(?:remember|note)(?:\s+that)?(?:\s*:\s*(.{3,300})|\s+((?:i|i'm|i've|i'd|my|me|we|our)\b.{2,300}))$/is.exec(String(text).trim());
+  if (match) return (match[1] || match[2]).replace(/[.!]+$/, "").trim();
+  return null;
+}
+
+function parseForgetCommand(text) {
+  const match = /^(?:please\s+)?forget(?:\s+(?:that|about))?\s*(.{0,80})$/is.exec(String(text).trim());
+  return match ? match[1].replace(/[.!?]+$/, "").trim() : null;
+}
+
+// --- end of memory helpers covered by tests ---
+
+function logMemory(action, text) {
+  state.memoryLog = [{ time: Date.now(), action, text: String(text).slice(0, 200) }, ...(state.memoryLog || [])].slice(0, 100);
+}
+
+function updateMemoryCount() {
+  DOM.memoryCount.textContent = state.memory.length;
+}
+
+// 604/611/630: save a fact, skipping duplicates and offering to replace a contradiction.
+function addMemoryFact(text, { category = "", source = "remember", uncertain = false, quiet = false } = {}) {
+  const fact = String(text).trim().slice(0, MEMORY_FACT_LIMIT);
+  if (!fact) return null;
+  const key = normalizeFact(fact);
+  if (state.memory.some(item => item.fact && normalizeFact(item.fact) === key)) {
+    if (!quiet) toast("AUI already remembers that");
+    return null;
+  }
+  const item = { id: createId("memory"), fact, category: category || guessMemoryCategory(fact), time: Date.now(), source, uses: 0, ...(uncertain ? { uncertain: true } : {}) };
+  const subject = memorySubject(fact);
+  const clash = subject && state.memory.find(other => other.fact && memorySubject(other.fact) === subject);
+  state.memory.push(item);
+  if (state.memory.length > CONFIG.MAX_MEMORY) state.memory.shift();
+  logMemory("Saved", fact);
+  persist();
+  updateMemoryCount();
+  if (clash && !quiet) {
+    toast(`This may replace “${clash.fact}”.`, "info", {
+      label: "Replace",
+      duration: 10000,
+      onClick: () => {
+        state.memory = state.memory.filter(other => other !== clash);
+        logMemory("Replaced", clash.fact);
+        persist();
+        updateMemoryCount();
+      }
+    });
+  } else if (!quiet) {
+    toast("Saved to memory", "success", { label: "Undo", duration: 6000, onClick: () => removeMemories([item]) });
+  }
+  return item;
+}
+
+// 602/637
+function guessMemoryCategory(text) {
+  if (/\b(prefer|like|love|hate|don't like|dislike|answers?|reply|replies|style|tone)\b/i.test(text)) return "preferences";
+  if (/\b(job|work|boss|company|team|client|office|career)\b/i.test(text)) return "work";
+  return "personal";
+}
+
+// 641/642: remove memories with an undo.
+function removeMemories(items) {
+  const removed = items.map(item => ({ item, index: state.memory.indexOf(item) })).filter(entry => entry.index >= 0);
+  if (!removed.length) return;
+  state.memory = state.memory.filter(item => !items.includes(item));
+  removed.forEach(({ item }) => logMemory("Deleted", memoryText(item)));
+  persist();
+  updateMemoryCount();
+  if (DOM.memoryDialog.open) renderMemoryPanel();
+  toast(removed.length === 1 ? "Memory deleted" : `${removed.length} memories deleted`, "success", {
+    label: "Undo",
+    duration: 8000,
+    onClick: () => {
+      removed.sort((a, b) => a.index - b.index).forEach(({ item, index }) => state.memory.splice(Math.min(index, state.memory.length), 0, item));
+      logMemory("Restored", `${removed.length} item(s)`);
+      persist();
+      updateMemoryCount();
+      if (DOM.memoryDialog.open) renderMemoryPanel();
+    }
+  });
+}
+
+// 605: "forget that" removes the newest fact; "forget my job" removes the best match.
+function handleForgetCommand(text) {
+  const target = parseForgetCommand(text);
+  if (target === null) return false;
+  const facts = state.memory.filter(item => item.fact);
+  let match = null;
+  if (!target || /^(it|that|this)$/i.test(target)) {
+    match = facts.at(-1);
+  } else {
+    const words = new Set(memoryWords(target));
+    match = facts.map(item => ({ item, score: memoryWords(item.fact).filter(word => words.has(word)).length }))
+      .filter(entry => entry.score > 0)
+      .sort((a, b) => b.score - a.score)[0]?.item;
+  }
+  if (!match) return false;
+  removeMemories([match]);
+  return true;
+}
+
+// 603: offer to remember things you say about yourself.
+const MEMORY_HINT_PATTERN = /\b(?:my name is|i am a|i'm a|i am an|i'm an|i work (?:as|at|in)|i live in|i prefer|i'm allergic|i am allergic|i'm learning|i am learning|my (?:job|goal|birthday|favorite|favourite) (?:is|are))\b/i;
+function suggestMemory(text) {
+  if (!state.settings.memory || getChat()?.temporary || getChat()?.memoryOff) return;
+  if (/\?/.test(text) || parseRememberCommand(text) !== null || text.length > 240 || !MEMORY_HINT_PATTERN.test(text)) return;
+  const sentence = text.split(/(?<=[.!])\s+/).find(part => MEMORY_HINT_PATTERN.test(part)) || text;
+  toast("Remember this about you?", "info", { label: "Remember", duration: 9000, onClick: () => addMemoryFact(sentence.replace(/[.!]+$/, ""), { source: "suggested" }) });
+}
+
+// 636: three requests for the same change become a remembered preference.
+const STYLE_PREFERENCES = { Shorter: "Prefers shorter answers", Longer: "Prefers longer, detailed answers", Simpler: "Prefers simple explanations", Formal: "Prefers a formal tone", Casual: "Prefers a casual tone", Funnier: "Enjoys funny answers" };
+function noteStylePreference(chipLabel) {
+  const preference = STYLE_PREFERENCES[chipLabel];
+  if (!preference || !state.settings.memory) return;
+  let counts = {};
+  try { counts = JSON.parse(localStorage.getItem("aui.styleCounts") || "{}"); } catch {}
+  counts[chipLabel] = (counts[chipLabel] || 0) + 1;
+  try { localStorage.setItem("aui.styleCounts", JSON.stringify(counts)); } catch {}
+  if (counts[chipLabel] !== 3 || state.memory.some(item => item.fact === preference)) return;
+  toast(`You often ask for “${chipLabel}”. Remember that you ${preference.toLowerCase().replace(/^prefers/, "prefer").replace(/^enjoys/, "enjoy")}?`, "info", {
+    label: "Remember",
+    duration: 10000,
+    onClick: () => addMemoryFact(preference, { category: "preferences", source: "style" })
+  });
+}
+
+// 609/616/648: the memories used for this message, added to the message itself so the
+// system prompt stays the same and the engine can reuse its cached work.
+function memoriesForMessage(chat, text) {
+  if (!state.settings.memory || chat?.memoryOff || chat?.temporary || !state.memory.length) return [];
+  const chosen = selectMemories(state.memory, text);
+  chosen.forEach(item => {
+    item.uses = (item.uses || 0) + 1;
+    item.lastUsed = Date.now();
+  });
+  return chosen;
+}
+
+function withMemoryNotes(userText, memories) {
+  if (!memories.length) return userText;
+  const lines = memories.map(item => `- ${item.uncertain ? "(unsure) " : ""}${memoryText(item).slice(0, 300)}`).join("\n");
+  return `${userText}\n\n[Things you remember about the user. Use them only if they help with this message]\n${lines}`;
+}
+
+// 612: forget memories after a while, if asked to.
+function expireMemories() {
+  const days = Number(state.settings.memoryExpiry) || 0;
+  if (!days) return;
+  const cutoff = Date.now() - days * 86_400_000;
+  const kept = state.memory.filter(item => (item.lastUsed || item.time || 0) >= cutoff);
+  if (kept.length === state.memory.length) return;
+  logMemory("Expired", `${state.memory.length - kept.length} item(s)`);
+  state.memory = kept;
+  persist();
+}
+
+// 624/625/626/627: knowledge files, stored in this browser and searched on every message.
+const KNOWLEDGE_DB = "aui-knowledge";
+function knowledgeStore(mode) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(KNOWLEDGE_DB, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore("docs", { keyPath: "id" });
+    request.onsuccess = () => resolve(request.result.transaction("docs", mode).objectStore("docs"));
+    request.onerror = () => reject(request.error);
+  });
+}
+function knowledgeRequest(store, call) {
+  return new Promise((resolve, reject) => {
+    const request = call(store);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+let knowledgeCache = null;
+async function listKnowledge() {
+  if (knowledgeCache) return knowledgeCache;
+  try {
+    const docs = await knowledgeRequest(await knowledgeStore("readonly"), store => store.getAll());
+    knowledgeCache = docs.map(doc => ({ ...doc, words: new Set(memoryWords(doc.text)) }));
+  } catch {
+    knowledgeCache = [];
+  }
+  return knowledgeCache;
+}
+async function addKnowledgeFiles(files) {
+  const prepared = await prepareFiles(files).catch(error => {
+    toast(error.message || "Couldn't read that file.", "error");
+    return [];
+  });
+  let added = 0;
+  for (const file of prepared) {
+    const text = String(file.extractedText || "").trim();
+    if (!text) {
+      toast(`${file.name} has no text AUI can read.`, "error");
+      continue;
+    }
+    await knowledgeRequest(await knowledgeStore("readwrite"), store => store.put({ id: createId("doc"), name: file.name, text: text.slice(0, 400_000), size: text.length, added: Date.now() }));
+    added += 1;
+  }
+  knowledgeCache = null;
+  if (added) toast(added === 1 ? "File added to knowledge" : `${added} files added to knowledge`);
+  if (DOM.memoryDialog.open) renderMemoryPanel();
+}
+async function deleteKnowledge(id) {
+  await knowledgeRequest(await knowledgeStore("readwrite"), store => store.delete(id));
+  knowledgeCache = null;
+  if (DOM.memoryDialog.open) renderMemoryPanel();
+}
+async function addKnowledgeNotes(text, tools) {
+  const docs = await listKnowledge();
+  if (!docs.length) return;
+  const words = memoryWords(text);
+  const budget = getSlmSpeed() === "tiny" ? 900 : 1500;
+  const hits = docs.map(doc => ({ doc, score: words.filter(word => doc.words.has(word)).length })).filter(entry => entry.score > 0).sort((a, b) => b.score - a.score).slice(0, 2);
+  hits.forEach(({ doc }) => {
+    tools.notes.push(`From the user's file “${doc.name}”: ${pickRelevantText(doc.text, text, Math.round(budget / hits.length))}`);
+    tools.sources.push(`Knowledge: ${doc.name}`);
+  });
+}
+
+// 619/620/621: pin a message, leave one out, or reset what the model sees.
+function resetContext() {
+  const chat = getChat();
+  if (!chat?.messages.length) return toast("Nothing to reset yet.");
+  chat.messages.forEach(message => { message.beforeReset = true; });
+  persistChatChange();
+  DOM.chatArea.dataset.chatId = "";
+  renderMessages();
+  toast("Context reset. AUI won't see the messages above.", "success", {
+    label: "Undo",
+    onClick: () => {
+      chat.messages.forEach(message => { delete message.beforeReset; });
+      persistChatChange();
+      DOM.chatArea.dataset.chatId = "";
+      renderMessages();
+    }
+  });
+}
+
+function pinnedContext(chat) {
+  const pinned = (chat?.messages || []).filter(message => message.pinnedContext && message.content);
+  if (!pinned.length) return "";
+  return `Pinned from earlier in this chat:\n${pinned.map(message => `${message.role === "user" ? "User" : "You"}: ${message.content.slice(0, 600)}`).join("\n").slice(0, 1500)}`;
+}
+
+// 622: say once per chat when older messages stop fitting.
+const overflowWarned = new Set();
+function warnContextOverflow(chat) {
+  if (!chat || overflowWarned.has(chat.id)) return;
+  overflowWarned.add(chat.id);
+  toast("This chat is longer than the model can read at once. AUI keeps a short list of the older topics.", "info", { label: "See what it reads", duration: 10000, onClick: openContextViewer });
+}
+
+// 618: exactly what the model receives for your next message.
+function openContextViewer() {
+  const chat = getChat();
+  if (!chat) return;
+  const typed = DOM.input.value.trim() || "(your next message)";
+  const history = createHistory(chat, null, true);
+  const messages = fitSlmMessages(getChatSystemPrompt(chat), history, withMemoryNotes(buildSlmUserText(typed, state.pendingAttachments), selectMemories(chat.memoryOff || !state.settings.memory ? [] : state.memory, typed)), getPromptBudget());
+  const dropped = history.length - (messages.length - 2);
+  const total = messages.reduce((sum, message) => sum + message.content.length, 0);
+  let dialog = byId("contextDialog");
+  if (!dialog) {
+    dialog = element("dialog", "dialog");
+    dialog.id = "contextDialog";
+    document.body.append(dialog);
+    dialog.addEventListener("click", event => {
+      if (event.target === dialog || event.target.closest("[data-close-dialog]")) dialog.close();
+    });
+  }
+  dialog.innerHTML = `<div class="dialogPanel"><header><div><p class="eyebrow">Context</p><h2>What the model reads</h2></div><button class="iconBtn" type="button" data-close-dialog aria-label="Close">×</button></header><div class="dialogContent contextViewer">
+    <p class="contextSummary">${messages.length} parts · ${total.toLocaleString()} of ${getPromptBudget().toLocaleString()} characters${dropped > 0 ? ` · ${dropped} older message${dropped === 1 ? "" : "s"} left out` : ""}</p>
+    ${messages.map(message => `<section class="contextPart"><h3>${message.role === "system" ? "Instructions" : message.role === "user" ? "You" : "AUI"} <small>${message.content.length.toLocaleString()} chars</small></h3><pre>${escapeHtml(message.content)}</pre></section>`).join("")}
+  </div></div>`;
+  dialog.showModal();
+}
+
+// The memory panel: facts, knowledge files and a history of changes.
+let memoryFilter = "all";
+let memoryQuery = "";
+let memorySelecting = false;
+const memorySelected = new Set();
+const MEMORY_TEMPLATES = [["My job", "My job is "], ["My goals", "My goal is "], ["About me", "I am "], ["How I like answers", "I prefer answers that are "], ["A project", "I'm working on "]];
+
+function memoryCategories() {
+  const projects = [...new Set(state.memory.map(item => item.category).filter(category => category?.startsWith("project:")))];
+  return [["all", "All"], ["personal", "Personal"], ["work", "Work"], ["preferences", "Preferences"], ...projects.map(project => [project, project.slice(8)]), ["stale", "Not used lately"], ["snippets", "Chat snippets"]];
+}
+
+function memoryMatchesFilter(item) {
+  if (memoryQuery && !memoryText(item).toLowerCase().includes(memoryQuery)) return false;
+  if (memoryFilter === "all") return true;
+  if (memoryFilter === "snippets") return !item.fact;
+  if (memoryFilter === "stale") return Date.now() - (item.lastUsed || item.time || 0) > 90 * 86_400_000;
+  return item.category === memoryFilter;
+}
+
+async function renderMemoryPanel() {
+  const docs = await listKnowledge();
+  const items = state.memory.map((item, index) => ({ item, index })).filter(({ item }) => memoryMatchesFilter(item)).reverse();
+  const facts = state.memory.filter(item => item.fact);
+  let onboarding = "";
+  try {
+    if (!localStorage.getItem("aui.memoryIntroSeen")) {
+      onboarding = '<div class="memoryIntro"><strong>How memory works</strong><p>Say “Remember that…” in a chat, accept a suggestion, or add a memory here. AUI picks the few that fit each message. Everything stays in this browser (and your account, if you sign in). Say “Forget that…” to remove one.</p><button type="button" class="linkBtn" data-mem="intro-ok">Got it</button></div>';
+    }
+  } catch {}
+  const summary = facts.length
+    ? `<details class="memorySummary"><summary>Here's what I know about you</summary>${["personal", "work", "preferences"].map(category => {
+      const list = facts.filter(item => item.category === category);
+      return list.length ? `<h4>${category[0].toUpperCase()}${category.slice(1)}</h4><ul>${list.map(item => `<li>${escapeHtml(item.fact)}</li>`).join("")}</ul>` : "";
+    }).join("")}</details>`
+    : "";
+  DOM.memoryContent.innerHTML = `${onboarding}
+    <div class="memoryToolbar">
+      <input type="search" class="memorySearch" placeholder="Search memories" aria-label="Search memories" value="${escapeHtml(memoryQuery)}">
+      <button type="button" class="secondaryBtn" data-mem="add">Add</button>
+      <button type="button" class="secondaryBtn" data-mem="select">${memorySelecting ? "Done" : "Select"}</button>
+    </div>
+    <div class="memoryMeter" title="AUI keeps up to ${CONFIG.MAX_MEMORY} memories"><span style="--fill:${state.memory.length / CONFIG.MAX_MEMORY}"></span><small>${state.memory.length} / ${CONFIG.MAX_MEMORY} memories${state.settings.memory ? "" : " · memory is paused"}</small></div>
+    <div class="memoryFilters">${memoryCategories().map(([id, label]) => `<button type="button" class="tagChip${memoryFilter === id ? " active" : ""}" data-mem-filter="${escapeHtml(id)}">${escapeHtml(label)}</button>`).join("")}</div>
+    ${summary}
+    ${memorySelecting ? `<div class="memoryBulk"><button type="button" class="secondaryBtn dangerButton" data-mem="delete-selected">Delete selected (${memorySelected.size})</button></div>` : ""}
+    <div class="memoryList">${items.length ? items.map(({ item, index }) => `<article class="memoryCard${item.fact ? "" : " isSnippet"}" data-mem-index="${index}">
+      ${memorySelecting ? `<input type="checkbox" class="memoryCheck" data-mem-check="${index}" ${memorySelected.has(item) ? "checked" : ""} aria-label="Select this memory">` : ""}
+      <div class="memoryCardBody"><p>${escapeHtml(memoryText(item))}</p>
+      <small>${item.fact ? `${escapeHtml((item.category || "personal").replace(/^project:/, "Project: "))} · ` : "Chat snippet · "}<time title="${new Date(item.time || Date.now()).toLocaleString()}">added ${formatRelativeTime(item.time)}</time>${item.uses ? ` · used ${item.uses}×` : ""}${item.uncertain ? " · unsure" : ""}</small></div>
+      <div class="memoryCardActions">${item.fact ? `<button type="button" data-mem="edit" data-mem-index="${index}" aria-label="Edit memory">Edit</button><button type="button" data-mem="sure" data-mem-index="${index}">${item.uncertain ? "Mark sure" : "Mark unsure"}</button>` : `<button type="button" data-mem="keep" data-mem-index="${index}">Keep as fact</button>`}<button type="button" data-mem="delete" data-mem-index="${index}" aria-label="Delete memory">Delete</button></div>
+    </article>`).join("") : `<div class="dialogEmpty"><strong>${state.memory.length ? "No memories match" : "No memories yet"}</strong><span>Say “Remember that…” in a chat, or press Add.</span></div>`}</div>
+    <div class="memoryMore">
+      <button type="button" class="linkBtn" data-mem="dedupe">Merge duplicates</button>
+      <button type="button" class="linkBtn" data-mem="compress">Turn chat snippets into short facts</button>
+      <button type="button" class="linkBtn" data-mem="export">Export</button>
+      <button type="button" class="linkBtn" data-mem="import">Import</button>
+      <button type="button" class="linkBtn dangerTextBtn" data-mem="clear">Clear all</button>
+      <input type="file" id="memoryImportInput" accept=".json,.txt,.md,application/json,text/plain" hidden>
+    </div>
+    <section class="knowledgeSection"><h3>Knowledge files</h3><p>Files here are searched on every message, in every chat, and cited under the reply. They stay in this browser.</p>
+      <ul class="knowledgeList">${docs.map(doc => `<li><span>${escapeHtml(doc.name)} <small>${doc.size < 1000 ? `${doc.size} characters` : `${Math.round(doc.size / 1000)}k characters`}</small></span><button type="button" class="linkBtn" data-knowledge-delete="${escapeHtml(doc.id)}">Remove</button></li>`).join("") || "<li><small>No files yet.</small></li>"}</ul>
+      <button type="button" class="secondaryBtn" data-mem="knowledge-add">Add files</button>
+      <input type="file" id="knowledgeInput" multiple hidden accept=".txt,.md,.markdown,.csv,.json,.html,.pdf,.doc,.docx,.xls,.xlsx,text/plain,text/markdown">
+    </section>
+    <details class="memoryHistory"><summary>History of changes</summary><ul>${(state.memoryLog || []).slice(0, 50).map(entry => `<li><time>${new Date(entry.time).toLocaleString()}</time> ${escapeHtml(entry.action)}: ${escapeHtml(entry.text)}</li>`).join("") || "<li>Nothing yet.</li>"}</ul></details>`;
+  const search = DOM.memoryContent.querySelector(".memorySearch");
+  search.addEventListener("input", () => {
+    memoryQuery = search.value.trim().toLowerCase();
+    const caret = search.selectionStart;
+    renderMemoryPanel().then(() => {
+      const next = DOM.memoryContent.querySelector(".memorySearch");
+      next.focus();
+      next.setSelectionRange(caret, caret);
+    });
+  });
+  DOM.memoryContent.querySelector("#memoryImportInput").addEventListener("change", event => {
+    const file = event.target.files[0];
+    event.target.value = "";
+    if (file) importMemories(file);
+  });
+  DOM.memoryContent.querySelector("#knowledgeInput").addEventListener("change", event => {
+    const files = [...event.target.files];
+    event.target.value = "";
+    if (files.length) addKnowledgeFiles(files);
+  });
+}
+
+// 601/645/646: add or edit one memory, with a character count and starter templates.
+function editMemoryDialog(item = null) {
+  let dialog = byId("memoryEditDialog");
+  if (!dialog) {
+    dialog = element("dialog", "dialog");
+    dialog.id = "memoryEditDialog";
+    document.body.append(dialog);
+  }
+  const categories = memoryCategories().filter(([id]) => !["all", "stale", "snippets"].includes(id));
+  dialog.innerHTML = `<form method="dialog" class="dialogPanel compactDialog"><header><div><p class="eyebrow">Memory</p><h2>${item ? "Edit memory" : "Add a memory"}</h2></div></header><div class="dialogContent setupBody">
+    ${item ? "" : `<div class="memoryTemplates">${MEMORY_TEMPLATES.map(([label, text]) => `<button type="button" class="tagChip" data-template="${escapeHtml(text)}">${escapeHtml(label)}</button>`).join("")}</div>`}
+    <label>What should AUI remember? <textarea id="memoryEditText" rows="3" maxlength="${MEMORY_FACT_LIMIT}"></textarea><small class="memoryCounter"></small></label>
+    <label>Category <select id="memoryEditCategory">${categories.map(([id, label]) => `<option value="${escapeHtml(id)}">${escapeHtml(label)}</option>`).join("")}<option value="new-project">New project…</option></select></label>
+    <div class="setupActions"><button class="secondaryBtn" value="cancel">Cancel</button><button class="primaryBtn" value="save">Save</button></div>
+  </div></form>`;
+  const textarea = dialog.querySelector("#memoryEditText");
+  const counter = dialog.querySelector(".memoryCounter");
+  const count = () => { counter.textContent = `${textarea.value.length} / ${MEMORY_FACT_LIMIT}`; };
+  textarea.value = item ? memoryText(item) : "";
+  dialog.querySelector("#memoryEditCategory").value = item?.category || "personal";
+  textarea.addEventListener("input", count);
+  count();
+  dialog.querySelectorAll("[data-template]").forEach(button => button.addEventListener("click", () => {
+    textarea.value = button.dataset.template;
+    textarea.focus();
+    count();
+  }));
+  dialog.onclose = async () => {
+    if (dialog.returnValue !== "save") return;
+    const text = textarea.value.trim();
+    if (!text) return;
+    let category = dialog.querySelector("#memoryEditCategory").value;
+    if (category === "new-project") {
+      const name = (await askForText({ eyebrow: "Memory", title: "Project name", label: "Name", value: "", submitLabel: "Save" }))?.trim().slice(0, 30);
+      category = name ? `project:${name}` : "personal";
+    }
+    if (item) {
+      logMemory("Edited", `${memoryText(item)} → ${text}`);
+      Object.assign(item, { fact: text.slice(0, MEMORY_FACT_LIMIT), category, id: item.id || createId("memory") });
+      delete item.user;
+      delete item.ai;
+      persist();
+    } else {
+      addMemoryFact(text, { category, source: "manual" });
+    }
+    renderMemoryPanel();
+  };
+  dialog.returnValue = "";
+  dialog.showModal();
+  textarea.focus();
+}
+
+function exportMemories() {
+  downloadFile("aui-memories.json", JSON.stringify({ app: "AUI", kind: "memories", exportedAt: new Date().toISOString(), memories: state.memory }, null, 2), "application/json");
+}
+
+// 608: AUI exports, or plain text with one memory per line (for example copied from another assistant).
+async function importMemories(file) {
+  const text = await file.text();
+  let incoming = [];
+  try {
+    const data = JSON.parse(text);
+    incoming = (Array.isArray(data) ? data : data.memories || data.memory || []).map(item => typeof item === "string" ? item : item.fact || item.content || memoryText(item));
+  } catch {
+    incoming = text.split(/\r?\n/).map(line => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").trim()).filter(line => line.length > 2);
+  }
+  let added = 0;
+  incoming.slice(0, CONFIG.MAX_MEMORY).forEach(line => { if (addMemoryFact(line, { source: "import", quiet: true })) added += 1; });
+  toast(added ? `Imported ${added} ${added === 1 ? "memory" : "memories"}` : "Nothing new to import");
+  renderMemoryPanel();
+}
+
+async function handleMemoryPanelClick(event) {
+  const filter = event.target.closest("[data-mem-filter]");
+  if (filter) {
+    memoryFilter = filter.dataset.memFilter;
+    return renderMemoryPanel();
+  }
+  const check = event.target.closest("[data-mem-check]");
+  if (check) {
+    const item = state.memory[Number(check.dataset.memCheck)];
+    if (check.checked) memorySelected.add(item);
+    else memorySelected.delete(item);
+    const bulk = DOM.memoryContent.querySelector('[data-mem="delete-selected"]');
+    if (bulk) bulk.textContent = `Delete selected (${memorySelected.size})`;
+    return;
+  }
+  const knowledgeDelete = event.target.closest("[data-knowledge-delete]");
+  if (knowledgeDelete) return deleteKnowledge(knowledgeDelete.dataset.knowledgeDelete);
+  const button = event.target.closest("[data-mem]");
+  if (!button) return;
+  const item = state.memory[Number(button.dataset.memIndex)];
+  switch (button.dataset.mem) {
+    case "intro-ok":
+      try { localStorage.setItem("aui.memoryIntroSeen", "1"); } catch {}
+      return renderMemoryPanel();
+    case "add":
+      return editMemoryDialog();
+    case "edit":
+      return editMemoryDialog(item);
+    case "keep":
+      if (item) {
+        item.fact = String(item.user || "").split(/[.?!\n]/)[0].slice(0, 140) || memoryText(item).slice(0, 140);
+        item.id ||= createId("memory");
+        item.category ||= guessMemoryCategory(item.fact);
+        delete item.user;
+        delete item.ai;
+        logMemory("Kept as fact", item.fact);
+        persist();
+      }
+      return renderMemoryPanel();
+    case "sure":
+      if (item) item.uncertain = !item.uncertain;
+      persist();
+      return renderMemoryPanel();
+    case "delete":
+      return item && removeMemories([item]);
+    case "select":
+      memorySelecting = !memorySelecting;
+      memorySelected.clear();
+      return renderMemoryPanel();
+    case "delete-selected":
+      memorySelecting = false;
+      removeMemories([...memorySelected]);
+      memorySelected.clear();
+      return renderMemoryPanel();
+    case "dedupe": {
+      const seen = new Set();
+      const duplicates = state.memory.filter(entry => {
+        const key = normalizeFact(memoryText(entry));
+        if (seen.has(key)) return true;
+        seen.add(key);
+        return false;
+      });
+      if (!duplicates.length) return toast("No duplicates found");
+      return removeMemories(duplicates);
+    }
+    case "compress": {
+      // 643: long chat snippets become one short fact each.
+      let changed = 0;
+      state.memory.forEach(entry => {
+        if (entry.fact) return;
+        entry.fact = String(entry.user || "").split(/[.?!\n]/)[0].trim().slice(0, 140);
+        if (!entry.fact) return;
+        entry.id = createId("memory");
+        entry.category = guessMemoryCategory(entry.fact);
+        entry.uncertain = true;
+        delete entry.user;
+        delete entry.ai;
+        changed += 1;
+      });
+      state.memory = state.memory.filter(entry => entry.fact || entry.user);
+      if (changed) logMemory("Compressed", `${changed} snippet(s)`);
+      persist();
+      toast(changed ? `${changed} snippets shortened. They're marked “unsure” until you check them.` : "No chat snippets to shorten");
+      return renderMemoryPanel();
+    }
+    case "export":
+      return exportMemories();
+    case "import":
+      return DOM.memoryContent.querySelector("#memoryImportInput").click();
+    case "knowledge-add":
+      return DOM.memoryContent.querySelector("#knowledgeInput").click();
+    case "clear": {
+      const confirmed = await askForConfirmation({ eyebrow: "Memory", title: "Clear all memories?", message: "Every saved memory is removed. Knowledge files stay.", submitLabel: "Clear all", cancelLabel: "Cancel" });
+      if (confirmed) removeMemories([...state.memory]);
+      return;
+    }
+  }
+}
+
+function openMemory() {
+  renderMemoryPanel();
+  if (!DOM.memoryDialog.open) DOM.memoryDialog.showModal();
+  try { localStorage.setItem("aui.memoryReviewed", String(Date.now())); } catch {}
+}
+
+// 633: a gentle monthly reminder to look over what AUI remembers.
+function memoryReviewReminder() {
+  if (state.memory.filter(item => item.fact).length < 5) return;
+  let last = 0;
+  try {
+    last = Number(localStorage.getItem("aui.memoryReviewed")) || 0;
+    if (!last) return localStorage.setItem("aui.memoryReviewed", String(Date.now()));
+  } catch {
+    return;
+  }
+  if (Date.now() - last < 30 * 86_400_000) return;
+  try { localStorage.setItem("aui.memoryReviewed", String(Date.now())); } catch {}
+  toast("It's been a month. Want to check what AUI remembers?", "info", { label: "Review", duration: 10000, onClick: openMemory });
+}
+
+// 639: a quick look at your memories from the sidebar.
+function setupMemoryPeek() {
+  const button = DOM.memoryBtn;
+  if (!button || matchMedia("(pointer: coarse)").matches) return;
+  const peek = element("div", "memoryPeek");
+  peek.setAttribute("aria-hidden", "true");
+  peek.hidden = true;
+  document.body.append(peek);
+  let timer = null;
+  button.addEventListener("mouseenter", () => {
+    timer = setTimeout(() => {
+      const facts = state.memory.filter(item => item.fact).slice(-5).reverse();
+      peek.innerHTML = facts.length ? `<strong>Latest memories</strong><ul>${facts.map(item => `<li>${escapeHtml(item.fact)}</li>`).join("")}</ul>` : "<strong>No memories yet</strong><p>Say “Remember that…” in a chat.</p>";
+      const box = button.getBoundingClientRect();
+      peek.style.left = `${Math.round(box.right + 8)}px`;
+      peek.style.top = `${Math.round(box.top - 10)}px`;
+      peek.hidden = false;
+    }, 500);
+  });
+  button.addEventListener("mouseleave", () => {
+    clearTimeout(timer);
+    peek.hidden = true;
+  });
+  button.addEventListener("click", () => {
+    clearTimeout(timer);
+    peek.hidden = true;
+  });
+}
+
+function setupMemoryFeatures() {
+  DOM.memoryContent.addEventListener("click", handleMemoryPanelClick);
+  expireMemories();
+  setupMemoryPeek();
+  // 638: Ctrl/⌘ + Shift + M opens memory.
+  document.addEventListener("keydown", event => {
+    if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "m") {
+      event.preventDefault();
+      openMemory();
+    }
+  });
+  setTimeout(memoryReviewReminder, 4000);
+  byId("memoryAutoSelect")?.addEventListener("change", event => {
+    state.settings.memoryAuto = event.target.value;
+    persist();
+  });
+  byId("memoryExpirySelect")?.addEventListener("change", event => {
+    state.settings.memoryExpiry = Number(event.target.value) || 0;
+    persist();
+    expireMemories();
+  });
+  const auto = byId("memoryAutoSelect");
+  if (auto) auto.value = state.settings.memoryAuto || "facts";
+  const expiry = byId("memoryExpirySelect");
+  if (expiry) expiry.value = String(state.settings.memoryExpiry || 0);
+}
+
 let appInitialized = false;
 
 if (document.readyState === "loading") {
@@ -4153,6 +4824,7 @@ async function init() {
   setupFileHandling();
   setupMobile();
   setupSettingsExtras();
+  setupMemoryFeatures();
   setTimeout(prefillFromUrl);
   setupBackgroundDownload();
   setInterval(updateReadyBadge, 3000);
@@ -4418,6 +5090,7 @@ function normalizeChats(chats) {
     ...(typeof chat.style === "string" && chat.style ? { style: chat.style } : {}),
     ...(typeof chat.instructions === "string" && chat.instructions ? { instructions: chat.instructions } : {}),
     ...(typeof chat.speed === "string" && chat.speed ? { speed: chat.speed } : {}),
+    ...(chat.memoryOff ? { memoryOff: true } : {}),
     ...(Number.isFinite(chat.pinOrder) ? { pinOrder: chat.pinOrder } : {}),
     messages: Array.isArray(chat.messages)
       ? chat.messages.map(message => ({
@@ -4436,6 +5109,10 @@ function normalizeChats(chats) {
         durationMs: Number(message.durationMs) || 0,
         ...(Array.isArray(message.toolSources) ? { toolSources: message.toolSources.map(String) } : {}),
         ...(message.factNote ? { factNote: true } : {}),
+        ...(message.pinnedContext ? { pinnedContext: true } : {}),
+        ...(message.excluded ? { excluded: true } : {}),
+        ...(message.beforeReset ? { beforeReset: true } : {}),
+        ...(Array.isArray(message.memoryUsed) ? { memoryUsed: message.memoryUsed.map(String) } : {}),
         ...(message.tldr ? { tldr: String(message.tldr), tldrHidden: Boolean(message.tldrHidden) } : {}),
         feedback: message.feedback === "up" || message.feedback === "down" ? message.feedback : "",
         starred: Boolean(message.starred),
@@ -4935,15 +5612,21 @@ async function sendMessage(options = {}) {
     applyChatSpeed(chat);
     await confirmModelDownload();
     const tools = await runTools(text);
+    await addKnowledgeNotes(text, tools).catch(() => {});
+    const memories = memoriesForMessage(chat, text);
+    if (memories.length) assistantMessage.memoryUsed = memories.map(item => memoryText(item).slice(0, 80));
     if (tools.sources.length) assistantMessage.toolSources = tools.sources;
     const slmMessages = fitSlmMessages(
       getChatSystemPrompt(chat),
       history,
-      withToolNotes(buildSlmUserText(text, attachments), tools),
+      withMemoryNotes(withToolNotes(buildSlmUserText(text, attachments), tools), memories),
       getPromptBudget()
     );
     const droppedNote = summarizeDroppedTurns(history, slmMessages.length - 2);
-    if (droppedNote) slmMessages[0] = { ...slmMessages[0], content: `${slmMessages[0].content}\n${droppedNote}` };
+    if (droppedNote) {
+      slmMessages[0] = { ...slmMessages[0], content: `${slmMessages[0].content}\n${droppedNote}` };
+      warnContextOverflow(chat);
+    }
     await backgroundModelTask;
     for await (const token of streamSlm(slmMessages, {
       signal: abortController.signal,
@@ -5063,13 +5746,7 @@ function buildSlmSystemPrompt() {
   const custom = String(state.settings.customInstructions || "").trim();
   if (custom) parts.push(`The user's instructions for how you should answer:
 ${custom.slice(0, 1500)}`);
-  if (state.settings.memory && state.memory.length) {
-    const notes = state.memory.slice(-3)
-      .map(item => `- User: ${String(item.user || "").slice(0, 120)} / You: ${String(item.ai || "").slice(0, 160)}`)
-      .join("\n")
-      .slice(0, 1200);
-    parts.push(`Recent things you remember about the user:\n${notes}`);
-  }
+  // Memories now travel with each message (see memoriesForMessage) so this prompt stays stable.
   return parts.join("\n");
 }
 
@@ -5209,7 +5886,7 @@ function createHistory(chat, assistantMessageId, includeTargetAssistant = false)
     : chat.messages;
   const history = includeTargetAssistant ? messages : messages.slice(0, -1);
   return history
-    .filter(message => ["user", "assistant"].includes(message.role) && message.content)
+    .filter(message => ["user", "assistant"].includes(message.role) && message.content && !message.excluded && !message.beforeReset)
     .slice(-18)
     .map(({ role, content }) => ({ role, content }));
 }
@@ -5538,7 +6215,7 @@ function createEmptyState() {
 
 function createMessageElement(message, index, { animate = true } = {}) {
   const isUser = message.role === "user";
-  const article = element("article", `message ${isUser ? "userMessage" : "assistantMessage"}${animate ? " messageEnter" : ""}`);
+  const article = element("article", `message ${isUser ? "userMessage" : "assistantMessage"}${animate ? " messageEnter" : ""}${message.excluded ? " isExcluded" : ""}${message.beforeReset ? " beforeReset" : ""}${message.pinnedContext ? " isPinnedContext" : ""}`);
   article.dataset.messageId = message.id;
   article.dataset.status = message.status || "complete";
   article.title = new Date(message.timestamp).toLocaleString();
@@ -5657,7 +6334,14 @@ function createMessageFooter(message, index) {
     const sources = element("span", "toolSources");
     sources.textContent = `Sources: ${message.toolSources.join(", ")}`;
     footer.append(sources);
-  } else if (message.role === "assistant" && message.factNote && message.status === "complete") {
+  }
+  if (message.role === "assistant" && message.memoryUsed?.length) {
+    const badge = element("span", "memoryBadge");
+    badge.textContent = `🧠 ${message.memoryUsed.length} ${message.memoryUsed.length === 1 ? "memory" : "memories"}`;
+    badge.title = `Used: ${message.memoryUsed.join("; ")}`;
+    footer.append(badge);
+  }
+  if (message.role === "assistant" && !message.toolSources?.length && message.factNote && message.status === "complete") {
     const note = element("span", "factNote");
     note.textContent = "Small models can get facts wrong. Check anything important.";
     footer.append(note);
@@ -5698,6 +6382,7 @@ function createMessageFooter(message, index) {
     actions.append(actionButton("Copy", "copy"), actionButton("Edit", "edit"), actionButton("Link", "permalink"));
   }
   actions.append(actionButton(message.starred ? "★ Starred" : "☆ Star", "star"));
+  if (message.content && message.status !== "streaming") actions.append(actionButton(message.pinnedContext ? "Unpin" : "Pin", "pin-context"), actionButton(message.excluded ? "Include" : "Leave out", "exclude"));
   footer.append(actions);
   return footer;
 }
@@ -5770,7 +6455,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b15");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b16");
   return markdownModulePromise;
 }
 
@@ -5843,6 +6528,21 @@ async function handleChatAction(event) {
       break;
     case "share":
       shareMessage(message);
+      break;
+    case "pin-context":
+      message.pinnedContext = !message.pinnedContext;
+      systemPromptSnapshots.delete(chat.id);
+      persistChatChange();
+      DOM.chatArea.dataset.chatId = "";
+      renderMessages({ preserveScroll: true });
+      toast(message.pinnedContext ? "Pinned. AUI will always see this message." : "Unpinned");
+      break;
+    case "exclude":
+      message.excluded = !message.excluded;
+      persistChatChange();
+      DOM.chatArea.dataset.chatId = "";
+      renderMessages({ preserveScroll: true });
+      toast(message.excluded ? "Left out. AUI won't see this message." : "Included again");
       break;
     case "permalink": {
       const url = new URL("/chat", location.origin);
@@ -7045,7 +7745,7 @@ function cycleTheme() {
   toast(`Theme: ${state.settings.theme}`);
 }
 
-function openMemory() {
+function openMemoryLegacy() {
   DOM.memoryContent.replaceChildren();
   if (!state.memory.length) {
     DOM.memoryContent.innerHTML = `<div class="dialogEmpty"><strong>No saved memory yet</strong><span>Useful context from your chats will appear here.</span></div>`;
@@ -7990,7 +8690,8 @@ function updateMessageCounter() {
 }
 
 function rememberExchange(user, assistant) {
-  if (!state.settings.memory || !assistant || getChat()?.temporary) return;
+  // 634: by default only facts are kept; saving every exchange is opt-in.
+  if (!state.settings.memory || !assistant || getChat()?.temporary || getChat()?.memoryOff || (state.settings.memoryAuto || "facts") !== "all") return;
   state.memory.push({ user, ai: assistant, time: Date.now() });
   if (state.memory.length > CONFIG.MAX_MEMORY) state.memory.shift();
 }
@@ -8062,6 +8763,19 @@ let lastEscapeAt = 0;
 
 function handleComposerSubmit(event) {
   event.preventDefault();
+  // Memory commands work even while a reply is being written.
+  if (handleForgetCommand(DOM.input.value)) {
+    DOM.input.value = "";
+    saveDraft();
+    updateComposerState();
+    return;
+  }
+  const rememberText = parseRememberCommand(DOM.input.value);
+  if (rememberText) {
+    if (state.settings.memory && !getChat()?.temporary) addMemoryFact(rememberText);
+  } else if (DOM.input.value.trim()) {
+    suggestMemory(DOM.input.value.trim());
+  }
   if (state.loading) {
     // Enter with text queues it; the stop button (or Enter on an empty box) stops the reply.
     if (event.submitter !== DOM.sendBtn && queueMessage()) return;
@@ -8787,7 +9501,7 @@ function mergeCloudData(cloudData, { authoritative = false } = {}) {
     const allMemory = [...cloudMemory, ...state.memory];
     const seen = new Set();
     state.memory = allMemory.filter(item => {
-      const key = item.user || "";
+      const key = item.id || item.fact || item.user || "";
       if (seen.has(key)) return false;
       seen.add(key);
       return true;

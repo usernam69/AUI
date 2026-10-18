@@ -30,7 +30,7 @@
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css" integrity="sha384-wH75j6z1lH97ZOpMOInqhgKzFkAInZPPSPlZpYKYTOqsaizPvhQZmAtLcPKXpLyH" crossorigin="anonymous" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="/style.css?v=20261018-b15">
+  <link rel="stylesheet" href="/style.css?v=20261018-b16">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -262,6 +262,8 @@
         <label class="settingRow"><span><strong>Emoji</strong><small>How many emoji AUI uses</small></span><select id="emojiLevelSelect"><option value="some" selected>Some</option><option value="none">None</option><option value="lots">Lots</option></select></label>
         <label class="settingRow"><span><strong>Humor</strong><small>From serious to unhinged</small></span><input id="humorInput" type="range" min="0" max="3" step="1" value="1" aria-valuetext="Humor level"></label>
         <label class="settingRow"><span><strong>Formality</strong><small>From casual to formal</small></span><input id="formalityInput" type="range" min="0" max="2" step="1" value="1" aria-valuetext="Formality level"></label>
+        <label class="settingRow"><span><strong>What AUI saves</strong><small>Facts you confirm, or also a log of recent exchanges</small></span><select id="memoryAutoSelect"><option value="facts" selected>Only facts I confirm</option><option value="all">Facts and recent exchanges</option></select></label>
+        <label class="settingRow"><span><strong>Forget unused memories</strong><small>Remove memories that haven't been used for a while</small></span><select id="memoryExpirySelect"><option value="0" selected>Never</option><option value="30">After 30 days</option><option value="90">After 90 days</option><option value="365">After a year</option></select></label>
         <div class="settingRow"><span><strong>Saved memories</strong><small>See, edit and delete what AUI remembers</small></span><button class="secondaryBtn" id="manageMemoryBtn" type="button">Manage</button></div>
         <div class="settingRow"><span><strong>All shortcuts</strong><small>Every keyboard shortcut in one list</small></span><button class="secondaryBtn" id="keyboardListBtn" type="button">Show</button></div>
         <div class="settingRow settingRowStack"><span id="labsIntro"><strong>Labs</strong><small>Early features. They work, but may change or go away.</small></span></div>
@@ -446,6 +448,6 @@
       navigator.serviceWorker.register("/chat/sw.js").catch(() => {});
     }
   </script>
-  <script type="module" src="/chat/app.js?v=20261018-b15"></script>
+  <script type="module" src="/chat/app.js?v=20261018-b16"></script>
 </body>
 </html>

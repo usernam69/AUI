@@ -1111,3 +1111,10 @@ Built: 551 (settings search), 552, 553, 554, 557, 558, 559, 560, 561 (Hebrew wit
 Already in AUI: 555 (the model speed is stored per browser), 556, 563 (turn off "Enter sends" for Ctrl/⌘ + Enter), 574 (signed-in sync already includes settings), 575 (shortcut labels already switch between ⌘ and Ctrl), 578, 579, 582, 583, 585, 590, 594.
 Skipped: none.
 Fixed along the way: the selected settings tab failed contrast in light mode (4.07:1), and replies written in English were laid out right to left in the Hebrew layout.
+
+### Batch 14 - category 13 (memory & context)
+Built: 601, 602, 603, 604 ("Remember that I…" or "remember: …"), 605 ("forget that", "forget my job"), 606, 607, 608 (AUI files, or plain text with one memory per line), 609, 610, 611, 612, 615, 616 (memories are picked per message by word overlap, with preferences always included), 618 (/context shows exactly what the model reads), 619, 620, 621 (/reset), 622, 624, 625, 626 (knowledge files in IndexedDB with a keyword index), 627, 628, 630, 632, 633, 634 (by default only confirmed facts are saved, not every exchange), 636, 637, 638 (Ctrl/⌘ + Shift + M), 639, 640, 641, 642, 643, 644, 645, 646, 648, 649, 650 (unit tests for memory selection and the remember/forget commands).
+Already in AUI: 613 (the Memory switch), 614 (per-chat notes from 599), 623, 629, 631, 635 and 647 (the name from 552).
+Skipped: 617 (an embedding model would be a second download of 100 MB or more and compete with the chat model for GPU memory; keyword scoring is used instead).
+Also changed: memories now travel with each message instead of the system prompt, so the prompt stays identical and the engine keeps reusing its cached work.
+Bug fixed along the way: merging memories from a signed-in account removed duplicates by the old snippet field, which would have kept only one of the new facts.

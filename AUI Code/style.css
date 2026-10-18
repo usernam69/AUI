@@ -3638,3 +3638,59 @@
 @layer components {
   .messageMetrics { unicode-bidi: plaintext; }
 }
+
+/* --- Memory & context from The Probe (category 13) --- */
+@layer components {
+  .memoryIntro { margin-bottom: 12px; padding: 12px 14px; border-radius: var(--radius-md); background: var(--accent-soft); }
+  .memoryIntro p { margin: 4px 0; color: var(--text-secondary); font-size: 14px; }
+  .memoryToolbar { display: flex; gap: 8px; align-items: center; }
+  .memorySearch { flex: 1; min-width: 0; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: var(--text); font: inherit; font-size: 16px; }
+  .memoryMeter { margin: 10px 0 6px; }
+  .memoryMeter span { display: block; height: 6px; border-radius: 6px; background: linear-gradient(to right, var(--accent) calc(var(--fill) * 100%), var(--surface-hover) 0); }
+  .memoryMeter small { color: var(--muted); font-size: 12px; }
+  .memoryFilters { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .memoryFilters .tagChip.active { background: var(--accent); color: #fff; }
+  .memorySummary, .memoryHistory { margin: 8px 0; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); }
+  .memorySummary summary, .memoryHistory summary { cursor: pointer; font-weight: 600; }
+  .memorySummary h4 { margin: 10px 0 2px; font-size: 13px; color: var(--muted); }
+  .memoryHistory li { font-size: 13px; color: var(--text-secondary); }
+  .memoryHistory time { color: var(--muted); font-size: 12px; }
+  .memoryList { display: grid; gap: 8px; margin: 8px 0; }
+  .memoryCard { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+  .memoryCard.isSnippet { border-style: dashed; }
+  .memoryCardBody { flex: 1; min-width: 0; }
+  .memoryCardBody p { margin: 0 0 4px; overflow-wrap: anywhere; }
+  .memoryCardBody small { color: var(--muted); font-size: 12px; }
+  .memoryCardActions { display: flex; flex-wrap: wrap; gap: 4px; }
+  .memoryCardActions button { padding: 4px 8px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text-secondary); font: inherit; font-size: 12px; cursor: pointer; }
+  .memoryCardActions button:hover { background: var(--surface-hover); }
+  .memoryMore { display: flex; flex-wrap: wrap; gap: 12px; margin: 10px 0; font-size: 13px; }
+  .knowledgeSection { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .knowledgeSection h3 { margin: 0 0 4px; font-size: 15px; }
+  .knowledgeSection p { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+  .knowledgeList { margin: 0 0 8px; padding: 0; list-style: none; display: grid; gap: 4px; }
+  .knowledgeList li { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .knowledgeList small { color: var(--muted); }
+  .memoryTemplates { display: flex; flex-wrap: wrap; gap: 6px; }
+  .memoryCounter { color: var(--muted); font-size: 12px; text-align: right; }
+  .memoryBadge { color: var(--muted); font-size: 12px; cursor: help; }
+  .memoryPeek { position: fixed; z-index: 80; width: 260px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-raised); box-shadow: var(--shadow-md); font-size: 13px; }
+  .memoryPeek ul { margin: 6px 0 0; padding-left: 18px; }
+  .memoryPeek p { margin: 4px 0 0; color: var(--muted); }
+  .checkRow { display: flex !important; gap: 8px; align-items: center; }
+  .message.isExcluded, .message.beforeReset { opacity: 0.5; }
+  .message.isExcluded .messageContent::before { content: "Left out of context"; display: block; margin-bottom: 4px; color: var(--muted); font-size: 12px; }
+  .message.isPinnedContext { box-shadow: inset 3px 0 0 var(--accent); }
+  .contextSummary { color: var(--muted); }
+  .contextPart { margin: 10px 0; }
+  .contextPart h3 { margin: 0 0 4px; font-size: 14px; }
+  .contextPart small { color: var(--muted); font-weight: 400; }
+  .contextPart pre { max-height: 260px; overflow: auto; margin: 0; padding: 10px; border-radius: var(--radius-md); background: var(--surface-hover); white-space: pre-wrap; font-size: 12.5px; }
+}
+@layer components {
+  .memoryMore .dangerTextBtn { color: color-mix(in srgb, var(--danger) 70%, var(--text)); }
+}
+@layer components {
+  .memoryCardBody p { font-size: 14.5px; color: var(--text); }
+  .memoryCardBody small, .memoryCardBody time { display: inline; margin: 0; }
+}
