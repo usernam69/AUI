@@ -39,13 +39,27 @@ export function removeKey() {
   } catch {}
 }
 
+// What the user can do about a failure: "key", "credits", "model", "wait" or "" (nothing to fix).
+export const fixFor = status => (status === 401 || status === 403 ? "key" : status === 402 ? "credits" : status === 404 ? "model" : status === 408 || status === 429 || status >= 500 ? "wait" : "");
+// A busy or unavailable model is worth skipping; a bad key or request is not.
+const canSkip = status => status === 402 || status === 404 || status === 408 || status === 429 || status >= 500;
+
+export class OpenRouterError extends Error {
+  constructor(message, status = 0) {
+    super(message);
+    this.name = "OpenRouterError";
+    this.status = status;
+    this.fix = fixFor(status);
+  }
+}
+
 // Turn an HTTP failure into something a student can act on.
 export function friendlyStatus(status, detail = "") {
   const extra = detail ? ` (${String(detail).slice(0, 160)})` : "";
   if (status === 401) return "OpenRouter didn't accept the key. Check it, or make a new one.";
   if (status === 402) return "The OpenRouter account is out of credits. Add credits, or use a free model such as openrouter/free.";
   if (status === 403) return `OpenRouter blocked this request${extra}.`;
-  if (status === 404) return `OpenRouter doesn't know that model${extra}. Change it in the Homework Helper setup.`;
+  if (status === 404) return `OpenRouter doesn't know that model${extra}. Pick another one in the key setup.`;
   if (status === 408 || status === 504) return "OpenRouter took too long to answer. Try again.";
   if (status === 429) return "OpenRouter says to slow down. Wait a moment and try again.";
   if (status >= 500) return `OpenRouter had a problem${extra}. Try again in a moment.`;
@@ -74,7 +88,9 @@ export function parseSse(buffer) {
   return { tokens, rest, error, done };
 }
 
-export async function* streamOpenRouter(messages, { signal, maxTokens = 1500, temperature = 0.6, key = getKey(), model = getModel(), onFallback } = {}) {
+// `fallbacks` are models to try, in order, when the chosen one is busy, out of credits or gone.
+// The free router is always the last stop. `onFallback(model, status)` says which one took over.
+export async function* streamOpenRouter(messages, { signal, maxTokens = 1500, temperature = 0.6, key = getKey(), model = getModel(), fallbacks = [], onFallback } = {}) {
   if (!looksLikeKey(key)) throw new Error("Add your OpenRouter key first.");
   const send = async chosen => {
     try {
@@ -93,16 +109,17 @@ export async function* streamOpenRouter(messages, { signal, maxTokens = 1500, te
       throw new Error(/Offline-only/.test(error?.message) ? error.message : "Couldn't reach OpenRouter. Check your internet connection.");
     }
   };
-  let response = await send(model);
-  // Out of credits: a paid model can't answer, but the free router still can.
-  if (response.status === 402 && !isFreeModel(model)) {
-    onFallback?.(FREE_MODEL);
-    response = await send(FREE_MODEL);
+  const chain = [model, ...fallbacks.filter(name => name && name !== model).slice(0, 3)];
+  if (!chain.includes(FREE_MODEL)) chain.push(FREE_MODEL);
+  let response = await send(chain[0]);
+  for (let step = 1; !response.ok && canSkip(response.status) && step < chain.length; step += 1) {
+    onFallback?.(chain[step], response.status);
+    response = await send(chain[step]);
   }
   if (!response.ok) {
     let detail = "";
     try { detail = (await response.json())?.error?.message || ""; } catch {}
-    throw new Error(friendlyStatus(response.status, detail));
+    throw new OpenRouterError(friendlyStatus(response.status, detail), response.status);
   }
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -136,7 +153,7 @@ export async function checkKey(key = getKey()) {
   } catch (error) {
     throw new Error(/Offline-only/.test(error?.message) ? error.message : "Couldn't reach OpenRouter. Check your internet connection.");
   }
-  if (!response.ok) throw new Error(friendlyStatus(response.status));
+  if (!response.ok) throw new OpenRouterError(friendlyStatus(response.status), response.status);
   const data = (await response.json())?.data || {};
-  return { label: data.label || "your key", limit: data.limit ?? null, remaining: data.limit_remaining ?? null, free: Boolean(data.is_free_tier) };
+  return { label: data.label || "your key", limit: data.limit ?? null, remaining: data.limit_remaining ?? null, usage: data.usage ?? null, free: Boolean(data.is_free_tier) };
 }

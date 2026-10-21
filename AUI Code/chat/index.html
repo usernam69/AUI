@@ -31,7 +31,7 @@
   <link rel="shortcut icon" href="/favicon-t-20260728.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
-  <link rel="stylesheet" href="/style.css?v=20261018-b29">
+  <link rel="stylesheet" href="/style.css?v=20261018-b30">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -294,6 +294,9 @@
         <label class="settingRow rangeRow"><span><strong>Playback speed</strong><small id="speechRateValue">1×</small></span><input id="speechRateInput" type="range" min="0.75" max="2" step="0.25" value="1"></label>
         <label class="settingRow"><span><strong>AI engine</strong><small>A small model on this device needs no key. Add your own OpenRouter key for bigger models</small></span><select id="engineSelect"><option value="device">This device (no key)</option><option value="online">OpenRouter key</option></select></label>
         <div class="settingRow"><span><strong>OpenRouter key</strong><small id="engineKeyStatus">No key yet</small></span><button class="secondaryBtn" id="openrouterKeyBtn" type="button">Set key</button></div>
+        <div class="settingRow"><span><strong>Model for this chat</strong><small>Search every OpenRouter model, with prices. Free ones are marked</small></span><button class="secondaryBtn" id="chooseModelBtn" type="button">Choose</button></div>
+        <label class="settingRow"><span><strong>Switch models when one is busy</strong><small>If a model is busy or unavailable, AUI tries the biggest free models instead</small></span><input id="fallbackChainToggle" type="checkbox" role="switch" checked></label>
+        <div class="settingRow"><span><strong>OpenRouter credit</strong><small id="creditStatus">Add a key to see this</small></span><button class="secondaryBtn" id="creditRefreshBtn" type="button">Check</button></div>
         <label class="settingRow"><span><strong>Model speed</strong><small>Fastest is quickest; Smartest gives better answers but is slower and a bigger download</small></span><select id="speedSelect"><option value="tiny">Tiny (SmolLM 360M, ~380 MB)</option><option value="fast">Fastest (Qwen 0.5B, ~950 MB)</option><option value="balanced">Balanced (Llama 1B, ~880 MB)</option><option value="smart">Smart (Llama 3B, ~2.3 GB)</option><option value="phi">Smartest (Phi 3.5 mini, ~3.7 GB)</option></select></label>
         <div class="settingRow"><span><strong>Model stats</strong><small>Average speed and a quick speed test</small></span><button class="secondaryBtn" id="perfBtn" type="button">Open stats</button></div>
         <label class="settingRow"><span><strong>Download in the background</strong><small>On desktop Wi-Fi, fetch the model while you browse so it's ready</small></span><input id="backgroundDownloadToggle" type="checkbox" role="switch"></label>
@@ -458,6 +461,6 @@
   <div class="toastRegion" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
   <div class="srOnly" id="announcer" aria-live="polite" aria-atomic="true"></div>
 
-  <script type="module" src="/chat/app.js?v=20261018-b29"></script>
+  <script type="module" src="/chat/app.js?v=20261018-b30"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
-const CACHE_NAME = "aui-t20261018-b29";
-const ASSET_VERSION = "20261018-b29";
+const CACHE_NAME = "aui-t20261018-b30";
+const ASSET_VERSION = "20261018-b30";
 const versioned = path => `${path}?v=${ASSET_VERSION}`;
 
 // The worker lives in <base>chat/, so resolve everything from there. That keeps it
@@ -28,6 +28,7 @@ const PRECACHE_ASSETS = [
   at(versioned("modules/plans.js")),
   at(versioned("modules/skills.js")),
   at(versioned("modules/openrouter.js")),
+  at(versioned("modules/models.js")),
   at("modules/vendor/marked-16.1.2.mjs"),
   at("modules/vendor/dompurify-3.2.6.mjs"),
   at("modules/vendor/highlight-11.11.1-common.mjs"),

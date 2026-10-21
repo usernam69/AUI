@@ -598,4 +598,93 @@ await test("vault encrypts, refuses a wrong passphrase, and locked storage is ne
   delete globalThis.localStorage;
 });
 
+await test("OpenRouter: fallback chain and error fixes", async () => {
+  const store = new Map();
+  globalThis.localStorage = { getItem: key => (store.has(key) ? store.get(key) : null), setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key) };
+  const router = await load("modules/openrouter.js");
+  const key = "sk-or-v1-abcdef0123456789abcdef";
+  const NL = String.fromCharCode(10);
+  const okBody = () => {
+    const bytes = new TextEncoder().encode('data: {"choices":[{"delta":{"content":"answer"}}]}' + NL + NL + "data: [DONE]" + NL + NL);
+    let done = false;
+    return { ok: true, status: 200, body: { getReader: () => ({ read: async () => (done ? { done: true } : ((done = true), { done: false, value: bytes })), cancel: async () => {} }) } };
+  };
+  const drain = async options => { let text = ""; for await (const token of router.streamOpenRouter([], { key, ...options })) text += token; return text; };
+
+  // A busy model (429) hands over to the next fallback, then the free router.
+  const sent = [];
+  const told = [];
+  globalThis.fetch = async (url, init) => {
+    const model = JSON.parse(init.body).model;
+    sent.push(model);
+    return model === "meta/free-b:free" ? okBody() : { ok: false, status: 429, json: async () => ({}) };
+  };
+  assert.equal(await drain({ model: "paid/a", fallbacks: ["meta/free-a:free", "meta/free-b:free"], onFallback: (model, status) => told.push([model, status]) }), "answer");
+  assert.deepEqual(sent, ["paid/a", "meta/free-a:free", "meta/free-b:free"]);
+  assert.deepEqual(told, [["meta/free-a:free", 429], ["meta/free-b:free", 429]]);
+
+  // The chain is capped at three fallbacks plus the free router, and never repeats the chosen model.
+  sent.length = 0;
+  globalThis.fetch = async (url, init) => { sent.push(JSON.parse(init.body).model); return { ok: false, status: 503, json: async () => ({}) }; };
+  await assert.rejects(() => drain({ model: "paid/a", fallbacks: ["paid/a", "f1", "f2", "f3", "f4", "f5"] }), error => error.status === 503 && error.fix === "wait");
+  assert.deepEqual(sent, ["paid/a", "f1", "f2", "f3", "openrouter/free"]);
+
+  // A bad key or a bad request is not worth skipping to another model.
+  sent.length = 0;
+  globalThis.fetch = async (url, init) => { sent.push(JSON.parse(init.body).model); return { ok: false, status: 401, json: async () => ({}) }; };
+  await assert.rejects(() => drain({ model: "paid/a", fallbacks: ["f1"] }), error => error.status === 401 && error.fix === "key");
+  assert.deepEqual(sent, ["paid/a"]);
+
+  assert.equal(router.fixFor(402), "credits");
+  assert.equal(router.fixFor(404), "model");
+  assert.equal(router.fixFor(429), "wait");
+  assert.equal(router.fixFor(400), "");
+  delete globalThis.localStorage;
+  delete globalThis.fetch;
+});
+
+await test("model list: parsing, prices, search and fallbacks", async () => {
+  const store = new Map();
+  globalThis.localStorage = { getItem: key => (store.has(key) ? store.get(key) : null), setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key) };
+  const models = await load("modules/models.js");
+  const json = { data: [
+    { id: "openai/gpt-x", name: "GPT X", context_length: 128000, pricing: { prompt: "0.0000025", completion: "0.00001" }, architecture: { input_modalities: ["text", "image"] } },
+    { id: "meta/llama-big:free", name: "Llama Big", context_length: 131072, pricing: { prompt: "0", completion: "0" }, architecture: { input_modalities: ["text"] } },
+    { id: "meta/llama-small:free", name: "Llama Small", context_length: 4000, pricing: { prompt: "0", completion: "0" } },
+    { id: "openrouter/auto", name: "Auto Router", context_length: 2000000, pricing: { prompt: "-1", completion: "-1" } },
+    { id: "x".repeat(200), name: "Too long" },
+    { name: "No id" }
+  ] };
+  const list = models.parseModels(json);
+  assert.equal(list.length, 4, "bad rows are dropped");
+  const gpt = list.find(model => model.id === "openai/gpt-x");
+  assert.ok(Math.abs(gpt.inputPerM - 2.5) < 1e-9 && Math.abs(gpt.outputPerM - 10) < 1e-9 && gpt.vision && !gpt.free);
+  assert.equal(models.priceHint(gpt), "$2.50 in · $10.00 out per 1M tokens");
+  assert.equal(models.priceHint(list.find(model => model.id === "meta/llama-big:free")), "Free");
+  assert.equal(models.priceHint(list.find(model => model.id === "openrouter/auto")), "Price varies");
+  assert.equal(models.contextHint(gpt), "128K context");
+  assert.equal(models.contextHint({ context: 2000000 }), "2.0M context");
+  assert.equal(models.costOfReply(gpt, 1000, 1000), 0.0125);
+  assert.equal(models.costOfReply(list[1], 1000, 1000), 0);
+  assert.deepEqual(models.searchModels(list, "llama").map(model => model.id), ["meta/llama-big:free", "meta/llama-small:free"]);
+  assert.deepEqual(models.searchModels(list, "", { freeOnly: true }).length, 2);
+  assert.deepEqual(models.searchModels(list, "", { visionOnly: true }).map(model => model.id), ["openai/gpt-x"]);
+  assert.deepEqual(models.fallbackModels(list), ["meta/llama-big:free"], "small-context and paid models are not fallbacks");
+  assert.deepEqual(models.fallbackModels(list, "meta/llama-big:free"), []);
+
+  // The list is cached, and an old cache still works when the network is down.
+  let calls = 0;
+  globalThis.fetch = async () => { calls += 1; return { ok: true, status: 200, json: async () => json }; };
+  assert.equal((await models.fetchModels()).length, 4);
+  assert.equal((await models.fetchModels()).length, 4);
+  assert.equal(calls, 1, "the second call comes from the cache");
+  assert.equal(models.cachedModels().length, 4);
+  globalThis.fetch = async () => { throw new TypeError("offline"); };
+  assert.equal((await models.fetchModels({ force: true })).length, 4, "the cache covers a failed refresh");
+  store.clear();
+  await assert.rejects(() => models.fetchModels(), /Couldn't load/);
+  delete globalThis.localStorage;
+  delete globalThis.fetch;
+});
+
 console.log(`\n${passed} test groups passed`);

@@ -1,19 +1,20 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b29";
-import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b29";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b30";
+import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b30";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b29";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b29";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b29";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b29";
-import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b29";
-import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b29";
-import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b29";
-import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL, FREE_MODEL } from "../modules/openrouter.js?v=20261018-b29";
+} from "../modules/uploads.js?v=20261018-b30";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b30";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b30";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b30";
+import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b30";
+import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b30";
+import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b30";
+import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL, FREE_MODEL } from "../modules/openrouter.js?v=20261018-b30";
+import { fetchModels, cachedModels, searchModels, priceHint, contextHint, fallbackModels, AUTO_MODEL } from "../modules/models.js?v=20261018-b30";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -559,7 +560,7 @@ const SETTINGS_TABS = [
   ["notifications", "Notifications", ["notifyToggle", "soundToggle", "soundPackSelect", "notifyDownloadToggle", "notifyTimerToggle", "quietHoursSelect"]],
   ["appearance", "Appearance", ["themeSelect", "themeSwatches", "accentSwatches", "fontSelect", "fontWeightInput", "lineHeightSelect", "contentWidthSelect", "bubbleSelect", "bubbleColorInput", "iconWeightSelect", "fontScaleInput", "densitySelect", "codeThemeSelect", "showModelBadgeToggle", "compactSidebarToggle", "seasonalToggle", "effectsToggle"]],
   ["personal", "Personalization", ["userNameInput", "assistantNameInput", "assistantAvatarSelect", "answerLengthSelect", "emojiLevelSelect", "humorInput", "formalityInput", "customInstructionsInput", "aiTitlesToggle", "markdownToggle", "onlineLookupsToggle"]],
-  ["model", "Model", ["engineSelect", "openrouterKeyBtn", "speedSelect", "perfBtn", "preloadModelBtn", "deleteModelsBtn", "backgroundDownloadToggle", "unloadIdleToggle", "wifiOnlyToggle", "batterySaverToggle"]],
+  ["model", "Model", ["engineSelect", "openrouterKeyBtn", "chooseModelBtn", "fallbackChainToggle", "creditRefreshBtn", "speedSelect", "perfBtn", "preloadModelBtn", "deleteModelsBtn", "backgroundDownloadToggle", "unloadIdleToggle", "wifiOnlyToggle", "batterySaverToggle"]],
   ["voice", "Voice", ["voiceSelect", "voiceOutputToggle", "speechRateInput", "voiceAutoSendToggle", "voiceFirstToggle"]],
   ["memory", "Memory", ["memoryToggle", "memoryAutoSelect", "memoryExpirySelect", "manageMemoryBtn"]],
   ["keyboard", "Keyboard", ["shortcutNewChatInput", "keyboardListBtn"]],
@@ -1712,6 +1713,8 @@ const SLASH_COMMANDS = [
   ["/bug", "Report a bug", () => openFeedback("bug")],
   ["/plans", "Plans and the demo checkout", () => openPlans()],
   ["/skills", "Turn skills on or make your own", () => openSkills()],
+  ["/model", "Choose the model for this chat", () => chooseChatModel()],
+  ["/credits", "Check your OpenRouter credit", () => showCredit()],
   ["/files", "Attach a file from an earlier chat", () => openRecentFiles()],
   ["/reset", "Reset what the model sees in this chat", () => resetContext()],
   ["/memory", "Open memory", () => openMemory()],
@@ -4800,7 +4803,7 @@ function setupMemoryFeatures() {
 
 let filesModulePromise = null;
 function loadFilesModule() {
-  filesModulePromise ||= import("../modules/files.js?v=20261018-b29");
+  filesModulePromise ||= import("../modules/files.js?v=20261018-b30");
   return filesModulePromise;
 }
 
@@ -6481,6 +6484,13 @@ function setupSkillsAndPlans() {
     if (event.target.value === "online" && !hasKey()) openOpenRouterSetup();
   });
   byId("openrouterKeyBtn")?.addEventListener("click", openOpenRouterSetup);
+  byId("creditRefreshBtn")?.addEventListener("click", () => refreshCredit());
+  byId("chooseModelBtn")?.addEventListener("click", () => chooseChatModel());
+  byId("fallbackChainToggle")?.addEventListener("change", event => {
+    state.settings.fallbackChain = event.target.checked;
+    cloudDirty = true;
+    persist();
+  });
   syncEngineUi();
   byId("skillStrip")?.addEventListener("click", event => {
     const id = event.target.closest("[data-skill]")?.dataset.skill;
@@ -6521,8 +6531,12 @@ function chatIsOnline(chat) {
 // Every reply AUI writes outside the main chat (titles, tl;dr, prompt improver) goes through here.
 function streamModel(messages, options = {}) {
   if (!chatIsOnline(getChat())) return streamSlm(messages, options);
-  return streamOpenRouter(messages, { signal: options.signal, maxTokens: options.maxTokens, temperature: options.temperature });
+  const chat = getChat();
+  return streamOpenRouter(messages, { signal: options.signal, maxTokens: options.maxTokens, temperature: options.temperature, model: chat?.onlineModel || getModel() });
 }
+
+const shortModel = id => String(id || "").replace(/^OpenRouter · /, "").replace(/^[^/]+\//, "").replace(/:free$/, " (free)");
+const modelOfMessage = message => (String(message.model || "").startsWith("OpenRouter · ") ? message.model.slice("OpenRouter · ".length) : "");
 
 function setEngine(engine) {
   state.settings.engine = engine === "device" ? "device" : "online";
@@ -6540,6 +6554,8 @@ function syncEngineUi() {
   if (select) select.value = online ? "online" : "device";
   const status = byId("engineKeyStatus");
   if (status) status.textContent = hasKey() ? `Key saved · ${getModel()}` : "No key yet";
+  const fallback = byId("fallbackChainToggle");
+  if (fallback) fallback.checked = state.settings.fallbackChain !== false;
   showModelName();
 }
 
@@ -6548,6 +6564,182 @@ function syncEngineUi() {
 function onlineSystemPrompt(prompt, strict) {
   const honest = prompt.replace("running privately on the user's device", "answering through the user's own OpenRouter key");
   return strict ? honest.replace("Help with any reasonable request. ", "").replace("Answer clearly and directly.", "") : honest;
+}
+
+// --- Model choice, retries, comparisons and the credit meter (key mode) ---
+
+const CREDIT_RECHECK_MS = 10 * 60 * 1000;
+let creditCheckedAt = 0;
+let lowCreditWarned = false;
+
+async function refreshCredit({ quiet = false } = {}) {
+  const status = byId("creditStatus");
+  if (!hasKey()) {
+    if (status) status.textContent = "Add a key to see this.";
+    return null;
+  }
+  creditCheckedAt = Date.now();
+  if (status && !quiet) status.textContent = "Checking…";
+  try {
+    const info = await checkKey();
+    const used = Number(info.usage || 0).toFixed(2);
+    const text = info.limit == null
+      ? `No spending limit on this key. Used about $${used}.`
+      : `About $${Number(info.remaining).toFixed(2)} left of $${Number(info.limit).toFixed(2)}. Used about $${used}.`;
+    if (status) status.textContent = info.free ? `${text} This key is on the free tier: free models only, with daily limits.` : text;
+    if (info.limit != null && info.remaining != null && info.remaining < 0.25 && !lowCreditWarned) {
+      lowCreditWarned = true;
+      toast(`Low OpenRouter credit: about $${Number(info.remaining).toFixed(2)} left. AUI uses a free model when it runs out.`, "info");
+    }
+    return info;
+  } catch (problem) {
+    if (status) status.textContent = problem.message;
+    return null;
+  }
+}
+
+async function showCredit() {
+  if (!hasKey()) return toast("Add an OpenRouter key first. The model on this device costs nothing.", "info");
+  const info = await refreshCredit({ quiet: true });
+  if (!info) return toast("Couldn't read the credit. Check the key in Settings.", "error");
+  toast(info.limit == null ? `No spending limit on this key. Used about $${Number(info.usage || 0).toFixed(2)}.` : `About $${Number(info.remaining).toFixed(2)} left of $${Number(info.limit).toFixed(2)}.`, "info");
+}
+
+// A searchable list of OpenRouter models with prices. Resolves to a model id, or null if closed.
+function pickOnlineModel({ title = "Choose a model", current = "", exclude = "" } = {}) {
+  return new Promise(resolve => {
+    const dialog = simpleDialog("modelPickerDialog", "OpenRouter", title, `
+      <div class="modelPicker">
+        <label class="srOnly" for="modelPickerSearch">Search models</label>
+        <input id="modelPickerSearch" type="search" placeholder="Search, for example claude, llama or gemini" autocomplete="off" spellcheck="false">
+        <label class="checkRow"><input type="checkbox" id="modelPickerFree"> Free models only</label>
+        <p class="toolHint" id="modelPickerNote" role="status">Loading the model list…</p>
+        <ul class="modelList" id="modelPickerList"></ul>
+        <div class="setupActions"><button type="button" class="textActionBtn" id="modelPickerRefresh">Refresh the list</button></div>
+      </div>`, { wide: true });
+    let done = false;
+    let models = cachedModels();
+    const finish = value => {
+      if (done) return;
+      done = true;
+      resolve(value);
+      dialog.close();
+    };
+    dialog.addEventListener("close", () => { if (!done) { done = true; resolve(null); } }, { once: true });
+    const search = dialog.querySelector("#modelPickerSearch");
+    const freeOnly = dialog.querySelector("#modelPickerFree");
+    const note = dialog.querySelector("#modelPickerNote");
+    const list = dialog.querySelector("#modelPickerList");
+    const row = (id, name, detail) => `<li><button type="button" class="modelOption" data-model-id="${escapeHtml(id)}"${id === current ? ' aria-current="true"' : ""}${id === exclude ? " disabled" : ""}><strong>${escapeHtml(name)}${id === current ? " (current)" : ""}</strong><small>${escapeHtml(detail)}</small></button></li>`;
+    const render = () => {
+      const query = search.value.trim();
+      const matches = searchModels(models, query, { freeOnly: freeOnly.checked }).slice(0, 80);
+      const featured = query || freeOnly.checked ? "" : row(AUTO_MODEL, "Auto: the best model for each question", `${AUTO_MODEL} · price varies`) + row(FREE_MODEL, "Free router: a free model for each question", `${FREE_MODEL} · Free`);
+      const custom = /^[\w.:@~+-]+\/[\w.:@~+-]+$/.test(query) && !matches.some(model => model.id === query) ? row(query, `Use "${query}"`, "A model name you typed") : "";
+      list.innerHTML = featured + custom + matches.filter(model => model.id !== AUTO_MODEL && model.id !== FREE_MODEL).map(model => row(model.id, model.name, [model.id, priceHint(model), contextHint(model)].filter(Boolean).join(" · "))).join("");
+      const free = models.filter(model => model.free).length;
+      note.textContent = models.length ? `${free} free models and ${models.length - free} paid models are listed on OpenRouter right now. Showing ${Math.min(matches.length, 80)} of ${searchModels(models, query, { freeOnly: freeOnly.checked }).length}.` : note.textContent;
+    };
+    const load = async force => {
+      note.textContent = "Loading the model list…";
+      try {
+        models = await fetchModels({ force });
+      } catch (problem) {
+        note.textContent = `${problem.message} You can still type a model name.`;
+      }
+      render();
+    };
+    search.addEventListener("input", render);
+    freeOnly.addEventListener("change", render);
+    dialog.querySelector("#modelPickerRefresh").addEventListener("click", () => load(true));
+    list.addEventListener("click", event => {
+      const option = event.target.closest("[data-model-id]");
+      if (option && !option.disabled) finish(option.dataset.modelId);
+    });
+    render();
+    load(false);
+    search.focus();
+  });
+}
+
+async function chooseChatModel() {
+  const chat = getChat();
+  if (!chat) return;
+  if (!hasKey()) {
+    toast("Pick a model after adding an OpenRouter key.", "info");
+    return openOpenRouterSetup();
+  }
+  const picked = await pickOnlineModel({ title: "Model for this chat", current: chat.onlineModel || getModel() });
+  if (!picked) return;
+  chat.onlineModel = picked;
+  systemPromptSnapshots.clear();
+  if (state.settings.engine === "device") setEngine("online");
+  persistChatChange();
+  showModelName();
+  toast(`This chat now uses ${shortModel(picked)}.`);
+}
+
+async function retryOnAnotherModel(message) {
+  if (state.loading) return;
+  if (!hasKey()) {
+    toast("Bigger models need an OpenRouter key. You can add a free one.", "info");
+    return openOpenRouterSetup();
+  }
+  const chat = getChat();
+  const picked = await pickOnlineModel({ title: "Retry on a different model", current: modelOfMessage(message) || chat.onlineModel || getModel() });
+  if (!picked) return;
+  chat.onlineModel = picked;
+  if (state.settings.engine === "device") setEngine("online");
+  persistChatChange();
+  showModelName();
+  regenerateMessage(message);
+}
+
+async function compareOnline(message) {
+  if (state.loading) return;
+  if (!hasKey()) {
+    toast("Comparing models needs an OpenRouter key. You can add a free one.", "info");
+    return openOpenRouterSetup();
+  }
+  const chat = getChat();
+  const assistantIndex = chat?.messages.findIndex(item => item.id === message.id) ?? -1;
+  let userIndex = assistantIndex - 1;
+  while (userIndex >= 0 && chat.messages[userIndex].role !== "user") userIndex -= 1;
+  if (userIndex < 0) return;
+  const original = modelOfMessage(message) || chat.onlineModel || getModel();
+  const picked = await pickOnlineModel({ title: "Compare with another model", current: original, exclude: original });
+  if (!picked) return;
+  if (state.settings.engine === "device") setEngine("online");
+  const userMessage = chat.messages[userIndex];
+  const comparisonId = message.comparisonId || createId("comparison");
+  message.comparisonId = comparisonId;
+  message.comparisonLabel = message.comparisonLabel || `Original · ${shortModel(original)}`;
+  persistChatChange();
+  renderMessages({ preserveScroll: true });
+  toast(`Comparing with ${shortModel(picked)}.`);
+  sendMessage({
+    text: `Give an independent second answer to this original request. Do not copy the earlier answer. Point out any important difference in your conclusion.\n\nOriginal request: ${userMessage.content}`,
+    attachments: userMessage.attachments || [],
+    hiddenUser: true,
+    bypassSearch: true,
+    onlineModel: picked,
+    comparisonId,
+    comparisonLabel: `Comparison · ${shortModel(picked)}`
+  });
+}
+
+function fixError(message, fix) {
+  const chat = getChat();
+  if (fix === "key") return openOpenRouterSetup();
+  if (fix === "credits" && chat) {
+    chat.onlineModel = FREE_MODEL;
+    persistChatChange();
+    showModelName();
+    toast("This chat now uses the free models.");
+    return regenerateMessage(message);
+  }
+  if (fix === "model") return retryOnAnotherModel(message);
+  regenerateMessage(message);
 }
 
 function openOpenRouterSetup() {
@@ -6937,6 +7129,7 @@ function normalizeChats(chats) {
     ...(typeof chat.speed === "string" && chat.speed ? { speed: chat.speed } : {}),
     ...(Array.isArray(chat.skills) && chat.skills.length ? { skills: chat.skills.filter(id => typeof id === "string").slice(0, 20) } : {}),
     ...(chat.memoryOff ? { memoryOff: true } : {}),
+    ...(typeof chat.onlineModel === "string" && /^[\w.:@~+-]+(\/[\w.:@~+-]+)*$/.test(chat.onlineModel) && chat.onlineModel.length <= 120 ? { onlineModel: chat.onlineModel } : {}),
     ...(Number.isFinite(chat.pinOrder) ? { pinOrder: chat.pinOrder } : {}),
     messages: Array.isArray(chat.messages)
       ? chat.messages.map(message => ({
@@ -6956,6 +7149,8 @@ function normalizeChats(chats) {
         ...(Array.isArray(message.toolSources) ? { toolSources: message.toolSources.map(String) } : {}),
         ...(message.factNote ? { factNote: true } : {}),
         ...(message.pinnedContext ? { pinnedContext: true } : {}),
+        ...(message.status === "error" && typeof message.error === "string" && message.error ? { error: message.error.slice(0, 300) } : {}),
+        ...(message.status === "error" && typeof message.errorFix === "string" && message.errorFix ? { errorFix: message.errorFix.slice(0, 12) } : {}),
         ...(message.excluded ? { excluded: true } : {}),
         ...(message.beforeReset ? { beforeReset: true } : {}),
         ...(Array.isArray(message.memoryUsed) ? { memoryUsed: message.memoryUsed.map(String) } : {}),
@@ -7252,6 +7447,7 @@ async function sendMessage(options = {}) {
   }
 
   const online = chatIsOnline(chat);
+  const onlineModel = options.onlineModel || chat.onlineModel || getModel();
   // Homework Helper is stricter than the key alone: no calculator, notes or memories that could hand over answers.
   const strictOnline = Boolean(onlineSkill(state.settings, chat));
   if (online && !hasKey()) {
@@ -7260,7 +7456,8 @@ async function sendMessage(options = {}) {
     return;
   }
   if (online && navigator.onLine === false) {
-    toast("Answers come through OpenRouter, which needs an internet connection.", "error");
+    if (!options.hiddenUser) offlineHeld = text;
+    toast("You're offline. Your message stays in the box and sends when you're back online.", "error");
     return;
   }
 
@@ -7438,7 +7635,7 @@ async function sendMessage(options = {}) {
     role: "assistant",
     content: "",
     timestamp: Date.now(),
-    model: online ? `OpenRouter · ${getModel()}` : requestModel,
+    model: online ? `OpenRouter · ${onlineModel}` : requestModel,
     status: "streaming",
     attachments: [],
     ...(online ? { online: true } : {}),
@@ -7450,7 +7647,7 @@ async function sendMessage(options = {}) {
   if (!options.targetMessage) chat.messages.push(assistantMessage);
   else {
     assistantMessage.status = "streaming";
-    assistantMessage.model = online ? `OpenRouter · ${getModel()}` : requestModel;
+    assistantMessage.model = online ? `OpenRouter · ${onlineModel}` : requestModel;
   }
 
   checkpointMessages({ immediate: true });
@@ -7497,7 +7694,17 @@ async function sendMessage(options = {}) {
       warnContextOverflow(chat);
     }
     if (!online) await backgroundModelTask;
-    for await (const token of (online ? streamOpenRouter(slmMessages, { signal: abortController.signal, maxTokens: 1500, temperature: 0.6, onFallback: () => { assistantMessage.model = `OpenRouter · ${FREE_MODEL}`; toast("Out of OpenRouter credits, so this reply uses the free models.", "info"); } }) : streamSlm(slmMessages, {
+    for await (const token of (online ? streamOpenRouter(slmMessages, {
+      signal: abortController.signal,
+      maxTokens: 1500,
+      temperature: 0.6,
+      model: onlineModel,
+      fallbacks: state.settings.fallbackChain === false ? [] : fallbackModels(cachedModels(), onlineModel),
+      onFallback: (next, status) => {
+        assistantMessage.model = `OpenRouter · ${next}`;
+        toast(status === 402 ? "Out of OpenRouter credits, so this reply uses a free model." : `${shortModel(onlineModel)} was busy or unavailable, so ${shortModel(next)} answered.`, "info");
+      }
+    }) : streamSlm(slmMessages, {
       signal: abortController.signal,
       maxTokens: Math.round(getReplyTokenLimit(text) * ({ short: 0.6, medium: 1, long: 1.5 }[state.settings.answerLength || "medium"])),
       temperature: chooseTemperature(text),
@@ -7564,6 +7771,7 @@ async function sendMessage(options = {}) {
       if (loadingShown) assistantMessage.content = priorContent;
       assistantMessage.status = "error";
       assistantMessage.error = error.message || "The response failed.";
+      assistantMessage.errorFix = error.fix || "";
       toast(assistantMessage.error, "error");
       announce("The response failed");
     }
@@ -7584,6 +7792,7 @@ async function sendMessage(options = {}) {
     updatePauseButton();
     noteBackgroundInterruption(assistantMessage);
     if (assistantMessage.status === "complete") announce("AUI finished replying");
+    if (online && Date.now() - creditCheckedAt > CREDIT_RECHECK_MS) refreshCredit({ quiet: true });
     if (messageQueue.length) setTimeout(sendQueuedMessage, 400);
     if (assistantMessage.status === "complete") {
       notifyReplyFinished(assistantMessage);
@@ -8247,6 +8456,7 @@ function createMessageFooter(message, index) {
       if (getUserTier() !== "guest" && MODEL_NAMES[message.model]) {
         if (Object.keys(MODEL_NAMES).length > 1) actions.append(actionButton("Compare model", "compare"));
       }
+      if (Object.keys(MODEL_NAMES).length < 2) actions.append(actionButton("Retry on a better model", "retry-model"), actionButton("Compare models", "compare-online"));
     }
     if (message.status === "stopped") actions.append(actionButton("Continue", "continue"));
     const model = element("span", "modelName");
@@ -8289,7 +8499,8 @@ function createTypingIndicator() {
 function createErrorState(message) {
   const error = element("div", "messageError");
   error.setAttribute("role", "alert");
-  error.innerHTML = `<div><strong>That response hit a snag.</strong><span>${escapeHtml(message.error || "Please try again.")}</span></div><button type="button" data-message-action="retry">Retry</button>`;
+  const fixLabel = { key: "Open key settings", credits: "Use free models", model: "Pick another model" }[message.errorFix];
+  error.innerHTML = `<div><strong>That response hit a snag.</strong><span>${escapeHtml(message.error || "Please try again.")}</span></div>${fixLabel ? `<button type="button" data-message-action="error-fix" data-fix="${escapeHtml(message.errorFix)}">${fixLabel}</button>` : ""}<button type="button" data-message-action="retry">Retry</button>`;
   return error;
 }
 
@@ -8334,7 +8545,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b29");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b30");
   return markdownModulePromise;
 }
 
@@ -8453,6 +8664,15 @@ async function handleChatAction(event) {
       break;
     case "compare":
       compareMessageWithAnotherModel(message);
+      break;
+    case "retry-model":
+      retryOnAnotherModel(message);
+      break;
+    case "compare-online":
+      compareOnline(message);
+      break;
+    case "error-fix":
+      fixError(message, button.dataset.fix);
       break;
     case "copy-plain":
       copyText(stripMarkdown(message.content)).then(() => toast("Copied as plain text")).catch(() => toast("Couldn’t copy.", "error"));
@@ -11016,7 +11236,7 @@ function warmCachedModel() {
 function showModelName() {
   const badge = byId("modelBadge");
   if (engineOnline()) {
-    if (badge) badge.textContent = `AUI · OpenRouter · ${getModel()}`;
+    if (badge) badge.textContent = `AUI · OpenRouter · ${getChat()?.onlineModel || getModel()}`;
     return;
   }
   pickModel().then(model => {
@@ -11050,8 +11270,17 @@ function scrollBottom({ behavior = "auto", force = false } = {}) {
   if (force) userPausedScroll = false;
 }
 
+// A message typed while offline is sent once the connection returns, unless it was edited or sent by hand.
+let offlineHeld = "";
+function sendHeldMessage() {
+  const held = offlineHeld;
+  offlineHeld = "";
+  if (held && DOM.input.value.trim() === held && !state.loading && navigator.onLine) sendMessage();
+}
+
 function updateNetworkStatus() {
   const online = navigator.onLine;
+  if (online) setTimeout(sendHeldMessage, 600);
   DOM.offlineBanner.hidden = online;
   DOM.connectionStatus.classList.toggle("offline", !online);
   DOM.connectionStatus.lastChild.textContent = online ? "Online" : "Offline";
