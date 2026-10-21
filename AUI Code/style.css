@@ -3840,3 +3840,8 @@
   #plansDialog, #skillsDialog { width: min(96vw, 940px); }
   .planCard .primaryBtn, .planCard .secondaryBtn { margin-top: auto; }
 }
+
+@layer components {
+  #openrouterForm input { width: 100%; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-elevated); }
+  #openrouterForm label { display: grid; gap: 4px; font-size: 14px; }
+}

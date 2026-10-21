@@ -1,18 +1,19 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b20";
-import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b20";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b21";
+import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b21";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b20";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b20";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b20";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b20";
-import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b20";
-import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b20";
-import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey } from "../modules/skills.js?v=20261018-b20";
+} from "../modules/uploads.js?v=20261018-b21";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b21";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b21";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b21";
+import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b21";
+import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b21";
+import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b21";
+import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL } from "../modules/openrouter.js?v=20261018-b21";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -1251,7 +1252,7 @@ async function ensureChatUnlocked(chat) {
 // Generate a short title with the on-device model once the first reply is in.
 let backgroundModelTask = Promise.resolve();
 async function generateAiTitle(chat, { force = false } = {}) {
-  if (!chat || (!force && (chat.aiTitled || state.settings.aiTitles === false))) return;
+  if (!chat || chatIsOnline(chat) || (!force && (chat.aiTitled || state.settings.aiTitles === false))) return;
   const firstUser = chat.messages.find(message => message.role === "user");
   if (!firstUser || state.loading) return;
   const previous = backgroundModelTask;
@@ -4799,7 +4800,7 @@ function setupMemoryFeatures() {
 
 let filesModulePromise = null;
 function loadFilesModule() {
-  filesModulePromise ||= import("../modules/files.js?v=20261018-b20");
+  filesModulePromise ||= import("../modules/files.js?v=20261018-b21");
   return filesModulePromise;
 }
 
@@ -6214,6 +6215,7 @@ function toggleChatSkill(id) {
   const skill = findSkill(customSkills(), id);
   if (!chat || !skill) return false;
   const on = (chat.skills || []).includes(id);
+  if (!on && skill.online && !hasKey()) toast("Homework Helper answers online. Add your OpenRouter key to use it.", "info", { label: "Add key", duration: 8000, onClick: openOpenRouterSetup });
   chat.skills = on ? chat.skills.filter(item => item !== id) : [...(chat.skills || []), id];
   saveSkillSettings();
   toast(on ? `${skill.name} is off for this chat.` : `${skill.name} is on for this chat.`);
@@ -6221,6 +6223,7 @@ function toggleChatSkill(id) {
 }
 
 function toggleAlwaysSkill(id, on) {
+  if (on && findSkill(customSkills(), id)?.online && !hasKey()) toast("Homework Helper answers online. Add your OpenRouter key to use it.", "info", { label: "Add key", duration: 8000, onClick: openOpenRouterSetup });
   const list = new Set(state.settings.skillsOn || []);
   if (on) list.add(id); else list.delete(id);
   state.settings.skillsOn = [...list];
@@ -6240,7 +6243,7 @@ function renderSkillStrip() {
     chip.type = "button";
     chip.dataset.skill = skill.id;
     chip.title = always.has(skill.id) ? "Always on. Click to turn it off everywhere." : "On for this chat. Click to turn it off.";
-    chip.textContent = `✧ ${skill.name} ×`;
+    chip.textContent = `✧ ${skill.name}${skill.online ? " (online)" : ""} ×`;
     return chip;
   }));
 }
@@ -6249,9 +6252,10 @@ function skillCard(skill, chat) {
   const onHere = (chat?.skills || []).includes(skill.id);
   const always = (state.settings.skillsOn || []).includes(skill.id);
   return `<article class="skillCard" data-skill-id="${escapeHtml(skill.id)}">
-    <div class="skillText"><h3>${escapeHtml(skill.name)} <code>${escapeHtml(commandOf(skill))}</code></h3><p>${escapeHtml(skill.description || "")}</p></div>
+    <div class="skillText"><h3>${escapeHtml(skill.name)} <code>${escapeHtml(commandOf(skill))}</code></h3><p>${escapeHtml(skill.description || "")}${skill.online ? " <strong>Online.</strong>" : ""}</p></div>
     <div class="skillActions">
       <button type="button" class="secondaryBtn" data-skill-use aria-pressed="${onHere}">${onHere ? "On in this chat" : "Use in this chat"}</button>
+      ${skill.online ? `<button type="button" class="secondaryBtn" data-skill-setup>${hasKey() ? "Key saved · change" : "Add your key"}</button>` : ""}
       <label class="checkRow"><input type="checkbox" data-skill-always ${always ? "checked" : ""}> Always on</label>
       ${skill.custom ? '<button type="button" class="textActionBtn" data-skill-edit>Edit</button><button type="button" class="textActionBtn" data-skill-export>Save as SKILL.md</button><button type="button" class="textActionBtn" data-skill-delete>Delete</button>' : ""}
     </div></article>`;
@@ -6277,6 +6281,7 @@ function openSkills() {
     if (event.target.closest("[data-skill-import]")) return importSkillFile();
     if (event.target.closest("[data-skill-plans]")) return openPlans();
     if (!id) return;
+    if (event.target.closest("[data-skill-setup]")) return openOpenRouterSetup();
     if (event.target.closest("[data-skill-use]")) { toggleChatSkill(id); openSkills(); }
     else if (event.target.closest("[data-skill-edit]")) openSkillEditor(findSkill(customSkills(), id));
     else if (event.target.closest("[data-skill-export]")) {
@@ -6490,6 +6495,78 @@ function setupSkillsAndPlans() {
     history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
     setTimeout(() => (target === "skills" ? openSkills() : openPlans()), 400);
   }
+}
+
+// --- Online skills (Homework Helper): replies come from OpenRouter with the user's own key ---
+
+const ONLINE_PROMPT_BUDGET = 24000;
+
+function chatIsOnline(chat) {
+  return Boolean(onlineSkill(state.settings, chat));
+}
+
+// The base prompt says the model runs on the device and should answer directly; online
+// homework chats must say what is true and must not undercut the skill's rules.
+function onlineSystemPrompt(prompt) {
+  return prompt
+    .replace("running privately on the user's device", "answering through the user's own OpenRouter key")
+    .replace("Help with any reasonable request. ", "")
+    .replace("Answer clearly and directly.", "");
+}
+
+function openOpenRouterSetup() {
+  const saved = hasKey();
+  const dialog = simpleDialog("openrouterDialog", "Homework Helper", "Connect your OpenRouter key", `
+    <form class="setupBody" id="openrouterForm" novalidate autocomplete="off">
+      <div class="planNotice" role="note"><strong>This skill is online.</strong> While Homework Helper is on for a chat, what you type, the text of files you attach and the earlier messages in that chat are sent to OpenRouter and the model it picks. They don't go to AUI. Everything else in AUI stays on your device.</div>
+      <label>OpenRouter key <input name="key" type="password" autocomplete="off" spellcheck="false" placeholder="${saved ? "A key is saved. Type a new one to replace it." : "sk-or-v1-..."}"></label>
+      <label>Model <input name="model" autocomplete="off" spellcheck="false" value="${escapeHtml(getModel())}"></label>
+      <small class="toolHint">The default <code>${DEFAULT_MODEL}</code> lets OpenRouter pick a model for each question. Use a name from openrouter.ai/models (for example <code>meta-llama/llama-3.3-70b-instruct:free</code>) to choose one yourself.</small>
+      <p class="toolHint">Get a key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">openrouter.ai/keys</a>. Give it a spending limit. The key is saved in this browser only: it is not synced to your account, not in your data download, and anyone using this browser profile could read it.</p>
+      <p class="formError" id="openrouterError" role="alert" hidden></p>
+      <p class="toolHint" id="openrouterStatus" role="status"></p>
+      <div class="setupActions">
+        ${saved ? '<button type="button" class="textActionBtn dangerButton" data-key-remove>Remove key</button>' : ""}
+        <button type="button" class="secondaryBtn" data-key-test>Test key</button>
+        <button type="submit" class="primaryBtn">Save</button>
+      </div>
+    </form>`);
+  const form = dialog.querySelector("#openrouterForm");
+  const error = dialog.querySelector("#openrouterError");
+  const status = dialog.querySelector("#openrouterStatus");
+  const fail = message => { error.hidden = !message; error.textContent = message || ""; };
+  const typedKey = () => form.key.value.trim() || getKey();
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+    fail("");
+    try {
+      saveKey(typedKey(), form.model.value);
+    } catch (problem) {
+      return fail(problem.message);
+    }
+    form.key.value = "";
+    toast("Saved. Homework Helper will answer online.");
+    dialog.close();
+    openSkills();
+  });
+  dialog.querySelector("[data-key-test]").addEventListener("click", async () => {
+    fail("");
+    status.textContent = "Checking…";
+    try {
+      const info = await checkKey(typedKey());
+      status.textContent = info.remaining == null ? `Key "${info.label}" works.` : `Key "${info.label}" works. About $${Number(info.remaining).toFixed(2)} left on its limit.`;
+    } catch (problem) {
+      status.textContent = "";
+      fail(problem.message);
+    }
+  });
+  dialog.querySelector("[data-key-remove]")?.addEventListener("click", () => {
+    removeKey();
+    toast("Key removed from this browser.", "info");
+    dialog.close();
+    openSkills();
+  });
+  form.key.focus();
 }
 
 let appInitialized = false;
@@ -7130,6 +7207,17 @@ async function sendMessage(options = {}) {
     return;
   }
 
+  const online = chatIsOnline(chat);
+  if (online && !hasKey()) {
+    toast("Homework Helper answers online. Add your OpenRouter key first.", "info");
+    openOpenRouterSetup();
+    return;
+  }
+  if (online && navigator.onLine === false) {
+    toast("Homework Helper needs an internet connection.", "error");
+    return;
+  }
+
   if (searchMode && !options.bypassSearch && !attachments.length) {
     return sendSearchMessage(text);
   }
@@ -7304,9 +7392,10 @@ async function sendMessage(options = {}) {
     role: "assistant",
     content: "",
     timestamp: Date.now(),
-    model: requestModel,
+    model: online ? `OpenRouter · ${getModel()}` : requestModel,
     status: "streaming",
     attachments: [],
+    ...(online ? { online: true } : {}),
     comparisonId: options.comparisonId || "",
     comparisonLabel: options.comparisonLabel || "",
     ...(options.previousVersions?.length ? { versions: [...options.previousVersions] } : {})
@@ -7315,7 +7404,7 @@ async function sendMessage(options = {}) {
   if (!options.targetMessage) chat.messages.push(assistantMessage);
   else {
     assistantMessage.status = "streaming";
-    assistantMessage.model = requestModel;
+    assistantMessage.model = online ? `OpenRouter · ${getModel()}` : requestModel;
   }
 
   checkpointMessages({ immediate: true });
@@ -7334,18 +7423,22 @@ async function sendMessage(options = {}) {
   try {
     const history = options.historyOverride
       || createHistory(chat, assistantMessage.id, Boolean(options.targetMessage));
-    applyChatSpeed(chat);
-    await confirmModelDownload();
-    const tools = await runTools(text);
-    await addKnowledgeNotes(text, tools).catch(() => {});
-    const memories = memoriesForMessage(chat, text);
+    if (!online) {
+      applyChatSpeed(chat);
+      await confirmModelDownload();
+    }
+    // An online homework chat gets no calculator or knowledge notes (they would hand over answers)
+    // and no memories (nothing personal is sent that the student didn't type in this chat).
+    const tools = online ? { notes: [], sources: [] } : await runTools(text);
+    if (!online) await addKnowledgeNotes(text, tools).catch(() => {});
+    const memories = online ? [] : memoriesForMessage(chat, text);
     if (memories.length) assistantMessage.memoryUsed = memories.map(item => memoryText(item).slice(0, 80));
     if (tools.sources.length) assistantMessage.toolSources = tools.sources;
     const slmMessages = fitSlmMessages(
-      getChatSystemPrompt(chat),
+      online ? onlineSystemPrompt(getChatSystemPrompt(chat)) : getChatSystemPrompt(chat),
       history,
       withMemoryNotes(withToolNotes(buildSlmUserText(text, attachments), tools), memories),
-      getPromptBudget()
+      online ? ONLINE_PROMPT_BUDGET : getPromptBudget()
     );
     userMessage?.attachments?.forEach(item => {
       const excerpt = sentExcerpts.get(item.id);
@@ -7356,8 +7449,8 @@ async function sendMessage(options = {}) {
       slmMessages[0] = { ...slmMessages[0], content: `${slmMessages[0].content}\n${droppedNote}` };
       warnContextOverflow(chat);
     }
-    await backgroundModelTask;
-    for await (const token of streamSlm(slmMessages, {
+    if (!online) await backgroundModelTask;
+    for await (const token of (online ? streamOpenRouter(slmMessages, { signal: abortController.signal, maxTokens: 1500, temperature: 0.6 }) : streamSlm(slmMessages, {
       signal: abortController.signal,
       maxTokens: Math.round(getReplyTokenLimit(text) * ({ short: 0.6, medium: 1, long: 1.5 }[state.settings.answerLength || "medium"])),
       temperature: chooseTemperature(text),
@@ -7371,7 +7464,7 @@ async function sendMessage(options = {}) {
         scheduleStreamingRender(assistantMessage);
         DOM.chatArea.querySelector(`[data-message-id="${CSS.escape(assistantMessage.id)}"]`)?.classList.add("isLoadingModel");
       }
-    })) {
+    }))) {
       if (loadingShown) {
         loadingShown = false;
         DOM.chatArea.querySelector(`[data-message-id="${CSS.escape(assistantMessage.id)}"]`)?.classList.remove("isLoadingModel");
@@ -7395,7 +7488,7 @@ async function sendMessage(options = {}) {
     const seconds = firstTokenAt ? (performance.now() - firstTokenAt) / 1000 : 0;
     if (tokenCount > 1 && seconds > 0) assistantMessage.tokensPerSecond = Math.round(tokenCount / seconds * 10) / 10;
     assistantMessage.durationMs = modelWasLoading ? 0 : Math.round(performance.now() - requestedAt);
-    suggestFasterModel(assistantMessage.tokensPerSecond);
+    if (!online) suggestFasterModel(assistantMessage.tokensPerSecond);
     if (isFactualQuestion(text) && !assistantMessage.toolSources) assistantMessage.factNote = true;
 
     assistantMessage.status = assistantMessage.content ? "complete" : "error";
@@ -8194,7 +8287,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b20");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b21");
   return markdownModulePromise;
 }
 

@@ -440,7 +440,7 @@ await test("skills: validation, SKILL.md round trip and prompt", async () => {
   const skills = await load("modules/skills.js");
   const { normalizeSkill, toSkillFile, parseSkillFile, skillsPrompt, skillsKey, BUILTIN_SKILLS, MAX_INSTRUCTIONS } = skills;
   assert.ok(BUILTIN_SKILLS.length >= 10 && new Set(BUILTIN_SKILLS.map(skill => skill.id)).size === BUILTIN_SKILLS.length);
-  assert.ok(BUILTIN_SKILLS.every(skill => skill.instructions.length < MAX_INSTRUCTIONS));
+  assert.ok(BUILTIN_SKILLS.filter(skill => !skill.online).every(skill => skill.instructions.length < MAX_INSTRUCTIONS), "small-model skills stay short");
   assert.ok(normalizeSkill({ name: "", instructions: "x" }).error);
   assert.ok(normalizeSkill({ name: "A", instructions: "" }).error);
   assert.ok(normalizeSkill({ name: "A", instructions: "x".repeat(MAX_INSTRUCTIONS + 1) }).error);
@@ -463,6 +463,78 @@ await test("skills: validation, SKILL.md round trip and prompt", async () => {
   assert.notEqual(skillsKey(settings, {}), skillsKey({ ...settings, skills: [{ ...made, instructions: "Talk like a robot." }] }, { skills: [made.id] }));
   const huge = { skills: Array.from({ length: 5 }, (_, i) => ({ id: `s${i}`, name: `S${i}`, instructions: "y".repeat(1100) })), skillsOn: ["s0", "s1", "s2", "s3", "s4"] };
   assert.ok(skillsPrompt(huge, {}).length < 2000, "the prompt budget caps the skills");
+});
+
+await test("Homework Helper is an online skill that keeps its whole rule set", async () => {
+  const { BUILTIN_SKILLS, skillsPrompt, onlineSkill } = await load("modules/skills.js");
+  const homework = BUILTIN_SKILLS.find(skill => skill.id === "homework");
+  assert.ok(homework?.online && homework.instructions.length > 2500, "the full rules, not a short summary");
+  for (const rule of ["How old are you", "never hand over a finished answer", "Never write the graded piece yourself", "Solo review problem", "answer only from what the student tells you"]) {
+    assert.ok(homework.instructions.toLowerCase().includes(rule.toLowerCase()), rule);
+  }
+  assert.ok(skillsPrompt({}, { skills: ["homework"] }).includes("Solo review problem"), "online skills skip the small-model budget");
+  assert.equal(onlineSkill({}, { skills: ["homework"] })?.id, "homework");
+  assert.equal(onlineSkill({ skillsOn: ["homework"] }, {})?.id, "homework", "always-on counts too");
+  assert.equal(onlineSkill({}, { skills: ["summarize"] }), null);
+});
+
+await test("OpenRouter: key checks, stream parsing, errors and storage", async () => {
+  const store = new Map();
+  globalThis.localStorage = { getItem: key => (store.has(key) ? store.get(key) : null), setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key) };
+  const router = await load("modules/openrouter.js");
+  assert.ok(router.looksLikeKey("sk-or-v1-abcdef0123456789abcdef"));
+  assert.ok(!router.looksLikeKey("sk-abcdef0123456789abcdef") && !router.looksLikeKey("") && !router.looksLikeKey("sk-or-short"));
+  assert.equal(router.hasKey(), false);
+  assert.throws(() => router.saveKey("nope", ""), /OpenRouter key/);
+  assert.throws(() => router.saveKey("sk-or-v1-abcdef0123456789abcdef", "bad model name!"), /model name/);
+  router.saveKey("  sk-or-v1-abcdef0123456789abcdef ", "");
+  assert.equal(router.getKey(), "sk-or-v1-abcdef0123456789abcdef");
+  assert.equal(router.getModel(), "openrouter/auto");
+  router.saveKey("sk-or-v1-abcdef0123456789abcdef", "meta-llama/llama-3.3-70b-instruct:free");
+  assert.equal(router.getModel(), "meta-llama/llama-3.3-70b-instruct:free");
+  router.removeKey();
+  assert.equal(router.hasKey(), false);
+
+  const NL = String.fromCharCode(10);
+  const lines = [
+    ": OPENROUTER PROCESSING", "",
+    'data: {"choices":[{"delta":{"content":"Hel"}}]}', "",
+    'data: {"choices":[{"delta":{"content":"lo"}}]}', "",
+    'data: {"choi'
+  ].join(NL);
+  const piece = router.parseSse(lines);
+  assert.deepEqual(piece.tokens, ["Hel", "lo"]);
+  assert.ok(piece.rest.startsWith('data: {"choi'), "a half-received line waits for the next piece");
+  assert.equal(router.parseSse('data: {"error":{"message":"Provider failed"}}' + NL).error, "Provider failed");
+  assert.ok(router.parseSse("data: [DONE]" + NL).done);
+  assert.ok(/credits/.test(router.friendlyStatus(402)) && /key/.test(router.friendlyStatus(401)) && /model/.test(router.friendlyStatus(404)));
+
+  // A full stream through a fake server, split at awkward places.
+  const body = ['data: {"choices":[{"delta":{"content":"Hi "}}]}', "", 'data: {"choices":[{"delta":{"content":"there"}}]}', "", "data: [DONE]", "", ""].join(NL);
+  let request;
+  globalThis.fetch = async (url, init) => {
+    request = { url, init };
+    const bytes = new TextEncoder().encode(body);
+    let sent = 0;
+    return { ok: true, status: 200, body: { getReader: () => ({ read: async () => (sent >= bytes.length ? { done: true } : { done: false, value: bytes.slice(sent, (sent += 17)) }), cancel: async () => {} }) } };
+  };
+  const key = "sk-or-v1-abcdef0123456789abcdef";
+  let text = "";
+  for await (const token of router.streamOpenRouter([{ role: "user", content: "hi" }], { key, model: "openrouter/auto" })) text += token;
+  assert.equal(text, "Hi there");
+  assert.equal(request.url, "https://openrouter.ai/api/v1/chat/completions");
+  assert.equal(request.init.headers.Authorization, `Bearer ${key}`);
+  const sentBody = JSON.parse(request.init.body);
+  assert.ok(sentBody.stream && sentBody.model === "openrouter/auto" && sentBody.messages[0].content === "hi");
+
+  const drain = async () => { for await (const _ of router.streamOpenRouter([], { key })) { /* read it all */ } };
+  globalThis.fetch = async () => ({ ok: false, status: 402, json: async () => ({ error: { message: "no credits" } }) });
+  await assert.rejects(drain, /out of credits/);
+  globalThis.fetch = async () => { throw new TypeError("Offline-only mode is on, so AUI won't contact other websites."); };
+  await assert.rejects(drain, /Offline-only/);
+  await assert.rejects(async () => { for await (const _ of router.streamOpenRouter([], { key: "bad" })) { /* nothing */ } }, /Add your OpenRouter key/);
+  delete globalThis.localStorage;
+  delete globalThis.fetch;
 });
 
 await test("content security policy is strict where it matters", () => {
