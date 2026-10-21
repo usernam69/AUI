@@ -3,17 +3,20 @@
 [![Deploy to GitHub Pages](https://github.com/usernam69/AUI/actions/workflows/pages.yml/badge.svg)](https://github.com/usernam69/AUI/actions/workflows/pages.yml)
 [![Tests](https://github.com/usernam69/AUI/actions/workflows/test.yml/badge.svg)](https://github.com/usernam69/AUI/actions/workflows/test.yml)
 
-A private AI chat that runs a small language model in your browser with WebGPU.
+A private AI chat. It runs a small language model in your browser with WebGPU, or answers through your own OpenRouter key if you add one.
 Live at **https://usernam69.github.io/AUI/**.
 
 ## Project layout
 
-- `AUI Code/` — the website (static HTML, CSS and JavaScript, no build step)
-  - `chat/` — the chat app (`app.js`) and its service worker (`sw.js`)
-  - `modules/` — the in-browser model (`slm.js`, `slm-worker.js`), Markdown rendering, storage, uploads
-- `tests/run.mjs` — dependency-free tests: `node tests/run.mjs`
-- `scripts/serve.mjs` — local preview at `/AUI/`, like GitHub Pages
-- `scripts/check-links.mjs` — fails the deploy on broken internal links
+- `AUI Code/`: the website (static HTML, CSS and JavaScript, no build step)
+  - `index.html` and `home/`: the home page
+  - `chat/`: the chat app (`app.js`) and its service worker (`sw.js`)
+  - `modules/`: the in-browser model (`slm.js`, `slm-worker.js`), the OpenRouter client, skills, plans and the card check, Markdown rendering, storage, uploads
+- `desktop/`: the Electron desktop app (see its README)
+- `tests/run.mjs`: dependency-free tests, run with `node tests/run.mjs`
+- `scripts/serve.mjs`: local preview at `/AUI/`, like GitHub Pages
+- `scripts/check-links.mjs`: fails the deploy on broken internal links
+- `scripts/security-check.mjs` and `scripts/xss-check.mjs`: committed-secret, link and XSS checks that run in CI
 
 ## Run it locally
 
