@@ -6,7 +6,11 @@ const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 const KEY_INFO = "https://openrouter.ai/api/v1/auth/key";
 const KEY_STORE = "aui.openrouterKey";
 const MODEL_STORE = "aui.openrouterModel";
-export const DEFAULT_MODEL = "openrouter/auto";
+// OpenRouter's free router picks a free model for each question, so it works with no credits
+// (free models have daily limits). Paid models are still available by name.
+export const FREE_MODEL = "openrouter/free";
+export const DEFAULT_MODEL = FREE_MODEL;
+export const isFreeModel = model => model === FREE_MODEL || String(model).endsWith(":free");
 
 const read = name => {
   try { return localStorage.getItem(name) || ""; } catch { return ""; }
@@ -39,7 +43,7 @@ export function removeKey() {
 export function friendlyStatus(status, detail = "") {
   const extra = detail ? ` (${String(detail).slice(0, 160)})` : "";
   if (status === 401) return "OpenRouter didn't accept the key. Check it, or make a new one.";
-  if (status === 402) return "The OpenRouter account is out of credits.";
+  if (status === 402) return "The OpenRouter account is out of credits. Add credits, or use a free model such as openrouter/free.";
   if (status === 403) return `OpenRouter blocked this request${extra}.`;
   if (status === 404) return `OpenRouter doesn't know that model${extra}. Change it in the Homework Helper setup.`;
   if (status === 408 || status === 504) return "OpenRouter took too long to answer. Try again.";
@@ -70,23 +74,30 @@ export function parseSse(buffer) {
   return { tokens, rest, error, done };
 }
 
-export async function* streamOpenRouter(messages, { signal, maxTokens = 1500, temperature = 0.6, key = getKey(), model = getModel() } = {}) {
+export async function* streamOpenRouter(messages, { signal, maxTokens = 1500, temperature = 0.6, key = getKey(), model = getModel(), onFallback } = {}) {
   if (!looksLikeKey(key)) throw new Error("Add your OpenRouter key first.");
-  let response;
-  try {
-    response = await fetch(ENDPOINT, {
-      method: "POST",
-      signal,
-      headers: {
-        Authorization: `Bearer ${key.trim()}`,
-        "Content-Type": "application/json",
-        "X-Title": "AUI"
-      },
-      body: JSON.stringify({ model, messages, stream: true, max_tokens: maxTokens, temperature })
-    });
-  } catch (error) {
-    if (error?.name === "AbortError") throw error;
-    throw new Error(/Offline-only/.test(error?.message) ? error.message : "Couldn't reach OpenRouter. Check your internet connection.");
+  const send = async chosen => {
+    try {
+      return await fetch(ENDPOINT, {
+        method: "POST",
+        signal,
+        headers: {
+          Authorization: `Bearer ${key.trim()}`,
+          "Content-Type": "application/json",
+          "X-Title": "AUI"
+        },
+        body: JSON.stringify({ model: chosen, messages, stream: true, max_tokens: maxTokens, temperature })
+      });
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      throw new Error(/Offline-only/.test(error?.message) ? error.message : "Couldn't reach OpenRouter. Check your internet connection.");
+    }
+  };
+  let response = await send(model);
+  // Out of credits: a paid model can't answer, but the free router still can.
+  if (response.status === 402 && !isFreeModel(model)) {
+    onFallback?.(FREE_MODEL);
+    response = await send(FREE_MODEL);
   }
   if (!response.ok) {
     let detail = "";

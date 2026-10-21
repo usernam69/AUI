@@ -1159,3 +1159,6 @@ Desktop app: it is the website in a window, so it uses the same engine; the key 
 ### Batch 21 - guests need no key (asked for directly)
 The default engine is now decided by whether a key exists: no key means the on-device model (no dialog, no prompt, works at once); adding a key in Settings, Model, or the key dialog switches the whole app to OpenRouter; removing it switches back. Settings, Model, AI engine can force either. Homework Helper still needs a key and asks for it. Home, privacy, security and help copy changed back to match: private on-device by default, OpenRouter only with the visitor's own key.
 Declined by the owner: a server-side proxy holding the owner's key (the only safe way to give guests an online model without their own key). A key placed in the site's files would be public and was not done.
+
+### Batch 22 - free models (owner is out of OpenRouter credits)
+The default model is now `openrouter/free`, OpenRouter's router over its free models (listed live on openrouter.ai/api/v1/models), so a key with no credits still answers. If a paid model returns 402 (out of credits), AUI retries once on the free router and tells the user. Free models have daily limits that OpenRouter sets.

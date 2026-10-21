@@ -489,7 +489,7 @@ await test("OpenRouter: key checks, stream parsing, errors and storage", async (
   assert.throws(() => router.saveKey("sk-or-v1-abcdef0123456789abcdef", "bad model name!"), /model name/);
   router.saveKey("  sk-or-v1-abcdef0123456789abcdef ", "");
   assert.equal(router.getKey(), "sk-or-v1-abcdef0123456789abcdef");
-  assert.equal(router.getModel(), "openrouter/auto");
+  assert.equal(router.getModel(), "openrouter/free");
   router.saveKey("sk-or-v1-abcdef0123456789abcdef", "meta-llama/llama-3.3-70b-instruct:free");
   assert.equal(router.getModel(), "meta-llama/llama-3.3-70b-instruct:free");
   router.removeKey();
@@ -530,6 +530,27 @@ await test("OpenRouter: key checks, stream parsing, errors and storage", async (
   const drain = async () => { for await (const _ of router.streamOpenRouter([], { key })) { /* read it all */ } };
   globalThis.fetch = async () => ({ ok: false, status: 402, json: async () => ({ error: { message: "no credits" } }) });
   await assert.rejects(drain, /out of credits/);
+  assert.ok(router.isFreeModel("openrouter/free") && router.isFreeModel("meta-llama/llama-3.3-70b-instruct:free") && !router.isFreeModel("openrouter/auto"));
+  // Out of credits on a paid model: one retry on the free router, and the caller is told.
+  const sentModels = [];
+  let fellBackTo = "";
+  globalThis.fetch = async (url, init) => {
+    const model = JSON.parse(init.body).model;
+    sentModels.push(model);
+    if (model !== "openrouter/free") return { ok: false, status: 402, json: async () => ({ error: { message: "no credits" } }) };
+    const bytes = new TextEncoder().encode('data: {"choices":[{"delta":{"content":"free answer"}}]}' + NL + NL + "data: [DONE]" + NL + NL);
+    let done = false;
+    return { ok: true, status: 200, body: { getReader: () => ({ read: async () => (done ? { done: true } : ((done = true), { done: false, value: bytes })), cancel: async () => {} }) } };
+  };
+  let fallbackText = "";
+  for await (const token of router.streamOpenRouter([], { key, model: "anthropic/claude-sonnet-4.5", onFallback: model => { fellBackTo = model; } })) fallbackText += token;
+  assert.deepEqual(sentModels, ["anthropic/claude-sonnet-4.5", "openrouter/free"]);
+  assert.equal(fallbackText, "free answer");
+  assert.equal(fellBackTo, "openrouter/free");
+  sentModels.length = 0;
+  globalThis.fetch = async (url, init) => { sentModels.push(JSON.parse(init.body).model); return { ok: false, status: 402, json: async () => ({}) }; };
+  await assert.rejects(async () => { for await (const _ of router.streamOpenRouter([], { key, model: "openrouter/free" })) { /* none */ } }, /out of credits/);
+  assert.equal(sentModels.length, 1, "a free model is not retried");
   globalThis.fetch = async () => { throw new TypeError("Offline-only mode is on, so AUI won't contact other websites."); };
   await assert.rejects(drain, /Offline-only/);
   await assert.rejects(async () => { for await (const _ of router.streamOpenRouter([], { key: "bad" })) { /* nothing */ } }, /Add your OpenRouter key/);

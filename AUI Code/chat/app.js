@@ -1,19 +1,19 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b24";
-import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b24";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b25";
+import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b25";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b24";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b24";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b24";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b24";
-import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b24";
-import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b24";
-import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b24";
-import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL } from "../modules/openrouter.js?v=20261018-b24";
+} from "../modules/uploads.js?v=20261018-b25";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b25";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b25";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b25";
+import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b25";
+import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b25";
+import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b25";
+import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL, FREE_MODEL } from "../modules/openrouter.js?v=20261018-b25";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -4800,7 +4800,7 @@ function setupMemoryFeatures() {
 
 let filesModulePromise = null;
 function loadFilesModule() {
-  filesModulePromise ||= import("../modules/files.js?v=20261018-b24");
+  filesModulePromise ||= import("../modules/files.js?v=20261018-b25");
   return filesModulePromise;
 }
 
@@ -6557,7 +6557,7 @@ function openOpenRouterSetup() {
       <div class="planNotice" role="note"><strong>With a key, AUI answers through OpenRouter</strong> (bigger models, billed to your account). Without one it uses a small model on your device. With a key, what you type, the text of files you attach and the earlier messages in the chat are sent to OpenRouter and the model it picks, under your account. They don't go to AUI. Chats, memories and settings stay in this browser (and in your AUI account if you sign in).</div>
       <label>OpenRouter key <input name="key" type="password" autocomplete="off" spellcheck="false" placeholder="${saved ? "A key is saved. Type a new one to replace it." : "sk-or-v1-..."}"></label>
       <label>Model <input name="model" autocomplete="off" spellcheck="false" value="${escapeHtml(getModel())}"></label>
-      <small class="toolHint">The default <code>${DEFAULT_MODEL}</code> lets OpenRouter pick a model for each question. Use a name from openrouter.ai/models (for example <code>meta-llama/llama-3.3-70b-instruct:free</code>) to choose one yourself.</small>
+      <small class="toolHint">The default <code>${DEFAULT_MODEL}</code> picks a free model for each question, so it works with no credits (free models have daily limits). Use a name from openrouter.ai/models to choose one yourself. If your credits run out, AUI switches to the free router by itself.</small>
       <p class="toolHint">Get a key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">openrouter.ai/keys</a>. Give it a spending limit. The key is saved in this browser only: it is not synced to your account, not in your data download, and anyone using this browser profile could read it.</p>
       <p class="formError" id="openrouterError" role="alert" hidden></p>
       <p class="toolHint" id="openrouterStatus" role="status"></p>
@@ -7494,7 +7494,7 @@ async function sendMessage(options = {}) {
       warnContextOverflow(chat);
     }
     if (!online) await backgroundModelTask;
-    for await (const token of (online ? streamOpenRouter(slmMessages, { signal: abortController.signal, maxTokens: 1500, temperature: 0.6 }) : streamSlm(slmMessages, {
+    for await (const token of (online ? streamOpenRouter(slmMessages, { signal: abortController.signal, maxTokens: 1500, temperature: 0.6, onFallback: () => { assistantMessage.model = `OpenRouter · ${FREE_MODEL}`; toast("Out of OpenRouter credits, so this reply uses the free models.", "info"); } }) : streamSlm(slmMessages, {
       signal: abortController.signal,
       maxTokens: Math.round(getReplyTokenLimit(text) * ({ short: 0.6, medium: 1, long: 1.5 }[state.settings.answerLength || "medium"])),
       temperature: chooseTemperature(text),
@@ -8331,7 +8331,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b24");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b25");
   return markdownModulePromise;
 }
 
