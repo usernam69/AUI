@@ -1060,3 +1060,12 @@ Source: the interview in this conversation. Audience: students. Biggest pain: an
 1011. **Credit meter plus cap** - A meter that can stop spending.
 1012. **Backup plus reminder** - A nudge to export monthly.
 1013. **Everything plus off switch** - Every new feature can be turned off.
+
+## Build log (2026-10-21)
+
+Built from your 45 picks. Numbers match the list above.
+
+- Built and tested: 1 flashcards, 2 quiz (skill), 3 essay feedback (skill), 4 study planner (with calendar file), 5 retry on a better model, 6 compare two models, 7 global hotkey, 8 system tray, 9 auto-update (installs from the downloaded app, needs a release tag), 10 screenshot to chat (drag a region), 11 student pricing (demo check of the school email), 12 try-it box on the home page (opens the chat with your question ready), 13 plan comparison table, 15 branch a conversation is NOT built (see below), 16 voice (already existed), 17 pin and folder chats (already existed), 18 search (already existed), 19 skill share by link, 20 subject skill pack (13 new skills, 26 in all), 21 model picker with prices, 22 per-chat model memory, 23 citation helper, 24 photo of homework (sent to the model as a picture when a key answers), 26 focus timer (already existed), 27 axe check in CI, 28 onboarding tour, 29 credit meter, 30 export and import (now includes study data and custom skills), 31 per-class memory (a folder is a class), 32 explain it my way, 33 weekly recap, 34 mistake notebook, 37 streaks (one missed day forgiven), 38 badges (no ranking), 39 offline banner and held messages, 40 auto-fallback chain, 41 free-model list (shown in the model picker), 42 error explainer with fix buttons, 43 browser extension (load unpacked), 36 read-only chat link (inside the link, no server).
+- 14 testimonials: not built as asked. Invented quotes would be fake, so the home page has four use cases that describe what the tools do.
+- 25 parent or teacher view: built as the weekly recap you can copy (counts and topics, no messages).
+- Not built: 15 branch a conversation, 35 study groups, 44 teacher classroom mode, 45 plugin API. Groups and classrooms need a server that stores shared data, which this site does not have; share links cover one-way sharing. Branching and a plugin API are design work that needs your decisions.

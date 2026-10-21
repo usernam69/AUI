@@ -1,21 +1,21 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b32";
-import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b32";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b33";
+import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b33";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b32";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b32";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b32";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b32";
-import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b32";
-import { PLANS, planById, customSkillLimit, priceLabel, planRecord, schoolEmailProblem } from "../modules/plans.js?v=20261018-b32";
-import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b32";
-import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL, FREE_MODEL } from "../modules/openrouter.js?v=20261018-b32";
-import { setupStudy, normalizeStudy, mergeStudy } from "../modules/study-ui.js?v=20261018-b32";
-import { fetchModels, cachedModels, searchModels, priceHint, contextHint, fallbackModels, AUTO_MODEL } from "../modules/models.js?v=20261018-b32";
+} from "../modules/uploads.js?v=20261018-b33";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b33";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b33";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b33";
+import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b33";
+import { PLANS, planById, customSkillLimit, priceLabel, planRecord, schoolEmailProblem } from "../modules/plans.js?v=20261018-b33";
+import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b33";
+import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL, FREE_MODEL } from "../modules/openrouter.js?v=20261018-b33";
+import { setupStudy, normalizeStudy, mergeStudy } from "../modules/study-ui.js?v=20261018-b33";
+import { fetchModels, cachedModels, searchModels, priceHint, contextHint, fallbackModels, AUTO_MODEL } from "../modules/models.js?v=20261018-b33";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -1725,6 +1725,7 @@ const SLASH_COMMANDS = [
   ["/mistakes", "Your mistake notebook", () => studyApi?.openStudy("mistakes")],
   ["/cite", "Make a citation in APA, MLA or Chicago", () => studyApi?.openCite()],
   ["/screenshot", "Capture part of your screen (desktop app)", () => takeScreenshot()],
+  ["/tour", "A four-step tour of AUI", () => openTour(0)],
   ["/model", "Choose the model for this chat", () => chooseChatModel()],
   ["/credits", "Check your OpenRouter credit", () => showCredit()],
   ["/files", "Attach a file from an earlier chat", () => openRecentFiles()],
@@ -2130,7 +2131,7 @@ function setupComposerExtras() {
   tools?.append(
     make("emojiBtn", "Emoji", "🙂", toggleEmojiPicker),
     make("improveBtn", "Improve my prompt (/improve)", "✨", improvePrompt),
-    make("previewBtn", "Preview formatting", "Md", toggleMarkdownPreview)
+    make("previewBtn", "Preview formatting", '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17V7l4 5 4-5v10"/><path d="M17 7v9m0 0-3-3m3 3 3-3"/></svg>', toggleMarkdownPreview)
   );
   byId("previewBtn")?.setAttribute("aria-pressed", "false");
   const clear = make("composerClearBtn", "Clear message", "×", () => {
@@ -3017,6 +3018,11 @@ function setupUpdateChecks() {
 // Text shared from other apps (share target), web+aui: links, or ?q= opens a new chat with it typed.
 function prefillFromUrl() {
   const params = new URLSearchParams(location.search);
+  // The browser extension puts the text after "#ask=", which never reaches a server.
+  const asked = /^#ask=([\s\S]*)$/.exec(location.hash);
+  if (asked) {
+    try { params.set("text", decodeURIComponent(asked[1])); } catch { /* damaged link: ignore it */ }
+  }
   const parts = [params.get("title"), params.get("text"), params.get("url"), params.get("q")].filter(Boolean);
   if (!parts.length) return;
   let text = parts.join("\n");
@@ -3996,8 +4002,44 @@ function showFirstRunSetup() {
       refreshGreeting();
     }
     dialog.remove();
+    setTimeout(maybeStartTour, 300);
   });
   dialog.showModal();
+}
+
+// A four-step tour, offered once after the first-run setup and any time with /tour.
+const TOUR_KEY = "aui.tourSeen";
+const TOUR_STEPS = [
+  { title: "Ask anything", text: "Type a question and press Enter. With no key, a small model on your device answers, and the first reply downloads it once. After that it works offline.", action: null },
+  { title: "Your study space", text: "Flashcards that come back on a schedule, a mistake notebook, an exam planner, citations and a weekly recap. Press Make cards or Save mistake under any reply.", action: ["Open the study space", () => studyApi?.openStudy("today")] },
+  { title: "Skills", text: "A skill changes how AUI answers. Quiz me, Essay feedback and the subject coaches are built in. Type / in the message box to switch one on.", action: ["Browse skills", () => openSkills()] },
+  { title: "Bigger models", text: "Add a free OpenRouter key to use bigger models. You can pick any model, retry an answer on another one, and compare. If a model is busy, AUI tries a free one.", action: ["Add a key", () => openOpenRouterSetup()] }
+];
+
+function maybeStartTour() {
+  try {
+    if (localStorage.getItem(TOUR_KEY)) return;
+    localStorage.setItem(TOUR_KEY, "1");
+  } catch {
+    return;
+  }
+  openTour(0);
+}
+
+function openTour(step = 0) {
+  const last = TOUR_STEPS.length - 1;
+  const item = TOUR_STEPS[Math.min(Math.max(step, 0), last)];
+  const dialog = simpleDialog("tourDialog", `Quick tour · ${step + 1} of ${TOUR_STEPS.length}`, item.title, `
+    <p class="tourText">${escapeHtml(item.text)}</p>
+    <div class="setupActions">
+      ${item.action ? `<button type="button" class="secondaryBtn" data-tour-action>${escapeHtml(item.action[0])}</button>` : ""}
+      ${step > 0 ? '<button type="button" class="secondaryBtn" data-tour-back>Back</button>' : ""}
+      <button type="button" class="textActionBtn" data-close-dialog>${step === last ? "Close" : "Skip the tour"}</button>
+      ${step < last ? '<button type="button" class="primaryBtn" data-tour-next>Next</button>' : ""}
+    </div>`);
+  dialog.querySelector("[data-tour-next]")?.addEventListener("click", () => openTour(step + 1));
+  dialog.querySelector("[data-tour-back]")?.addEventListener("click", () => openTour(step - 1));
+  dialog.querySelector("[data-tour-action]")?.addEventListener("click", () => { dialog.close(); item.action[1](); });
 }
 
 // 597/598/599: a style, a model and private notes for one chat.
@@ -4844,7 +4886,7 @@ function setupMemoryFeatures() {
 
 let filesModulePromise = null;
 function loadFilesModule() {
-  filesModulePromise ||= import("../modules/files.js?v=20261018-b32");
+  filesModulePromise ||= import("../modules/files.js?v=20261018-b33");
   return filesModulePromise;
 }
 
@@ -8502,10 +8544,10 @@ function createEmptyState() {
     <h1 id="landingTitle">${getGreeting()}${greetingName()}. What can I help with?</h1>
     <p class="heroTagline">AUI</p>
     <div class="suggestionGrid">
-      <button type="button" data-suggestion="Help me plan a focused week with realistic priorities" aria-label="Start with: Plan my week"><strong>Plan my week</strong><span>Turn a messy list into a clear plan</span></button>
-      <button type="button" data-suggestion="Explain a difficult concept to me using a simple analogy" aria-label="Start with: Make it click"><strong>Make it click</strong><span>Explain something without the jargon</span></button>
-      <button type="button" data-suggestion="Review this idea and challenge my assumptions" aria-label="Start with: Pressure-test an idea"><strong>Pressure-test an idea</strong><span>Find the gaps before they find you</span></button>
-      <button type="button" data-suggestion="Help me write something concise, clear, and human" aria-label="Start with: Write with me"><strong>Write with me</strong><span>Polish a draft or start from scratch</span></button>
+      <button type="button" data-suggestion="Help me plan a focused week with realistic priorities"><strong>Plan my week</strong><span>Turn a messy list into a clear plan</span></button>
+      <button type="button" data-suggestion="Explain a difficult concept to me using a simple analogy"><strong>Make it click</strong><span>Explain something without the jargon</span></button>
+      <button type="button" data-suggestion="Review this idea and challenge my assumptions"><strong>Pressure-test an idea</strong><span>Find the gaps before they find you</span></button>
+      <button type="button" data-suggestion="Help me write something concise, clear, and human"><strong>Write with me</strong><span>Polish a draft or start from scratch</span></button>
     </div>
     <p class="preloadRow"><button type="button" class="secondaryBtn" data-preload-model>Download the model now</button> <small data-model-size>First load downloads the model once.</small></p>`;
   pickModel().then(model => {
@@ -8765,7 +8807,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b32");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b33");
   return markdownModulePromise;
 }
 
@@ -11025,7 +11067,7 @@ function updateAccount() {
           : betaApproved
           ? "Beta approved · View profile"
           : "View profile";
-    DOM.loginBtn.setAttribute("aria-label", `Open profile for ${name}`);
+    DOM.loginBtn.removeAttribute("aria-label"); // the visible name and status already name the button
     if (avatarUrl) {
       const image = new Image();
       image.src = avatarUrl;
@@ -11038,7 +11080,7 @@ function updateAccount() {
     strong.textContent = "Guest";
     small.textContent = "Log in or sign up";
     avatar.textContent = "G";
-    DOM.loginBtn.setAttribute("aria-label", "Log in or sign up");
+    DOM.loginBtn.removeAttribute("aria-label");
   }
 }
 

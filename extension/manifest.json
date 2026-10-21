@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Ask AUI",
+  "version": "1.0.0",
+  "description": "Ask AUI about the page you are reading, or make flashcards and quizzes from it. Nothing is sent anywhere until you open AUI.",
+  "icons": { "128": "icon.png" },
+  "action": { "default_title": "Ask AUI", "default_popup": "popup.html", "default_icon": "icon.png" },
+  "background": { "service_worker": "background.js" },
+  "permissions": ["contextMenus", "activeTab", "scripting"]
+}

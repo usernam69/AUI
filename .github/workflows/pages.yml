@@ -38,9 +38,11 @@ jobs:
         run: node scripts/security-check.mjs
       - name: Render known XSS payloads in a real browser
         run: |
-          npm i --no-save playwright
+          npm i --no-save playwright axe-core
           npx playwright install --with-deps chromium
           node scripts/xss-check.mjs
+      - name: Accessibility check (axe-core on pages and dialogs)
+        run: node scripts/axe-check.mjs
       - uses: actions/configure-pages@v5
       - name: Build static site
         run: |

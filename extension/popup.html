@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Ask AUI</title>
+  <style>
+    body { margin: 0; padding: 14px; width: 300px; font: 14px/1.4 system-ui, sans-serif; color: #0a1430; background: #f5f8ff; }
+    h1 { margin: 0 0 8px; font-size: 16px; }
+    p { margin: 0 0 10px; color: #3b4a6b; font-size: 13px; }
+    button { display: block; width: 100%; margin: 0 0 8px; padding: 10px 12px; border: 0; border-radius: 10px; background: #1d4ed8; color: #fff; font: inherit; cursor: pointer; text-align: left; }
+    button.plain { background: #dbe8ff; color: #0a1430; }
+    button:focus-visible { outline: 3px solid #0a1430; outline-offset: 2px; }
+    #status { min-height: 18px; color: #3b4a6b; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Ask AUI</h1>
+  <p>Opens AUI with the text from this page. Nothing leaves your computer until AUI opens.</p>
+  <button id="ask" type="button">Ask about this page</button>
+  <button id="quiz" type="button" class="plain">Quiz me on this page</button>
+  <button id="cards" type="button" class="plain">Make flashcards from this page</button>
+  <p id="status" role="status"></p>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

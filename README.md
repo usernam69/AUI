@@ -43,3 +43,10 @@ to deploy in the `ref` box.
 
 **Lighthouse:** after each deploy, `lighthouse.yml` scores the live chat page and saves the
 report as a downloadable artifact on the run.
+
+## Study space and extras
+
+- Study space (`/study`): flashcards with spaced repetition, mistake notebook, exam planner (calendar file), streak and badges, weekly recap, class notes, citations (`/cite`). Everything stays in the browser.
+- Share links for skills, decks, plans and chats: the content is inside the link after `#`.
+- `extension/`: a browser extension (load unpacked) that sends selected text or a page to AUI.
+- `scripts/axe-check.mjs`: accessibility check run by the Pages workflow.
