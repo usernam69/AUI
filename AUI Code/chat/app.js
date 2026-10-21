@@ -1,20 +1,21 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b30";
-import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b30";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b31";
+import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b31";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b30";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b30";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b30";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b30";
-import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b30";
-import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b30";
-import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b30";
-import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL, FREE_MODEL } from "../modules/openrouter.js?v=20261018-b30";
-import { fetchModels, cachedModels, searchModels, priceHint, contextHint, fallbackModels, AUTO_MODEL } from "../modules/models.js?v=20261018-b30";
+} from "../modules/uploads.js?v=20261018-b31";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b31";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b31";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b31";
+import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b31";
+import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b31";
+import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b31";
+import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL, FREE_MODEL } from "../modules/openrouter.js?v=20261018-b31";
+import { setupStudy, normalizeStudy, mergeStudy } from "../modules/study-ui.js?v=20261018-b31";
+import { fetchModels, cachedModels, searchModels, priceHint, contextHint, fallbackModels, AUTO_MODEL } from "../modules/models.js?v=20261018-b31";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -559,7 +560,7 @@ const SETTINGS_TABS = [
   ["general", "General", ["profileSelect", "languageSelect", "startupSelect", "enterToSendToggle", "counterSelect", "composerStyleSelect", "spellcheckToggle", "typingSoundToggle", "timestampsToggle", "clockSelect", "autoScrollToggle", "scrollSensitivitySelect", "streamPaceSelect", "showSpeedToggle", "exportSettingsBtn"]],
   ["notifications", "Notifications", ["notifyToggle", "soundToggle", "soundPackSelect", "notifyDownloadToggle", "notifyTimerToggle", "quietHoursSelect"]],
   ["appearance", "Appearance", ["themeSelect", "themeSwatches", "accentSwatches", "fontSelect", "fontWeightInput", "lineHeightSelect", "contentWidthSelect", "bubbleSelect", "bubbleColorInput", "iconWeightSelect", "fontScaleInput", "densitySelect", "codeThemeSelect", "showModelBadgeToggle", "compactSidebarToggle", "seasonalToggle", "effectsToggle"]],
-  ["personal", "Personalization", ["userNameInput", "assistantNameInput", "assistantAvatarSelect", "answerLengthSelect", "emojiLevelSelect", "humorInput", "formalityInput", "customInstructionsInput", "aiTitlesToggle", "markdownToggle", "onlineLookupsToggle"]],
+  ["personal", "Personalization", ["userNameInput", "assistantNameInput", "assistantAvatarSelect", "answerLengthSelect", "emojiLevelSelect", "humorInput", "formalityInput", "learningStyleSelect", "learningNoteInput", "customInstructionsInput", "aiTitlesToggle", "markdownToggle", "onlineLookupsToggle"]],
   ["model", "Model", ["engineSelect", "openrouterKeyBtn", "chooseModelBtn", "fallbackChainToggle", "creditRefreshBtn", "speedSelect", "perfBtn", "preloadModelBtn", "deleteModelsBtn", "backgroundDownloadToggle", "unloadIdleToggle", "wifiOnlyToggle", "batterySaverToggle"]],
   ["voice", "Voice", ["voiceSelect", "voiceOutputToggle", "speechRateInput", "voiceAutoSendToggle", "voiceFirstToggle"]],
   ["memory", "Memory", ["memoryToggle", "memoryAutoSelect", "memoryExpirySelect", "manageMemoryBtn"]],
@@ -1113,6 +1114,7 @@ function decorateChatItem(item, chat, query) {
       <button type="button" data-chat-action="emoji">Emoji</button>
       <button type="button" data-chat-action="duplicate">Duplicate</button>
       <button type="button" data-chat-action="template">Save as template</button>
+      <button type="button" data-chat-action="sharelink">Copy a share link</button>
       <button type="button" data-chat-action="json">Export as JSON</button>
       <button type="button" data-chat-action="print">Print or save as PDF</button>
       <button type="button" data-chat-action="regenTitle">Better title</button>
@@ -1164,6 +1166,9 @@ async function handleExtraChatAction(action, chat) {
       toast("Saved as a template. Find it under Explore prompts.");
       return true;
     }
+    case "sharelink":
+      studyApi?.shareChat(chat);
+      return true;
     case "json":
       downloadFile(`${slugify(chat.title)}.json`, JSON.stringify({ chats: [chat] }, null, 2), "application/json");
       return true;
@@ -1713,6 +1718,12 @@ const SLASH_COMMANDS = [
   ["/bug", "Report a bug", () => openFeedback("bug")],
   ["/plans", "Plans and the demo checkout", () => openPlans()],
   ["/skills", "Turn skills on or make your own", () => openSkills()],
+  ["/study", "Flashcards, mistakes, study plan and progress", () => studyApi?.openStudy("today")],
+  ["/cards", "Make flashcards from this chat", () => studyApi?.openStudy("cards")],
+  ["/exams", "Plan your exams day by day", () => studyApi?.openStudy("plan")],
+  ["/recap", "Your week of studying", () => studyApi?.openStudy("progress")],
+  ["/mistakes", "Your mistake notebook", () => studyApi?.openStudy("mistakes")],
+  ["/cite", "Make a citation in APA, MLA or Chicago", () => studyApi?.openCite()],
   ["/model", "Choose the model for this chat", () => chooseChatModel()],
   ["/credits", "Check your OpenRouter credit", () => showCredit()],
   ["/files", "Attach a file from an earlier chat", () => openRecentFiles()],
@@ -2559,7 +2570,7 @@ async function showDefinition(event) {
 // cached work on that prefix (new memories would otherwise change it every turn).
 const systemPromptSnapshots = new Map();
 function getChatSystemPrompt(chat) {
-  const key = `${chat?.id}|${state.settings.customInstructions || ""}|${state.settings.memory}|${Math.floor(Date.now() / 900_000)}|${chat?.style || ""}|${chat?.instructions || ""}|${(chat?.messages || []).filter(message => message.pinnedContext).map(message => message.id).join(",")}|${skillsKey(state.settings, chat)}`;
+  const key = `${chat?.id}|${state.settings.customInstructions || ""}|${state.settings.memory}|${Math.floor(Date.now() / 900_000)}|${chat?.style || ""}|${chat?.instructions || ""}|${(chat?.messages || []).filter(message => message.pinnedContext).map(message => message.id).join(",")}|${skillsKey(state.settings, chat)}|${learningPrompt()}|${classPrompt(chat)}`;
   const cached = systemPromptSnapshots.get(chat?.id);
   if (cached?.key === key) return cached.prompt;
   const addition = chatPromptAddition(chat);
@@ -4002,6 +4013,31 @@ function chatStyleText(chat) {
   if (builtIn) return builtIn[2];
   return (state.settings.styles || []).find(style => style.id === chat.style)?.text || "";
 }
+const LEARNING_STYLES = {
+  visual: "Help the student picture it: use small text diagrams, tables and side-by-side comparisons.",
+  examples: "Start with a worked example, then give the rule.",
+  short: "Give the shortest correct explanation first, then offer more.",
+  steps: "Break explanations into numbered steps.",
+  analogy: "Start with an everyday comparison, then give the precise idea."
+};
+
+function learningPrompt() {
+  const parts = [LEARNING_STYLES[state.settings.learningStyle]];
+  const note = String(state.settings.learningNote || "").trim().slice(0, 300);
+  if (note) parts.push(`This student says: ${note}`);
+  const text = parts.filter(Boolean).join(" ");
+  return text ? `How to explain: ${text}` : "";
+}
+
+// A folder is a class: its notes and goal go into every chat in that folder.
+function classPrompt(chat) {
+  const entry = chat?.folder ? state.study?.classes?.[chat.folder] : null;
+  const notes = String(entry?.notes || "").slice(0, 600);
+  const goal = String(entry?.goal || "").slice(0, 100);
+  if (!notes && !goal) return "";
+  return `This chat is for the class "${String(chat.folder).slice(0, 40)}".${notes ? ` About the class: ${notes}` : ""}${goal ? ` The student's goal: ${goal}.` : ""}`;
+}
+
 function chatPromptAddition(chat) {
   const parts = [];
   const style = chatStyleText(chat);
@@ -4011,6 +4047,10 @@ function chatPromptAddition(chat) {
   if (pinned) parts.push(pinned);
   const skills = skillsPrompt(state.settings, chat);
   if (skills) parts.push(skills);
+  const learning = learningPrompt();
+  if (learning) parts.push(learning);
+  const classNotes = classPrompt(chat);
+  if (classNotes) parts.push(classNotes);
   return parts.join("\n");
 }
 
@@ -4803,7 +4843,7 @@ function setupMemoryFeatures() {
 
 let filesModulePromise = null;
 function loadFilesModule() {
-  filesModulePromise ||= import("../modules/files.js?v=20261018-b30");
+  filesModulePromise ||= import("../modules/files.js?v=20261018-b31");
   return filesModulePromise;
 }
 
@@ -6040,7 +6080,7 @@ function resetAutoLock() {
 async function exportEncryptedBackup() {
   const pass = await askPassword({ title: "Protect the backup", message: "Anyone with this password can open the file. Keep it somewhere safe.", confirmLabel: "Download", repeat: true });
   if (!pass) return;
-  const backup = { app: "AUI", version: 1, exportedAt: new Date().toISOString(), chats: state.chats, memory: state.memory };
+  const backup = { app: "AUI", version: 1, exportedAt: new Date().toISOString(), chats: state.chats, memory: state.memory, study: normalizeStudy(state.study), skills: customSkills() };
   const sealed = await sealText(JSON.stringify(backup), pass);
   downloadFile(`aui-backup-locked-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ ...sealed, app: "AUI", kind: "locked-backup" }), "application/json");
   toast("Password-protected backup downloaded");
@@ -6261,7 +6301,7 @@ function skillCard(skill, chat) {
       <button type="button" class="secondaryBtn" data-skill-use aria-pressed="${onHere}">${onHere ? "On in this chat" : "Use in this chat"}</button>
       ${skill.online ? `<button type="button" class="secondaryBtn" data-skill-setup>${hasKey() ? "Key saved · change" : "Add your key"}</button>` : ""}
       <label class="checkRow"><input type="checkbox" data-skill-always ${always ? "checked" : ""}> Always on</label>
-      ${skill.custom ? '<button type="button" class="textActionBtn" data-skill-edit>Edit</button><button type="button" class="textActionBtn" data-skill-export>Save as SKILL.md</button><button type="button" class="textActionBtn" data-skill-delete>Delete</button>' : ""}
+      ${skill.custom ? '<button type="button" class="textActionBtn" data-skill-edit>Edit</button><button type="button" class="textActionBtn" data-skill-share>Share link</button><button type="button" class="textActionBtn" data-skill-export>Save as SKILL.md</button><button type="button" class="textActionBtn" data-skill-delete>Delete</button>' : ""}
     </div></article>`;
 }
 
@@ -6274,8 +6314,7 @@ function openSkills() {
     <div class="setupActions"><button type="button" class="primaryBtn" data-skill-new>New skill</button><button type="button" class="secondaryBtn" data-skill-import>Import SKILL.md</button></div>
     <h3 class="skillGroup">Your skills <small>${custom.length} of ${limit === Infinity ? "unlimited" : limit} · ${escapeHtml(currentPlan().name)} plan${limit !== Infinity ? ' · <button type="button" class="textActionBtn" data-skill-plans>Get more</button>' : ""}</small></h3>
     ${custom.length ? custom.map(skill => skillCard(skill, chat)).join("") : '<p class="toolHint">Nothing here yet. Make one for a task you repeat, like “reply to customers in a friendly tone”.</p>'}
-    <h3 class="skillGroup">Built in</h3>
-    ${BUILTIN_SKILLS.map(skill => skillCard(skill, chat)).join("")}`, { wide: true });
+    ${["Study", "Subjects", "Everyday"].map(group => `<h3 class="skillGroup">${group}</h3>${BUILTIN_SKILLS.filter(skill => skill.group === group).map(skill => skillCard(skill, chat)).join("")}`).join("")}`, { wide: true });
   if (dialog.dataset.skillsReady) return;
   dialog.dataset.skillsReady = "1";
   dialog.addEventListener("click", event => {
@@ -6288,6 +6327,7 @@ function openSkills() {
     if (event.target.closest("[data-skill-setup]")) return openOpenRouterSetup();
     if (event.target.closest("[data-skill-use]")) { toggleChatSkill(id); openSkills(); }
     else if (event.target.closest("[data-skill-edit]")) openSkillEditor(findSkill(customSkills(), id));
+    else if (event.target.closest("[data-skill-share]")) studyApi?.shareSkill(findSkill(customSkills(), id));
     else if (event.target.closest("[data-skill-export]")) {
       const skill = findSkill(customSkills(), id);
       downloadFile(`${skill.command}.SKILL.md`, toSkillFile(skill), "text/markdown;charset=utf-8");
@@ -6304,6 +6344,29 @@ function openSkills() {
   dialog.addEventListener("change", event => {
     if (!event.target.matches("[data-skill-always]")) return;
     toggleAlwaysSkill(event.target.closest("[data-skill-id]").dataset.skillId, event.target.checked);
+  });
+}
+
+// A skill that arrived in a link. Nothing is added until the student has read it and agrees.
+function importSharedSkill(data) {
+  const result = normalizeSkill({ name: data.name, description: data.description, instructions: data.instructions }, customSkills());
+  if (result.error) return toast(`That skill can't be added: ${result.error}`, "error");
+  const skill = result.skill;
+  const dialog = simpleDialog("sharedSkillDialog", "Shared with you", `A skill: ${skill.name}`, `
+    <p class="toolHint">Read the instructions first. They tell AUI how to answer in every chat that uses the skill, and anyone can make a link, so only add skills you trust.</p>
+    <p><strong>${escapeHtml(skill.name)}</strong> <code>${escapeHtml(commandOf(skill))}</code></p>
+    <p class="toolHint">${escapeHtml(skill.description || "")}</p>
+    <pre class="skillPreview" tabindex="0">${escapeHtml(skill.instructions)}</pre>
+    <div class="setupActions"><button type="button" class="secondaryBtn" data-close-dialog>No thanks</button><button type="button" class="primaryBtn" data-shared-add>Add this skill</button></div>`, { wide: true });
+  dialog.querySelector("[data-shared-add]").addEventListener("click", () => {
+    if (customSkills().length >= customSkillLimit(state.settings.plan)) {
+      dialog.close();
+      return toast(`The ${currentPlan().name} plan holds ${customSkillLimit(state.settings.plan)} custom skills.`, "info", { label: "See plans", duration: 7000, onClick: openPlans });
+    }
+    state.settings.skills = [...customSkills(), skill];
+    saveSkillSettings();
+    dialog.close();
+    toast(`Added ${skill.name}. Use it with ${commandOf(skill)}.`);
   });
 }
 
@@ -6507,10 +6570,10 @@ function setupSkillsAndPlans() {
   // Links from the home page: /chat/?open=skills, ?open=plans
   const url = new URL(location.href);
   const target = url.searchParams.get("open");
-  if (target === "skills" || target === "plans") {
+  if (target === "skills" || target === "plans" || target === "study") {
     url.searchParams.delete("open");
     history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
-    setTimeout(() => (target === "skills" ? openSkills() : openPlans()), 400);
+    setTimeout(() => (target === "skills" ? openSkills() : target === "plans" ? openPlans() : studyApi?.openStudy("today")), 400);
   }
 }
 
@@ -6742,6 +6805,94 @@ function fixError(message, fix) {
   regenerateMessage(message);
 }
 
+// --- Study hub ---
+
+let studyApi = null;
+
+function setComposerText(text) {
+  DOM.input.value = text;
+  scheduleTextareaResize();
+  updateComposerState();
+  DOM.input.focus();
+}
+
+function startQuiz() {
+  const chat = getChat() || (createChat(), getChat());
+  if (chat && !(chat.skills || []).includes("quiz")) toggleChatSkill("quiz");
+  setComposerText(chat?.messages.length ? "Quiz me on what we just covered." : "Quiz me on ");
+}
+
+function addSharedChat(shared) {
+  const chat = normalizeChats([{ title: shared.title, messages: shared.messages.map(message => ({ role: message.role, content: message.content, status: "complete" })) }])[0];
+  state.chats.unshift(chat);
+  state.currentChatId = chat.id;
+  persistChatChange();
+  renderChats();
+  renderMessages();
+}
+
+// With a key, pictures go to the model as pictures, so a photo of a worksheet can be worked through.
+function attachSeenImages(messages, attachments) {
+  const urls = attachments
+    .filter(item => item.kind === "image" && !item.extractedText && /^data:image\/(png|jpeg|webp|gif);base64,/.test(item.dataUrl || "") && item.dataUrl.length < 4_000_000)
+    .slice(0, 4)
+    .map(item => item.dataUrl);
+  if (!urls.length) return;
+  const last = messages.at(-1);
+  const text = last.content.replace(/\[Attached image: [^\]]*\]/g, "").trim() || "Please look at the attached picture.";
+  messages[messages.length - 1] = { role: "user", content: [{ type: "text", text }, ...urls.map(url => ({ type: "image_url", image_url: { url } }))] };
+}
+
+function setupLearningStyle() {
+  const style = byId("learningStyleSelect");
+  const note = byId("learningNoteInput");
+  if (!style || !note) return;
+  const load = () => {
+    style.value = state.settings.learningStyle || "";
+    note.value = state.settings.learningNote || "";
+  };
+  const save = () => {
+    state.settings.learningStyle = style.value;
+    state.settings.learningNote = note.value.trim().slice(0, 300);
+    systemPromptSnapshots.clear();
+    cloudDirty = true;
+    persist();
+  };
+  load();
+  style.addEventListener("change", save);
+  note.addEventListener("change", save);
+  const dialog = byId("settingsDialog");
+  if (dialog) new MutationObserver(() => { if (dialog.open) load(); }).observe(dialog, { attributes: true, attributeFilter: ["open"] });
+}
+
+function setupStudyHub() {
+  state.study = normalizeStudy(state.study);
+  setupLearningStyle();
+  studyApi = setupStudy({
+    getState: () => state,
+    persist: () => persist(),
+    byId, escapeHtml, simpleDialog, toast, getChat, downloadFile, copyText, startFocusTimer, openSkills, setComposerText, startQuiz,
+    streamModel: (messages, options) => streamModel(messages, options),
+    clearPromptCache: () => systemPromptSnapshots.clear(),
+    importSkill: importSharedSkill,
+    addChat: addSharedChat
+  });
+  const study = element("button", "exploreBtn");
+  study.type = "button";
+  study.id = "studyBtn";
+  study.innerHTML = `${svgIcon("image", 16)}<span>Study</span>`;
+  study.querySelector("svg").innerHTML = '<path d="M4 6.5C4 5.7 4.7 5 5.5 5H11v14H5.5C4.7 19 4 18.3 4 17.5z"/><path d="M20 6.5c0-.8-.7-1.5-1.5-1.5H13v14h5.5c.8 0 1.5-.7 1.5-1.5z"/>';
+  study.addEventListener("click", () => studyApi.openStudy("today"));
+  document.querySelector(".exploreBtn")?.after(study);
+  const more = document.querySelector(".moreLinksInner");
+  if (more && !byId("studyMoreBtn")) {
+    more.insertAdjacentHTML("afterbegin", '<button id="citeMoreBtn" type="button"><span>Citations</span><span class="navHint">\u201C\u201D</span></button><button id="studyMoreBtn" type="button"><span>Study space</span><span class="navHint">\u270E</span></button>');
+    byId("studyMoreBtn").addEventListener("click", () => studyApi.openStudy("today"));
+    byId("citeMoreBtn").addEventListener("click", () => studyApi.openCite());
+  }
+  studyApi.handleShareHash();
+}
+
 function openOpenRouterSetup() {
   const saved = hasKey();
   const dialog = simpleDialog("openrouterDialog", "AUI", "Use your own OpenRouter key", `
@@ -6859,6 +7010,7 @@ async function init() {
   setupFileFeatures();
   setupAccountExtras();
   setupSkillsAndPlans();
+  setupStudyHub();
   setupPrivacy();
   setTimeout(prefillFromUrl);
   setupBackgroundDownload();
@@ -7494,6 +7646,7 @@ async function sendMessage(options = {}) {
       attachments: attachments.map(stripAttachmentForMessage)
     };
     chat.messages.push(userMessage);
+    studyApi?.noteActivity();
   }
 
   if (!options.hiddenUser && !options.keepComposer) {
@@ -7693,6 +7846,7 @@ async function sendMessage(options = {}) {
       slmMessages[0] = { ...slmMessages[0], content: `${slmMessages[0].content}\n${droppedNote}` };
       warnContextOverflow(chat);
     }
+    if (online) attachSeenImages(slmMessages, attachments);
     if (!online) await backgroundModelTask;
     for await (const token of (online ? streamOpenRouter(slmMessages, {
       signal: abortController.signal,
@@ -8452,6 +8606,7 @@ function createMessageFooter(message, index) {
       if (message.versions?.length > 1) actions.append(actionButton("Changes", "diff"));
       actions.append(actionButton("Report", "report"));
       actions.append(actionButton("Image", "image"));
+      actions.append(actionButton("Make cards", "make-cards"), actionButton("Save mistake", "save-mistake"));
       actions.append(actionButton("Regenerate", "regenerate"), actionButton("Continue", "continue"));
       if (getUserTier() !== "guest" && MODEL_NAMES[message.model]) {
         if (Object.keys(MODEL_NAMES).length > 1) actions.append(actionButton("Compare model", "compare"));
@@ -8545,7 +8700,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b30");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b31");
   return markdownModulePromise;
 }
 
@@ -8667,6 +8822,12 @@ async function handleChatAction(event) {
       break;
     case "retry-model":
       retryOnAnotherModel(message);
+      break;
+    case "make-cards":
+      studyApi?.cardsFromMessage(message, chat);
+      break;
+    case "save-mistake":
+      studyApi?.saveMistake(message, chat);
       break;
     case "compare-online":
       compareOnline(message);
@@ -9155,7 +9316,7 @@ function exportChatMarkdown(chat) {
 }
 
 function exportAllChats() {
-  const backup = { app: "AUI", version: 1, exportedAt: new Date().toISOString(), chats: state.chats, memory: state.memory };
+  const backup = { app: "AUI", version: 1, exportedAt: new Date().toISOString(), chats: state.chats, memory: state.memory, study: normalizeStudy(state.study), skills: customSkills() };
   downloadFile(`aui-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(backup, null, 2), "application/json");
   toast(`Exported ${state.chats.length} chats`);
 }
@@ -9174,6 +9335,15 @@ async function importChats(file) {
     if (!state.chats.length) state.chats = [makeChat()];
     if (!state.chats.some(chat => chat.id === state.currentChatId)) state.currentChatId = state.chats[0].id;
     if (Array.isArray(data?.memory) && !state.memory.length) state.memory = data.memory.slice(-CONFIG.MAX_MEMORY);
+    if (data?.study && typeof data.study === "object") state.study = mergeStudy(state.study, data.study);
+    if (Array.isArray(data?.skills)) {
+      for (const entry of data.skills.slice(0, 50)) {
+        if (customSkills().length >= customSkillLimit(state.settings.plan)) break;
+        const result = normalizeSkill({ name: entry?.name, description: entry?.description, instructions: entry?.instructions }, customSkills());
+        if (!result.error) state.settings.skills = [...customSkills(), result.skill];
+      }
+      saveSkillSettings();
+    }
     persistChatChange();
     renderChats();
     renderMessages();
@@ -9322,7 +9492,7 @@ async function addFiles(fileList) {
 
   if (readyCount) {
     toast(`${readyCount} ${readyCount === 1 ? "file" : "files"} ready`);
-    if (state.pendingAttachments.some(item => item.kind === "image" && !item.extractedText)) {
+    if (!engineOnline() && state.pendingAttachments.some(item => item.kind === "image" && !item.extractedText)) {
       try {
         if (!sessionStorage.getItem("aui.imageHint")) {
           sessionStorage.setItem("aui.imageHint", "1");

@@ -31,7 +31,7 @@
   <link rel="shortcut icon" href="/favicon-t-20260728.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
-  <link rel="stylesheet" href="/style.css?v=20261018-b30">
+  <link rel="stylesheet" href="/style.css?v=20261018-b31">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -309,6 +309,8 @@
         <label class="settingRow"><span><strong>Answer length</strong><small>How long replies usually are</small></span><select id="answerLengthSelect"><option value="short">Short</option><option value="medium">Medium</option><option value="long">Long</option></select></label>
         <label class="settingRow"><span><strong>Online lookups</strong><small>For weather, definitions and "who/what is" questions, fetch facts from Open-Meteo, a free dictionary and Wikipedia. Your question is sent to those sites.</small></span><input id="onlineLookupsToggle" type="checkbox" role="switch"></label>
         <label class="settingRow"><span><strong>AI chat titles</strong><small>Let the model name new chats after the first reply</small></span><input id="aiTitlesToggle" type="checkbox" role="switch" checked></label>
+        <label class="settingRow"><span><strong>How you like things explained</strong><small>AUI shapes every answer this way</small></span><select id="learningStyleSelect"><option value="">No preference</option><option value="visual">Picture it: diagrams and tables</option><option value="examples">Example first, then the rule</option><option value="short">Shortest version first</option><option value="steps">Numbered steps</option><option value="analogy">An everyday comparison first</option></select></label>
+        <label class="settingRow settingRowStack"><span><strong>More about how you learn</strong><small>For example: "I lose track in long answers" or "I like football examples"</small></span><textarea id="learningNoteInput" rows="2" maxlength="300"></textarea></label>
         <label class="settingRow settingRowStack"><span><strong>Custom instructions</strong><small>How should AUI answer? For example: "Keep it short" or "Explain like I'm new to coding"</small></span><textarea id="customInstructionsInput" rows="3" maxlength="1500" placeholder="Anything AUI should know or do in every reply"></textarea></label>
         <div class="settingRow"><span><strong>Model</strong><small>Download it now so your first reply starts fast</small></span><button class="secondaryBtn" id="preloadModelBtn" type="button">Download the model now</button></div>
         <div class="settingRow"><span><strong>Downloaded models</strong><small>Free the space AI models use in this browser</small></span><button class="secondaryBtn dangerButton" id="deleteModelsBtn" type="button">Delete models</button></div>
@@ -461,6 +463,6 @@
   <div class="toastRegion" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
   <div class="srOnly" id="announcer" aria-live="polite" aria-atomic="true"></div>
 
-  <script type="module" src="/chat/app.js?v=20261018-b30"></script>
+  <script type="module" src="/chat/app.js?v=20261018-b31"></script>
 </body>
 </html>

@@ -3903,3 +3903,72 @@
   .modelOption small { color: var(--muted, inherit); opacity: 0.9; overflow-wrap: anywhere; }
   .messageError button + button { margin-left: 8px; }
 }
+@layer components {
+  /* Study space */
+  .studyTabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+  .studyTabs [role="tab"] { flex: none; padding: 10px 14px; min-height: 44px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--text-secondary); font-weight: 500; cursor: pointer; }
+  .studyTabs [role="tab"][aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+  .studyBody { display: grid; gap: 14px; min-width: 0; }
+  .studyGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+  .studyTile { display: grid; gap: 6px; align-content: start; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+  .studyTile h3 { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+  .studyBig { font-size: 24px; font-weight: 600; line-height: 1.2; }
+  .studyTile small { color: var(--text-secondary); }
+  .studyActions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .studyActionsLeft { justify-content: flex-start; flex-wrap: wrap; }
+  .deckList, .mistakeList, .planList, .badgeList, .citeList, .cardPreviewList { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .deckRow, .mistakeRow, .citeList li { display: flex; flex-wrap: wrap; gap: 8px 12px; justify-content: space-between; align-items: center; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+  .deckRow small { display: block; color: var(--text-secondary); }
+  .deckButtons { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .mistakeRow details { flex: 1 1 100%; }
+  .mistakeRow summary { cursor: pointer; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .mistakeRow.isFixed { opacity: 0.8; }
+  .mistakeAnswer { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-secondary); font-size: 13px; }
+  .reviewHeader { display: flex; justify-content: space-between; align-items: center; color: var(--text-secondary); }
+  .reviewCard { min-height: 160px; display: grid; align-content: center; gap: 12px; padding: 24px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); text-align: center; overflow-wrap: anywhere; }
+  .reviewFront { font-size: 20px; font-weight: 600; }
+  .reviewBack { font-size: 18px; color: var(--text); }
+  .gradeRow { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .gradeRow button { min-width: 84px; min-height: 48px; display: grid; gap: 2px; }
+  .gradeRow small { color: var(--text-secondary); font-size: 11px; }
+  .studyDone { display: grid; gap: 12px; justify-items: center; padding: 24px; text-align: center; }
+  .cardPreviewList label { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); }
+  .cardPreviewList li > span { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); }
+  .cardPreviewList label span { display: grid; gap: 2px; }
+  .cardPreviewList small { display: block; color: var(--text-secondary); }
+  .cardPreviewList { max-height: 40vh; overflow: auto; }
+  .examRow { display: grid; gap: 8px; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px; margin: 0 0 8px; min-width: 0; }
+  .examRow legend { padding: 0 6px; color: var(--text-secondary); font-size: 13px; }
+  .examRow label { display: grid; gap: 4px; }
+  .planDay { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+  .planDay.isExam { border-color: var(--accent); }
+  .planDay h4 { font-size: 14px; margin: 0 0 6px; }
+  .planDay h4 small { color: var(--text-secondary); font-weight: 400; }
+  .planDay ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; font-size: 13px; }
+  .planDay li small { color: var(--text-secondary); }
+  .heat { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 12px); gap: 3px; overflow-x: auto; padding-bottom: 4px; }
+  .heatCell { width: 12px; height: 12px; border-radius: 3px; background: var(--surface-hover); }
+  .heatCell.on { background: var(--accent); }
+  .badgeList { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+  .badge { display: grid; gap: 2px; padding: 10px 12px; border: 1px dashed var(--border); border-radius: var(--radius-md); color: var(--text-secondary); }
+  .badge.earned { border-style: solid; border-color: var(--accent); background: var(--accent-soft); color: var(--text); }
+  .badge small { color: inherit; }
+  .recapText { white-space: pre-wrap; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); font: inherit; font-size: 13px; }
+  .citeRow { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+  .citeOut { min-height: 24px; }
+  .citeText { padding: 12px 12px 12px 2.2em; text-indent: -1.4em; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); overflow-wrap: anywhere; }
+  .citeList li { align-items: flex-start; }
+  .citeList li > span { flex: 1 1 240px; overflow-wrap: anywhere; }
+  .sharedChat { display: grid; gap: 8px; max-height: 50vh; overflow: auto; }
+  .sharedMessage { padding: 10px 12px; border-radius: var(--radius-md); background: var(--surface); border: 1px solid var(--border); }
+  .sharedMessage p { white-space: pre-wrap; overflow-wrap: anywhere; margin: 4px 0 0; }
+  .skillPreview { white-space: pre-wrap; overflow: auto; max-height: 40vh; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); font-size: 13px; }
+}
+@layer components {
+  .citeRow > label, #citeForm input, #citeForm select, #citeForm textarea, #planForm input, #planForm textarea, #classForm input, #classForm textarea, #cardAddForm textarea, #cardAddForm input, #cardPreviewForm input[name="deck"] { min-width: 0; max-width: 100%; box-sizing: border-box; }
+  #citeForm input, #citeForm select, #citeForm textarea, #planForm input:not([type="checkbox"]), #planForm textarea, #classForm input, #classForm textarea { width: 100%; }
+  .studyTabs [role="tab"] { padding-inline: 10px; }
+}
+@layer components {
+  .gradeRow button { flex: 1 1 72px; min-width: 0; padding-inline: 6px; }
+}

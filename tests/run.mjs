@@ -687,4 +687,212 @@ await test("model list: parsing, prices, search and fallbacks", async () => {
   delete globalThis.fetch;
 });
 
+await test("study: flashcard parsing and spaced repetition", async () => {
+  const study = await load("modules/study.js");
+  const { parseCards, newCard, reviewCard, dueCards, deckSummary, intervalLabel } = study;
+  assert.deepEqual(parseCards('Here you go:\n[{"front":"2+2","back":"4"},{"question":"Capital of France","answer":"Paris"},["H2O","water"]]'), [{ front: "2+2", back: "4" }, { front: "Capital of France", back: "Paris" }, { front: "H2O", back: "water" }]);
+  const qa = parseCards("Q: What is a cell?\nA: The basic unit of life.\n\n**Q:** What is DNA?\n**A:** The molecule that carries genes.");
+  assert.equal(qa.length, 2);
+  assert.equal(qa[1].front, "What is DNA?");
+  assert.equal(qa[1].back, "The molecule that carries genes.");
+  assert.deepEqual(parseCards("mitosis :: cell division\nmeiosis | makes gametes\n1. osmosis: water moving across a membrane\n- **Diffusion**: spreading out"), [
+    { front: "mitosis", back: "cell division" }, { front: "meiosis", back: "makes gametes" }, { front: "osmosis", back: "water moving across a membrane" }, { front: "Diffusion", back: "spreading out" }]);
+  assert.deepEqual(parseCards("| Term | Meaning |\n|---|---|\n| atom | smallest unit |"), [{ front: "atom", back: "smallest unit" }], "table headers and separators are skipped");
+  assert.equal(parseCards("Q: a thing?\nA: yes\nQ: A thing?\nA: no").length, 1, "duplicates are dropped");
+  assert.deepEqual(parseCards("Just a normal paragraph with no cards in it. It has: a colon, but no list."), []);
+  assert.equal(parseCards("Q: x\nA: y".repeat(1), 5).length, 0, "one-letter fronts are not cards");
+
+  const now = 1_000_000_000_000;
+  const card = newCard("Front", "Back", "Deck", now);
+  assert.ok(dueCards([card], "", now).length === 1 && dueCards([card], "Other", now).length === 0);
+  const good1 = reviewCard(card, 2, now);
+  assert.equal(good1.interval, 1);
+  const good2 = reviewCard(good1, 2, now);
+  assert.equal(good2.interval, 3);
+  const good3 = reviewCard(good2, 2, now);
+  assert.equal(good3.interval, Math.round(3 * 2.5));
+  assert.equal(good3.due, now + good3.interval * 86400000);
+  const again = reviewCard(good3, 0, now);
+  assert.equal(again.reps, 0);
+  assert.equal(again.lapses, 1);
+  assert.equal(again.due, now + 10 * 60 * 1000);
+  assert.ok(again.ease < good3.ease && again.ease >= 1.3);
+  assert.ok(reviewCard(card, 3, now).interval > reviewCard(card, 2, now).interval, "easy waits longer than good");
+  assert.equal(reviewCard(card, 1, now).interval, 1);
+  let worn = card;
+  for (let i = 0; i < 30; i += 1) worn = reviewCard(worn, 0, now);
+  assert.equal(worn.ease, 1.3, "ease has a floor");
+  assert.equal(intervalLabel(card, 0, now), "10 min");
+  assert.equal(intervalLabel(card, 2, now), "1 day");
+  assert.equal(intervalLabel(good2, 2, now), "8 days");
+  const summary = deckSummary([card, good1, newCard("a", "b", "Other", now)], now);
+  assert.deepEqual(summary.map(deck => [deck.name, deck.total, deck.due, deck.fresh]), [["Deck", 2, 1, 1], ["Other", 1, 1, 1]]);
+});
+
+await test("study: streak, badges, recap, plan and saved data", async () => {
+  const study = await load("modules/study.js");
+  const { dayKey, streakInfo, recordDay, earnedBadges, weeklyRecap, recapText, buildPlan, planToIcs, normalizeStudy, mergeStudy, newMistake } = study;
+  const at = (month, day) => new Date(2026, month - 1, day, 12).getTime();
+  const key = (month, day) => dayKey(at(month, day));
+  const now = at(10, 21);
+
+  assert.equal(streakInfo([], now).current, 0);
+  assert.deepEqual(streakInfo([key(10, 19), key(10, 20), key(10, 21)], now), { current: 3, longest: 3, activeToday: true });
+  assert.equal(streakInfo([key(10, 19), key(10, 20)], now).current, 2, "not studied yet today, the streak is still alive");
+  assert.equal(streakInfo([key(10, 18), key(10, 19), key(10, 21)], now).current, 3, "one missed day is forgiven");
+  assert.equal(streakInfo([key(10, 17), key(10, 21)], now).current, 1, "two missed days break it");
+  assert.equal(streakInfo([key(10, 17)], now).current, 0);
+  assert.equal(streakInfo([key(10, 1), key(10, 2), key(10, 3), key(10, 4)], now).longest, 4);
+  const once = recordDay([], now);
+  assert.deepEqual(recordDay(once, now), once, "the same day is not added twice");
+  assert.equal(recordDay(once, at(10, 22)).length, 2);
+
+  const badges = earnedBadges({ cardsMade: 1, reviews: 100, longest: 7, mistakes: 2, plans: 0 }).map(badge => badge.id);
+  assert.deepEqual(badges, ["first-card", "first-review", "reviews-100", "streak-3", "streak-7"]);
+
+  const chats = [
+    { id: "a", title: "Photosynthesis", folder: "Biology", messages: [{ role: "user", timestamp: at(10, 20) }, { role: "assistant", timestamp: at(10, 20) }, { role: "user", timestamp: at(10, 21) }] },
+    { id: "b", title: "Old", messages: [{ role: "user", timestamp: at(9, 1) }] },
+    { id: "c", title: "Temp", temporary: true, messages: [{ role: "user", timestamp: at(10, 21) }] }
+  ];
+  const data = normalizeStudy({
+    cards: [{ id: "k1", front: "f", back: "b", deck: "D", due: 1, lapses: 3 }],
+    mistakes: [{ id: "m1", question: "q", created: at(10, 20), fixed: false }, { id: "m2", question: "q2", created: at(9, 1), fixed: true }],
+    days: [key(10, 20), key(10, 21)], reviewLog: [[key(10, 20), 12], [key(9, 1), 50]]
+  });
+  const recap = weeklyRecap({ chats, study: data, now });
+  assert.equal(recap.messages, 2);
+  assert.equal(recap.chats, 1);
+  assert.equal(recap.activeDays, 2);
+  assert.deepEqual(recap.topics, [{ name: "Biology", count: 2 }]);
+  assert.equal(recap.cardsReviewed, 12);
+  assert.equal(recap.mistakesSaved, 1);
+  assert.equal(recap.mistakesOpen, 1);
+  assert.deepEqual(recap.stuck, ["f"]);
+  assert.equal(recap.streak, 2);
+  const text = recapText(recap, "Sam");
+  assert.ok(text.startsWith("Sam's study week") && text.includes("Biology") && !text.includes("Photosynthesis"), "the recap names topics, not message text");
+
+  // The planner
+  const today = key(10, 21);
+  const exam = { name: "Biology midterm", date: key(10, 31), topics: "Cells, Photosynthesis, Genetics, Evolution" };
+  const { plan, problems } = buildPlan({ exams: [exam], minutesPerDay: 60, today });
+  assert.deepEqual(problems, []);
+  assert.equal(plan.at(-1).date, key(10, 31));
+  assert.ok(plan.at(-1).tasks.some(task => task.kind === "exam"));
+  assert.equal(plan.flatMap(day => day.tasks).filter(task => task.kind === "learn").length, 4, "each topic is learned once");
+  const learnDay = plan.find(day => day.tasks.some(task => task.kind === "learn" && task.topic === "Cells"));
+  assert.equal(learnDay.date, today);
+  assert.ok(plan.find(day => day.date === key(10, 22)).tasks.some(task => task.kind === "review" && task.topic === "Cells"), "a topic comes back the next day");
+  assert.ok(plan.find(day => day.date === key(10, 29)).tasks.some(task => task.kind === "practice"), "two days out is practice");
+  assert.ok(plan.every(day => day.date >= today && day.date <= exam.date));
+  assert.ok(plan.filter(day => day.minutes).every(day => day.minutes >= 10));
+  assert.ok(buildPlan({ exams: [{ name: "X", date: today, topics: "a" }], today }).problems[0].includes("after today"));
+  assert.ok(buildPlan({ exams: [{ name: "X", date: "2026-02-31", topics: "a" }], today }).problems[0].includes("date"));
+  assert.ok(buildPlan({ exams: [{ name: "X", date: key(10, 25), topics: "" }], today }).problems[0].includes("topic"));
+  assert.ok(buildPlan({ exams: [{ name: "", date: key(10, 25), topics: "a" }], today }).problems[0].includes("name"));
+  assert.ok(buildPlan({ exams: [{ name: "X", date: "2027-12-01", topics: "a" }], today }).problems[0].includes("120"));
+  const soon = buildPlan({ exams: [{ name: "Quiz", date: key(10, 23), topics: "a, b, c, d, e" }], today });
+  assert.equal(soon.plan.length, 3, "two days of runway: two study days, then the exam");
+  assert.equal(soon.plan.flatMap(day => day.tasks).filter(task => task.kind === "learn").length, 5);
+  const ics = planToIcs(plan, new Date(Date.UTC(2026, 9, 21, 8, 0, 0)));
+  assert.ok(ics.startsWith("BEGIN:VCALENDAR\r\n") && ics.endsWith("END:VCALENDAR\r\n"));
+  assert.equal((ics.match(/BEGIN:VEVENT/g) || []).length, plan.length);
+  assert.ok(ics.includes("DTSTART;VALUE=DATE:20261021") && ics.includes("DTEND;VALUE=DATE:20261022") && ics.includes("DTSTAMP:20261021T080000Z"));
+  assert.ok(!/[^\r]\n/.test(ics), "calendar lines end in CRLF");
+
+  // Saved data survives garbage and merges without doubling
+  const junk = normalizeStudy({ cards: [null, { front: "a" }, { front: "x", back: "y", ease: 99, interval: -4 }], days: ["nope", "2026-01-02"], counts: { reviews: "lots" }, classes: { Math: { notes: "n".repeat(900) } } });
+  assert.equal(junk.cards.length, 1);
+  assert.equal(junk.cards[0].ease, 4);
+  assert.equal(junk.cards[0].interval, 0);
+  assert.deepEqual(junk.days, ["2026-01-02"]);
+  assert.equal(junk.counts.reviews, 0);
+  assert.equal(junk.classes.Math.notes.length, 600);
+  assert.deepEqual(normalizeStudy(null).cards, []);
+  const mine = normalizeStudy({ cards: [{ id: "c1", front: "a", back: "b" }], days: ["2026-10-20"], counts: { reviews: 5 } });
+  const theirs = normalizeStudy({ cards: [{ id: "c1", front: "a", back: "b" }, { id: "c2", front: "c", back: "d" }], days: ["2026-10-19"], counts: { reviews: 9 }, classes: { Art: { notes: "paint" } } });
+  const merged = mergeStudy(mine, theirs);
+  assert.deepEqual(merged.cards.map(card => card.id), ["c1", "c2"]);
+  assert.deepEqual(merged.days, ["2026-10-19", "2026-10-20"]);
+  assert.equal(merged.counts.reviews, 9);
+  assert.equal(merged.classes.Art.notes, "paint");
+  const mistake = newMistake({ question: "  q  ", answer: "a", note: "x".repeat(900) });
+  assert.equal(mistake.question, "q");
+  assert.equal(mistake.note.length, 400);
+  assert.equal(mistake.fixed, false);
+});
+
+await test("citations: APA, MLA and Chicago", async () => {
+  const { formatCitation, inTextCitation, parseAuthors } = await load("modules/citation.js");
+  assert.deepEqual(parseAuthors("Ada Lovelace\nBabbage, Charles"), [{ first: "Ada", last: "Lovelace" }, { first: "Charles", last: "Babbage" }]);
+  assert.deepEqual(parseAuthors("Plato"), [{ first: "", last: "Plato" }]);
+  const site = { type: "website", authors: "Ada Lovelace", title: "Notes on the Analytical Engine", container: "Science Museum", year: "1843", month: "7", day: "10", url: "https://example.org/notes", accessed: "5 May 2026" };
+  assert.equal(formatCitation("apa", site).text, "Lovelace, A. (1843, July 10). Notes on the Analytical Engine. Science Museum. https://example.org/notes");
+  assert.equal(formatCitation("apa", site).html, "Lovelace, A. (1843, July 10). <i>Notes on the Analytical Engine</i>. Science Museum. https://example.org/notes");
+  assert.equal(formatCitation("mla", site).text, "Lovelace, Ada. \u201CNotes on the Analytical Engine.\u201D Science Museum, 10 July 1843, example.org/notes. Accessed 5 May 2026.");
+  assert.equal(formatCitation("chicago", site).text, "Lovelace, Ada. \u201CNotes on the Analytical Engine.\u201D Science Museum. July 10, 1843. https://example.org/notes.");
+  const book = { type: "book", authors: "Smith, John; Jane Doe", title: "Learning to Learn", publisher: "Oxford University Press", year: "2019", edition: "2nd" };
+  assert.equal(formatCitation("apa", book).text, "Smith, J., & Doe, J. (2019). Learning to Learn (2nd ed.). Oxford University Press.");
+  assert.equal(formatCitation("mla", book).text, "Smith, John, and Jane Doe. Learning to Learn. 2nd ed., Oxford University Press, 2019.");
+  assert.equal(formatCitation("chicago", book).text, "Smith, John, and Jane Doe. Learning to Learn. 2nd ed. Oxford University Press, 2019.");
+  const article = { type: "article", authors: "Kim, Lee; Park, Min; Choi, Yu", title: "Spacing effects in recall", container: "Journal of Memory", year: "2021", volume: "12", issue: "3", pages: "45-60", doi: "https://doi.org/10.1000/xyz" };
+  assert.equal(formatCitation("apa", article).text, "Kim, L., Park, M., & Choi, Y. (2021). Spacing effects in recall. Journal of Memory, 12(3), 45\u201360. https://doi.org/10.1000/xyz");
+  assert.equal(formatCitation("mla", article).text, "Kim, Lee, et al. \u201CSpacing effects in recall.\u201D Journal of Memory, vol. 12, no. 3, 2021, pp. 45\u201360. doi.org/10.1000/xyz.");
+  assert.equal(formatCitation("chicago", article).text, "Kim, Lee, Min Park, and Yu Choi. \u201CSpacing effects in recall.\u201D Journal of Memory 12, no. 3 (2021): 45\u201360. https://doi.org/10.1000/xyz.");
+  assert.equal(formatCitation("apa", { type: "website", title: "A page with no author", container: "Site" }).text, "A page with no author. (n.d.). Site.");
+  assert.equal(formatCitation("apa", { type: "book", title: "Anonymous Book?", year: "2001", publisher: "P" }).text, "Anonymous Book? (2001). P.");
+  assert.ok(formatCitation("apa", { type: "website", authors: "<b>Bold</b>", title: "<script>x</script>" }).html.includes("&lt;script&gt;"), "html output is escaped");
+  assert.ok(formatCitation("apa", { type: "website", authors: "A B" }).error, "a title is required");
+  assert.ok(formatCitation("apa", { type: "article", title: "T" }).error, "a journal is required");
+  assert.ok(formatCitation("nope", { title: "T" }).error);
+  assert.equal(inTextCitation("apa", article), "(Kim et al., 2021)");
+  assert.equal(inTextCitation("apa", { ...book }), "(Smith & Doe, 2019)");
+  assert.equal(inTextCitation("mla", { ...book, page: "12" }), "(Smith and Doe 12)");
+  assert.equal(inTextCitation("chicago", book), "(Smith and Doe 2019)");
+  assert.equal(inTextCitation("apa", { title: "No author here" }), "(\u201CNo author here\u201D, n.d.)");
+});
+
+await test("share links: round trip, limits and cleaning", async () => {
+  const share = await load("modules/share.js");
+  const skill = { name: "Pirate", description: "Arr", instructions: "Talk like a pirate. \u05e9\u05dc\u05d5\u05dd \u{1F3F4}" };
+  const text = await share.encodeShare("skill", skill);
+  assert.ok(/^skill\.z[A-Za-z0-9_-]+$/.test(text), "compressed and URL-safe");
+  assert.deepEqual(await share.decodeShare(text), { kind: "skill", data: skill });
+  assert.equal(share.shareFromHash(`#share=${text}`), text);
+  assert.equal(share.shareFromHash("#other"), "");
+  assert.equal(share.shareFromHash(""), "");
+  assert.equal(share.shareUrl("https://x.dev/AUI", text), `https://x.dev/AUI/chat/#share=${text}`);
+  await assert.rejects(() => share.decodeShare("skill.zAAAA"), /damaged/);
+  await assert.rejects(() => share.decodeShare("skill.pnot-json"), /damaged/);
+  await assert.rejects(() => share.decodeShare("evil.zAAAA"), /damaged|too long/);
+  await assert.rejects(() => share.decodeShare(""), /damaged|too long/);
+  await assert.rejects(() => share.encodeShare("nope", {}), /Unknown/);
+  // Random-looking text does not compress, so a big chat is refused instead of making a huge link.
+  const noise = (await import("node:crypto")).randomBytes(45000).toString("base64");
+  await assert.rejects(() => share.encodeShare("chat", { messages: [{ role: "user", content: noise }] }), /too long to share/);
+  // A link that unpacks to a huge payload is refused (a zip bomb).
+  const bomb = await (async () => {
+    const stream = new CompressionStream("deflate-raw");
+    const writer = stream.writable.getWriter();
+    writer.write(new Uint8Array(6_000_000)).catch(() => {});
+    writer.close().catch(() => {});
+    const chunks = [];
+    const reader = stream.readable.getReader();
+    while (true) { const { value, done } = await reader.read(); if (done) break; chunks.push(...value); }
+    return Buffer.from(Uint8Array.from(chunks)).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  })();
+  await assert.rejects(() => share.decodeShare(`chat.z${bomb}`), /too much|too long/);
+
+  const deck = share.cleanDeck({ name: "x".repeat(100), cards: [{ front: "a", back: "b" }, { front: "", back: "c" }, null, { front: "d", back: "e", extra: "dropped" }] });
+  assert.equal(deck.name.length, 40);
+  assert.deepEqual(deck.cards, [{ front: "a", back: "b" }, { front: "d", back: "e" }]);
+  assert.equal(share.cleanDeck({}).name, "Shared deck");
+  const chat = share.cleanChat({ title: "T", messages: [{ role: "system", content: "evil" }, { role: "user", content: "hi" }, { role: "assistant", content: "  " }, { role: "assistant", content: "hello", attachments: [1] }] });
+  assert.deepEqual(chat.messages, [{ role: "user", content: "hi" }, { role: "assistant", content: "hello" }]);
+  const plan = share.cleanPlanInput({ minutesPerDay: 9999, exams: [{ name: "Bio", date: "2026-11-01", topics: ["a", "b"], extra: 1 }, null] });
+  assert.equal(plan.minutesPerDay, 600);
+  assert.equal(plan.exams[0].topics.length, 2);
+});
+
 console.log(`\n${passed} test groups passed`);
