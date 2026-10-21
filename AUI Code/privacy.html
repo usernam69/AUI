@@ -25,12 +25,12 @@
   <main>
     <a class="back" href="/chat">← Back to AUI</a>
     <h1>Privacy</h1>
-    <p style="color:var(--text-secondary)">Short version: AUI answers through your own OpenRouter key (or, if you choose, a small model on your device), your chats are saved in your browser, and there are no ads, trackers or analytics.</p>
+    <p style="color:var(--text-secondary)">Short version: AUI runs a small model on your device by default, answers through your own OpenRouter key only if you add one, saves your chats in your browser, and has no ads, trackers or analytics.</p>
 
     <h2>Where your chats go</h2>
     <ul>
-      <li><strong>To OpenRouter, using your own key, by default.</strong> Each message is sent, with the earlier messages of that chat and the text of any files you attach, to OpenRouter and the model it picks, under your own OpenRouter account. It does not go to AUI. AUI never sees your key: it is saved in this browser only and is not synced, exported or encrypted by the passphrase vault.</li>
-      <li><strong>Nowhere, if you choose the model on this device.</strong> Settings, Model, AI engine, "This device" runs a small model inside your browser. What you type, the files you attach and the replies never leave your device.</li>
+      <li><strong>Nowhere, by default.</strong> AUI's small model runs inside your browser. What you type, the files you attach and the replies never leave your device.</li>
+      <li><strong>To OpenRouter, only if you add your own key.</strong> Then each message is sent, with the earlier messages of that chat and the text of any files you attach, to OpenRouter and the model it picks, under your own OpenRouter account. It does not go to AUI. AUI never sees your key: it is saved in this browser only and is not synced, exported or encrypted by the passphrase vault. You can switch back in Settings, Model, AI engine.</li>
       <li><strong>Your account, if you sign in.</strong> Signed-in chats, memories and settings sync to your own row in AUI's database (Supabase), which only your account can read. You can switch chat or memory sync off in your profile.</li>
       <li><strong>Homework Helper always uses your key.</strong> Even with the model on this device chosen, this skill answers through OpenRouter.</li>
       <li><strong>Online lookups, only if you turn them on.</strong> The weather, dictionary and Wikipedia lookups send just the place, word or topic to those services.</li>
@@ -49,7 +49,7 @@
       <tr><td>raw.githubusercontent.com</td><td>The model's compiled runtime</td><td>With the model download</td></tr>
       <tr><td>cxulgeojkjnskdyoktkj.supabase.co</td><td>Accounts, sync, Beta requests, the visitor counter</td><td>If you sign in or count your visit</td></tr>
       <tr><td>esm.sh, cdn.jsdelivr.net</td><td>Optional tools: diagrams, the account library, PDF, OCR, image and audio models</td><td>Only when you use those tools</td></tr>
-      <tr><td>openrouter.ai</td><td>The AI model that writes replies</td><td>With every message, unless you chose the model on this device</td></tr>
+      <tr><td>openrouter.ai</td><td>The AI model that writes replies</td><td>Only if you added your own key (or use Homework Helper)</td></tr>
       <tr><td>api.open-meteo.com, api.dictionaryapi.dev, en.wikipedia.org</td><td>Online lookups</td><td>Only if you turn lookups on</td></tr>
     </table>
     <p>Fonts and the formatting libraries are served from AUI itself. Settings, Privacy, Network activity lists every site this tab has contacted, and Offline-only mode blocks everything except the model download.</p>

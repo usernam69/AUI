@@ -1,19 +1,19 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b22";
-import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b22";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b23";
+import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b23";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b22";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b22";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b22";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b22";
-import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b22";
-import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b22";
-import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b22";
-import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL } from "../modules/openrouter.js?v=20261018-b22";
+} from "../modules/uploads.js?v=20261018-b23";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b23";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b23";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b23";
+import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b23";
+import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b23";
+import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b23";
+import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL } from "../modules/openrouter.js?v=20261018-b23";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -4800,7 +4800,7 @@ function setupMemoryFeatures() {
 
 let filesModulePromise = null;
 function loadFilesModule() {
-  filesModulePromise ||= import("../modules/files.js?v=20261018-b22");
+  filesModulePromise ||= import("../modules/files.js?v=20261018-b23");
   return filesModulePromise;
 }
 
@@ -6182,7 +6182,7 @@ function setupPrivacy() {
   explainPersistentStorage();
   // 752/791: say plainly where the AI runs.
   const hint = document.querySelector(".composerHint");
-  if (hint && !hint.querySelector(".privacyBadge")) hint.insertAdjacentHTML("beforeend", ' · <a class="privacyBadge" href="../privacy.html" target="_blank" rel="noopener noreferrer">Your key · no tracking</a>');
+  if (hint && !hint.querySelector(".privacyBadge")) hint.insertAdjacentHTML("beforeend", ' · <a class="privacyBadge" href="../privacy.html" target="_blank" rel="noopener noreferrer">Private · no tracking</a>');
   // The KaTeX stylesheet loads without blocking the page (an inline onload handler would break the CSP).
   [["katex", "../modules/vendor/katex/katex.min.css"], ["hljs", "../modules/vendor/highlight-github-dark-11.11.1.min.css"]].forEach(([name, href]) => {
     if (document.querySelector(`link[data-vendor="${name}"]`)) return;
@@ -6507,9 +6507,10 @@ function setupSkillsAndPlans() {
 
 const ONLINE_PROMPT_BUDGET = 24000;
 
-// The whole app answers through the user's OpenRouter key unless they chose the model on this
-// device in Settings. An online skill (Homework Helper) forces the key either way.
-const engineOnline = () => state.settings.engine !== "device";
+// Nobody has to bring a key: until a visitor adds an OpenRouter key (or picks it in Settings)
+// AUI answers with the small model on their device. Once there is a key, it answers through the
+// key. An online skill (Homework Helper) always needs the key.
+const engineOnline = () => state.settings.engine === "online" || (state.settings.engine == null && hasKey());
 
 function chatIsOnline(chat) {
   return engineOnline() || Boolean(onlineSkill(state.settings, chat));
@@ -6551,9 +6552,9 @@ function onlineSystemPrompt(prompt) {
 
 function openOpenRouterSetup() {
   const saved = hasKey();
-  const dialog = simpleDialog("openrouterDialog", "AUI", "Connect your OpenRouter key", `
+  const dialog = simpleDialog("openrouterDialog", "AUI", "Use your own OpenRouter key", `
     <form class="setupBody" id="openrouterForm" novalidate autocomplete="off">
-      <div class="planNotice" role="note"><strong>AUI answers through your own OpenRouter key.</strong> What you type, the text of files you attach and the earlier messages in the chat are sent to OpenRouter and the model it picks, under your account. They don't go to AUI. Chats, memories and settings stay in this browser (and in your AUI account if you sign in).</div>
+      <div class="planNotice" role="note"><strong>With a key, AUI answers through OpenRouter</strong> (bigger models, billed to your account). Without one it uses a small model on your device. With a key, what you type, the text of files you attach and the earlier messages in the chat are sent to OpenRouter and the model it picks, under your account. They don't go to AUI. Chats, memories and settings stay in this browser (and in your AUI account if you sign in).</div>
       <label>OpenRouter key <input name="key" type="password" autocomplete="off" spellcheck="false" placeholder="${saved ? "A key is saved. Type a new one to replace it." : "sk-or-v1-..."}"></label>
       <label>Model <input name="model" autocomplete="off" spellcheck="false" value="${escapeHtml(getModel())}"></label>
       <small class="toolHint">The default <code>${DEFAULT_MODEL}</code> lets OpenRouter pick a model for each question. Use a name from openrouter.ai/models (for example <code>meta-llama/llama-3.3-70b-instruct:free</code>) to choose one yourself.</small>
@@ -6583,7 +6584,7 @@ function openOpenRouterSetup() {
     form.key.value = "";
     toast("Saved. AUI will answer through your OpenRouter key.");
     dialog.close();
-    syncEngineUi();
+    setEngine("online");
     if (byId("skillsDialog")?.open) openSkills();
   });
   dialog.querySelector("[data-key-test]").addEventListener("click", async () => {
@@ -6604,9 +6605,9 @@ function openOpenRouterSetup() {
   });
   dialog.querySelector("[data-key-remove]")?.addEventListener("click", () => {
     removeKey();
-    toast("Key removed from this browser.", "info");
+    toast("Key removed from this browser. AUI will use the model on this device.", "info");
     dialog.close();
-    syncEngineUi();
+    setEngine("device");
     if (byId("skillsDialog")?.open) openSkills();
   });
   form.key.focus();
@@ -7252,7 +7253,7 @@ async function sendMessage(options = {}) {
 
   const online = chatIsOnline(chat);
   if (online && !hasKey()) {
-    toast("Add your OpenRouter key to start chatting.", "info");
+    toast(chatIsOnline(chat) && !onlineSkill(state.settings, chat) ? "Add your OpenRouter key, or switch to the model on this device." : "Homework Helper answers through OpenRouter. Add your key to use it.", "info");
     openOpenRouterSetup();
     return;
   }
@@ -8330,7 +8331,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b22");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b23");
   return markdownModulePromise;
 }
 
