@@ -1,19 +1,19 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b21";
-import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b21";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b22";
+import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b22";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b21";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b21";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b21";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b21";
-import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b21";
-import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b21";
-import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b21";
-import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL } from "../modules/openrouter.js?v=20261018-b21";
+} from "../modules/uploads.js?v=20261018-b22";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b22";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b22";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b22";
+import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b22";
+import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b22";
+import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b22";
+import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL } from "../modules/openrouter.js?v=20261018-b22";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -559,7 +559,7 @@ const SETTINGS_TABS = [
   ["notifications", "Notifications", ["notifyToggle", "soundToggle", "soundPackSelect", "notifyDownloadToggle", "notifyTimerToggle", "quietHoursSelect"]],
   ["appearance", "Appearance", ["themeSelect", "themeSwatches", "accentSwatches", "fontSelect", "fontWeightInput", "lineHeightSelect", "contentWidthSelect", "bubbleSelect", "bubbleColorInput", "iconWeightSelect", "fontScaleInput", "densitySelect", "codeThemeSelect", "showModelBadgeToggle", "compactSidebarToggle", "seasonalToggle", "effectsToggle"]],
   ["personal", "Personalization", ["userNameInput", "assistantNameInput", "assistantAvatarSelect", "answerLengthSelect", "emojiLevelSelect", "humorInput", "formalityInput", "customInstructionsInput", "aiTitlesToggle", "markdownToggle", "onlineLookupsToggle"]],
-  ["model", "Model", ["speedSelect", "perfBtn", "preloadModelBtn", "deleteModelsBtn", "backgroundDownloadToggle", "unloadIdleToggle", "wifiOnlyToggle", "batterySaverToggle"]],
+  ["model", "Model", ["engineSelect", "openrouterKeyBtn", "speedSelect", "perfBtn", "preloadModelBtn", "deleteModelsBtn", "backgroundDownloadToggle", "unloadIdleToggle", "wifiOnlyToggle", "batterySaverToggle"]],
   ["voice", "Voice", ["voiceSelect", "voiceOutputToggle", "speechRateInput", "voiceAutoSendToggle", "voiceFirstToggle"]],
   ["memory", "Memory", ["memoryToggle", "memoryAutoSelect", "memoryExpirySelect", "manageMemoryBtn"]],
   ["keyboard", "Keyboard", ["shortcutNewChatInput", "keyboardListBtn"]],
@@ -1264,7 +1264,7 @@ async function generateAiTitle(chat, { force = false } = {}) {
         { role: "system", content: "You write chat titles. Reply with only a 2 to 5 word title. No quotes, no punctuation at the end." },
         { role: "user", content: firstUser.content.slice(0, 600) }
       ];
-      for await (const token of streamSlm(messages)) {
+      for await (const token of streamModel(messages)) {
         title += token;
         if (title.length > 60) break;
       }
@@ -1941,7 +1941,7 @@ async function improvePrompt() {
   let improved = "";
   try {
     const task = backgroundModelTask.then(async () => {
-      for await (const token of streamSlm([
+      for await (const token of streamModel([
         { role: "system", content: "Rewrite the user's request as a clearer, more specific prompt for an AI assistant. Keep the same intent and language. Reply with only the rewritten prompt." },
         { role: "user", content: original.slice(0, 3000) }
       ])) improved += token;
@@ -2408,7 +2408,7 @@ async function makeTldr(message, article) {
     const previous = backgroundModelTask;
     const task = (async () => {
       await previous;
-      for await (const token of streamSlm([
+      for await (const token of streamModel([
         { role: "system", content: "Summarize the text in at most two short sentences. Reply with only the summary." },
         { role: "user", content: stripMarkdown(message.content).slice(0, 6000) }
       ])) summary += token;
@@ -2617,7 +2617,7 @@ function setupIdleUnload() {
 }
 
 function setupBackgroundDownload() {
-  if (!state.settings.backgroundDownload || isMeteredConnection() || matchMedia("(pointer: coarse)").matches) return;
+  if (engineOnline() || !state.settings.backgroundDownload || isMeteredConnection() || matchMedia("(pointer: coarse)").matches) return;
   const idle = window.requestIdleCallback || (callback => setTimeout(callback, 20_000));
   setTimeout(() => idle(() => preloadModel(), { timeout: 30_000 }), 15_000);
 }
@@ -4800,7 +4800,7 @@ function setupMemoryFeatures() {
 
 let filesModulePromise = null;
 function loadFilesModule() {
-  filesModulePromise ||= import("../modules/files.js?v=20261018-b21");
+  filesModulePromise ||= import("../modules/files.js?v=20261018-b22");
   return filesModulePromise;
 }
 
@@ -6182,7 +6182,7 @@ function setupPrivacy() {
   explainPersistentStorage();
   // 752/791: say plainly where the AI runs.
   const hint = document.querySelector(".composerHint");
-  if (hint && !hint.querySelector(".privacyBadge")) hint.insertAdjacentHTML("beforeend", ' · <a class="privacyBadge" href="../privacy.html" target="_blank" rel="noopener noreferrer">Runs on your device · no tracking</a>');
+  if (hint && !hint.querySelector(".privacyBadge")) hint.insertAdjacentHTML("beforeend", ' · <a class="privacyBadge" href="../privacy.html" target="_blank" rel="noopener noreferrer">Your key · no tracking</a>');
   // The KaTeX stylesheet loads without blocking the page (an inline onload handler would break the CSP).
   [["katex", "../modules/vendor/katex/katex.min.css"], ["hljs", "../modules/vendor/highlight-github-dark-11.11.1.min.css"]].forEach(([name, href]) => {
     if (document.querySelector(`link[data-vendor="${name}"]`)) return;
@@ -6475,6 +6475,12 @@ function openCheckout(plan) {
 
 function setupSkillsAndPlans() {
   byId("skillsBtn")?.addEventListener("click", () => openSkills());
+  byId("engineSelect")?.addEventListener("change", event => {
+    setEngine(event.target.value);
+    if (event.target.value === "online" && !hasKey()) openOpenRouterSetup();
+  });
+  byId("openrouterKeyBtn")?.addEventListener("click", openOpenRouterSetup);
+  syncEngineUi();
   byId("skillStrip")?.addEventListener("click", event => {
     const id = event.target.closest("[data-skill]")?.dataset.skill;
     if (!id) return;
@@ -6501,8 +6507,37 @@ function setupSkillsAndPlans() {
 
 const ONLINE_PROMPT_BUDGET = 24000;
 
+// The whole app answers through the user's OpenRouter key unless they chose the model on this
+// device in Settings. An online skill (Homework Helper) forces the key either way.
+const engineOnline = () => state.settings.engine !== "device";
+
 function chatIsOnline(chat) {
-  return Boolean(onlineSkill(state.settings, chat));
+  return engineOnline() || Boolean(onlineSkill(state.settings, chat));
+}
+
+// Every reply AUI writes outside the main chat (titles, tl;dr, prompt improver) goes through here.
+function streamModel(messages, options = {}) {
+  if (!chatIsOnline(getChat())) return streamSlm(messages, options);
+  return streamOpenRouter(messages, { signal: options.signal, maxTokens: options.maxTokens, temperature: options.temperature });
+}
+
+function setEngine(engine) {
+  state.settings.engine = engine === "device" ? "device" : "online";
+  systemPromptSnapshots.clear();
+  cloudDirty = true;
+  persist();
+  syncEngineUi();
+}
+
+// Settings row, header badge and the model-download prompts follow the chosen engine.
+function syncEngineUi() {
+  const online = engineOnline();
+  document.body.classList.toggle("engineOnline", online);
+  const select = byId("engineSelect");
+  if (select) select.value = online ? "online" : "device";
+  const status = byId("engineKeyStatus");
+  if (status) status.textContent = hasKey() ? `Key saved · ${getModel()}` : "No key yet";
+  showModelName();
 }
 
 // The base prompt says the model runs on the device and should answer directly; online
@@ -6516,9 +6551,9 @@ function onlineSystemPrompt(prompt) {
 
 function openOpenRouterSetup() {
   const saved = hasKey();
-  const dialog = simpleDialog("openrouterDialog", "Homework Helper", "Connect your OpenRouter key", `
+  const dialog = simpleDialog("openrouterDialog", "AUI", "Connect your OpenRouter key", `
     <form class="setupBody" id="openrouterForm" novalidate autocomplete="off">
-      <div class="planNotice" role="note"><strong>This skill is online.</strong> While Homework Helper is on for a chat, what you type, the text of files you attach and the earlier messages in that chat are sent to OpenRouter and the model it picks. They don't go to AUI. Everything else in AUI stays on your device.</div>
+      <div class="planNotice" role="note"><strong>AUI answers through your own OpenRouter key.</strong> What you type, the text of files you attach and the earlier messages in the chat are sent to OpenRouter and the model it picks, under your account. They don't go to AUI. Chats, memories and settings stay in this browser (and in your AUI account if you sign in).</div>
       <label>OpenRouter key <input name="key" type="password" autocomplete="off" spellcheck="false" placeholder="${saved ? "A key is saved. Type a new one to replace it." : "sk-or-v1-..."}"></label>
       <label>Model <input name="model" autocomplete="off" spellcheck="false" value="${escapeHtml(getModel())}"></label>
       <small class="toolHint">The default <code>${DEFAULT_MODEL}</code> lets OpenRouter pick a model for each question. Use a name from openrouter.ai/models (for example <code>meta-llama/llama-3.3-70b-instruct:free</code>) to choose one yourself.</small>
@@ -6526,6 +6561,7 @@ function openOpenRouterSetup() {
       <p class="formError" id="openrouterError" role="alert" hidden></p>
       <p class="toolHint" id="openrouterStatus" role="status"></p>
       <div class="setupActions">
+        ${engineOnline() ? '<button type="button" class="textActionBtn" data-use-device>Use the model on this device instead</button>' : ""}
         ${saved ? '<button type="button" class="textActionBtn dangerButton" data-key-remove>Remove key</button>' : ""}
         <button type="button" class="secondaryBtn" data-key-test>Test key</button>
         <button type="submit" class="primaryBtn">Save</button>
@@ -6545,9 +6581,10 @@ function openOpenRouterSetup() {
       return fail(problem.message);
     }
     form.key.value = "";
-    toast("Saved. Homework Helper will answer online.");
+    toast("Saved. AUI will answer through your OpenRouter key.");
     dialog.close();
-    openSkills();
+    syncEngineUi();
+    if (byId("skillsDialog")?.open) openSkills();
   });
   dialog.querySelector("[data-key-test]").addEventListener("click", async () => {
     fail("");
@@ -6560,11 +6597,17 @@ function openOpenRouterSetup() {
       fail(problem.message);
     }
   });
+  dialog.querySelector("[data-use-device]")?.addEventListener("click", () => {
+    setEngine("device");
+    dialog.close();
+    toast("AUI will use the model on this device. The first reply downloads it once.", "info");
+  });
   dialog.querySelector("[data-key-remove]")?.addEventListener("click", () => {
     removeKey();
     toast("Key removed from this browser.", "info");
     dialog.close();
-    openSkills();
+    syncEngineUi();
+    if (byId("skillsDialog")?.open) openSkills();
   });
   form.key.focus();
 }
@@ -6629,7 +6672,7 @@ async function init() {
   setInterval(updateReadyBadge, 3000);
   // 318: hovering the message box warms an already-downloaded model.
   DOM.composer.addEventListener("pointerenter", () => {
-    if (!matchMedia("(pointer: coarse)").matches) isModelCached().then(cached => cached && warmSlm());
+    if (!engineOnline() && !matchMedia("(pointer: coarse)").matches) isModelCached().then(cached => cached && warmSlm());
   }, { once: true });
   applyPreferences();
   updateShortcutLabels();
@@ -6648,7 +6691,7 @@ async function init() {
   showVersion();
   showModelName();
   warmCachedModel();
-  if (!isSlmSupported()) {
+  if (!engineOnline() && !isSlmSupported()) {
     toast("AUI needs WebGPU to run its model. Use a recent desktop Chrome, Edge or Safari.", "error");
   }
   requestAnimationFrame(() => DOM.app.classList.add("appReady"));
@@ -6971,7 +7014,7 @@ function bindEvents() {
 
   // Typing starts the download on desktop only: phones may be on metered data.
   const meteredOrPhone = matchMedia("(pointer: coarse)").matches || isMeteredConnection();
-  if (!meteredOrPhone) DOM.input.addEventListener("input", warmSlm, { once: true });
+  if (!meteredOrPhone) DOM.input.addEventListener("input", () => { if (!engineOnline()) warmSlm(); }, { once: true });
   DOM.input.addEventListener("input", () => {
     scheduleTextareaResize();
     updateComposerState();
@@ -7209,12 +7252,12 @@ async function sendMessage(options = {}) {
 
   const online = chatIsOnline(chat);
   if (online && !hasKey()) {
-    toast("Homework Helper answers online. Add your OpenRouter key first.", "info");
+    toast("Add your OpenRouter key to start chatting.", "info");
     openOpenRouterSetup();
     return;
   }
   if (online && navigator.onLine === false) {
-    toast("Homework Helper needs an internet connection.", "error");
+    toast("Answers come through OpenRouter, which needs an internet connection.", "error");
     return;
   }
 
@@ -8287,7 +8330,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b21");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b22");
   return markdownModulePromise;
 }
 
@@ -9499,6 +9542,7 @@ function openSettings() {
   byId("fontScaleValue").textContent = `${Math.round(state.settings.fontScale * 100)}%`;
   byId("densitySelect").value = state.settings.density;
   byId("speedSelect").value = getSlmSpeed();
+  syncEngineUi();
   fillAppearanceControls();
   byId("counterSelect").value = state.settings.counter || "words";
   byId("composerStyleSelect").value = state.settings.composerStyle || "pill";
@@ -10962,13 +11006,17 @@ function showVersion() {
 // so the first reply starts right away instead of after a multi-second load.
 function warmCachedModel() {
   const idle = window.requestIdleCallback || (callback => setTimeout(callback, 1500));
-  idle(() => isModelCached().then(cached => { if (cached) warmSlm(); }));
+  idle(() => { if (!engineOnline()) isModelCached().then(cached => { if (cached) warmSlm(); }); });
 }
 
 function showModelName() {
+  const badge = byId("modelBadge");
+  if (engineOnline()) {
+    if (badge) badge.textContent = `AUI · OpenRouter · ${getModel()}`;
+    return;
+  }
   pickModel().then(model => {
-    const badge = byId("modelBadge");
-    if (badge) badge.textContent = `AUI SLM · ${model.label} · ~${model.approxMB} MB`;
+    if (badge && !engineOnline()) badge.textContent = `AUI SLM · ${model.label} · ~${model.approxMB} MB`;
   }).catch(() => {});
 }
 

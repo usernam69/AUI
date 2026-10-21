@@ -31,7 +31,7 @@
   <link rel="shortcut icon" href="/favicon-t-20260728.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
-  <link rel="stylesheet" href="/style.css?v=20261018-b21">
+  <link rel="stylesheet" href="/style.css?v=20261018-b22">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -270,7 +270,7 @@
         <div class="settingRow"><span><strong>Saved memories</strong><small>See, edit and delete what AUI remembers</small></span><button class="secondaryBtn" id="manageMemoryBtn" type="button">Manage</button></div>
         <div class="settingRow"><span><strong>All shortcuts</strong><small>Every keyboard shortcut in one list</small></span><button class="secondaryBtn" id="keyboardListBtn" type="button">Show</button></div>
         <div class="settingRow settingRowStack"><span id="labsIntro"><strong>Labs</strong><small>Early features. They work, but may change or go away.</small></span></div>
-        <div class="settingRow settingRowStack"><span id="aboutInfo"><strong>About AUI</strong><small>A private AI chat that runs in your browser. Made with WebLLM (Apache 2.0), marked (MIT), DOMPurify (Apache 2.0 / MPL 2.0), highlight.js (BSD 3-Clause), KaTeX (MIT), Mermaid (MIT) and html-to-image (MIT). Models: Llama 3.2 (Llama 3.2 Community License), Qwen 2.5 (Apache 2.0), SmolLM2 (Apache 2.0), Phi 3.5 (MIT). <a href="../changelog.html" target="_blank" rel="noopener">What's new</a> · <a href="../accessibility.html" target="_blank" rel="noopener">Accessibility</a> · <a href="https://github.com/usernam69/AUI" target="_blank" rel="noopener">Source code</a></small></span></div>
+        <div class="settingRow settingRowStack"><span id="aboutInfo"><strong>About AUI</strong><small>A private AI chat that answers through your own OpenRouter key, or with a small model in your browser. Made with WebLLM (Apache 2.0), marked (MIT), DOMPurify (Apache 2.0 / MPL 2.0), highlight.js (BSD 3-Clause), KaTeX (MIT), Mermaid (MIT) and html-to-image (MIT). Models: Llama 3.2 (Llama 3.2 Community License), Qwen 2.5 (Apache 2.0), SmolLM2 (Apache 2.0), Phi 3.5 (MIT). <a href="../changelog.html" target="_blank" rel="noopener">What's new</a> · <a href="../accessibility.html" target="_blank" rel="noopener">Accessibility</a> · <a href="https://github.com/usernam69/AUI" target="_blank" rel="noopener">Source code</a></small></span></div>
         <div class="settingRow settingRowStack"><span id="privacyInfo"><strong>Your privacy</strong><small>The AI runs on this device. Chats stay in this browser unless you sign in to sync them. <a href="../privacy.html" target="_blank" rel="noopener noreferrer">Read the privacy page</a></small></span></div>
         <div class="settingRow"><span><strong>Passphrase lock</strong><small>Encrypt chats, memories and settings stored in this browser</small></span><button class="secondaryBtn" id="passphraseBtn" type="button">Set a passphrase</button></div>
         <label class="settingRow"><span><strong>Lock after</strong><small>Ask for the passphrase again after this much time without use</small></span><select id="autoLockSelect"><option value="0" selected>Never</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="60">1 hour</option></select></label>
@@ -293,6 +293,8 @@
         <label class="settingRow"><span><strong>Markdown</strong><small>Render formatting, code, tables, and math</small></span><input id="markdownToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow"><span><strong>Voice output</strong><small>Allow responses to be read aloud</small></span><input id="voiceOutputToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow rangeRow"><span><strong>Playback speed</strong><small id="speechRateValue">1×</small></span><input id="speechRateInput" type="range" min="0.75" max="2" step="0.25" value="1"></label>
+        <label class="settingRow"><span><strong>AI engine</strong><small>Answer through your own OpenRouter key (bigger models), or with a small model that runs on this device</small></span><select id="engineSelect"><option value="online">OpenRouter key</option><option value="device">This device</option></select></label>
+        <div class="settingRow"><span><strong>OpenRouter key</strong><small id="engineKeyStatus">No key yet</small></span><button class="secondaryBtn" id="openrouterKeyBtn" type="button">Set key</button></div>
         <label class="settingRow"><span><strong>Model speed</strong><small>Fastest is quickest; Smartest gives better answers but is slower and a bigger download</small></span><select id="speedSelect"><option value="tiny">Tiny (SmolLM 360M, ~380 MB)</option><option value="fast">Fastest (Qwen 0.5B, ~950 MB)</option><option value="balanced">Balanced (Llama 1B, ~880 MB)</option><option value="smart">Smart (Llama 3B, ~2.3 GB)</option><option value="phi">Smartest (Phi 3.5 mini, ~3.7 GB)</option></select></label>
         <div class="settingRow"><span><strong>Model stats</strong><small>Average speed and a quick speed test</small></span><button class="secondaryBtn" id="perfBtn" type="button">Open stats</button></div>
         <label class="settingRow"><span><strong>Download in the background</strong><small>On desktop Wi-Fi, fetch the model while you browse so it's ready</small></span><input id="backgroundDownloadToggle" type="checkbox" role="switch"></label>
@@ -457,6 +459,6 @@
   <div class="toastRegion" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
   <div class="srOnly" id="announcer" aria-live="polite" aria-atomic="true"></div>
 
-  <script type="module" src="/chat/app.js?v=20261018-b21"></script>
+  <script type="module" src="/chat/app.js?v=20261018-b22"></script>
 </body>
 </html>
