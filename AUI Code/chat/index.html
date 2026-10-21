@@ -31,7 +31,7 @@
   <link rel="shortcut icon" href="/favicon-t-20260728.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
-  <link rel="stylesheet" href="/style.css?v=20261018-b31">
+  <link rel="stylesheet" href="/style.css?v=20261018-b32">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -190,6 +190,7 @@
 
   <div id="toolsPopover" class="toolsPopover" popover>
     <button id="popoverImageUpload" type="button"><span aria-hidden="true">▧</span><span><strong>Upload images</strong><small>Photos and screenshots, up to 18 MB each</small></span></button>
+    <button id="popoverScreenshot" type="button" hidden><span aria-hidden="true">▣</span><span><strong>Screenshot</strong><small>Drag over part of your screen</small></span></button>
     <button id="popoverFileUpload" type="button"><span aria-hidden="true">⌁</span><span><strong>Attach files</strong><small>PDF, Word, sheets, code, zip, audio (25 MB) or video (200 MB)</small></span></button>
     <button id="popoverFolderUpload" type="button"><span aria-hidden="true">▤</span><span><strong>Attach a folder</strong><small>Analyze a project or document folder</small></span></button>
     <button id="generateImageBtn" type="button"><span aria-hidden="true">✦</span><span><strong>Create an image</strong><small>Generate with AUI</small></span></button>
@@ -250,6 +251,7 @@
         <label class="settingRow"><span><strong>Pause auto-scroll</strong><small>When scrolling up stops the reply from pulling you down</small></span><select id="scrollSensitivitySelect"><option value="high" selected>As soon as I scroll up</option><option value="low">Only after a big scroll</option></select></label>
         <label class="settingRow"><span><strong>Text updates</strong><small>How often the reply on screen updates while AUI writes</small></span><select id="streamPaceSelect"><option value="live" selected>Live</option><option value="calm">Calm (fewer updates, easier to read)</option></select></label>
         <label class="settingRow"><span><strong>Show writing speed</strong><small>Tokens per second under each reply</small></span><input id="showSpeedToggle" type="checkbox" role="switch" checked></label>
+        <div class="settingRow settingRowStack" id="desktopSettings" hidden><span><strong>Desktop app</strong><small id="desktopStatus"></small></span><div class="desktopOptions"><label class="checkRow"><input type="checkbox" id="desktopTray"> Show a tray icon</label><label class="checkRow"><input type="checkbox" id="desktopCloseToTray"> Keep running when the window is closed</label><label class="checkRow"><input type="checkbox" id="desktopLogin"> Start with the computer</label><button type="button" class="secondaryBtn" id="desktopUpdateBtn">Check for updates</button></div></div>
         <div class="settingRow"><span><strong>Move your settings</strong><small>Save them to a file or load them in another browser</small></span><span class="inlineControls"><button class="secondaryBtn" id="exportSettingsBtn" type="button">Export</button><button class="secondaryBtn" id="importSettingsBtn" type="button">Import</button><input id="importSettingsInput" type="file" accept=".json,application/json" hidden></span></div>
         <label class="settingRow"><span><strong>Finish sound</strong><small>Which sound plays when a reply finishes</small></span><select id="soundPackSelect"><option value="chime" selected>Chime</option><option value="bell">Bell</option><option value="pop">Pop</option><option value="marimba">Marimba</option></select></label>
         <label class="settingRow"><span><strong>Model downloaded</strong><small>Notify me when the model finishes downloading in the background</small></span><input id="notifyDownloadToggle" type="checkbox" role="switch"></label>
@@ -463,6 +465,6 @@
   <div class="toastRegion" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
   <div class="srOnly" id="announcer" aria-live="polite" aria-atomic="true"></div>
 
-  <script type="module" src="/chat/app.js?v=20261018-b31"></script>
+  <script type="module" src="/chat/app.js?v=20261018-b32"></script>
 </body>
 </html>

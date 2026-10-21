@@ -1,7 +1,7 @@
 {
   "name": "aui-desktop",
   "productName": "AUI",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "AUI in its own window. A free AI assistant that runs privately on your device.",
   "main": "main.js",
   "author": "AUI",
@@ -18,11 +18,51 @@
   "build": {
     "appId": "io.github.usernam69.aui",
     "productName": "AUI",
-    "files": ["main.js", "offline.html", "package.json", "build/icon.png"],
-    "directories": { "buildResources": "build", "output": "dist" },
-    "win": { "target": ["nsis"] },
-    "mac": { "target": ["dmg"], "category": "public.app-category.productivity" },
-    "linux": { "target": ["AppImage"], "category": "Utility" },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
+    "files": [
+      "main.js",
+      "preload.js",
+      "selector.html",
+      "selector.js",
+      "selector-preload.js",
+      "offline.html",
+      "package.json",
+      "build/icon.png"
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "usernam69",
+        "repo": "AUI",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
   }
 }

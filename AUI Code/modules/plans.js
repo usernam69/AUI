@@ -12,6 +12,15 @@ export const PLANS = [
     customSkills: 3
   },
   {
+    id: "student",
+    name: "Student",
+    price: 4,
+    blurb: "For people in school.",
+    perks: ["Everything in Free", "8 custom skills", "Student badge on your profile", "Needs a school email"],
+    customSkills: 8,
+    school: true
+  },
+  {
     id: "plus",
     name: "Plus",
     price: 8,
@@ -28,6 +37,18 @@ export const PLANS = [
     customSkills: Infinity
   }
 ];
+
+// A school address ends like one: .edu, .ac.uk, .edu.au, .k12.ca.us, .sch.uk and similar. This is a demo
+// check on the spelling of the address only. No message is sent, so it cannot show the mailbox is yours.
+const SCHOOL_ENDINGS = /(\.edu|\.edu\.[a-z]{2}|\.ac\.[a-z]{2}|\.k12\.[a-z]{2}\.us|\.sch\.[a-z]{2}|\.school\.[a-z]{2,})$/i;
+export function schoolEmailProblem(value) {
+  const email = String(value ?? "").trim();
+  if (!email) return "Enter your school email.";
+  const match = /^[^\s@]+@([^\s@]+)$/.exec(email);
+  if (!match || email.length > 120) return "That doesn't look like an email address.";
+  if (!SCHOOL_ENDINGS.test(match[1])) return "That address doesn't end like a school address (for example .edu or .ac.uk).";
+  return "";
+}
 
 export const planById = id => PLANS.find(plan => plan.id === id) || PLANS[0];
 

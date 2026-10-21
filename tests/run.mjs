@@ -425,8 +425,12 @@ await test("Luhn check, card brands and expiry", async () => {
 });
 
 await test("plans keep the brand and last four digits only", async () => {
-  const { PLANS, planById, customSkillLimit, planRecord } = await load("modules/plans.js");
-  assert.equal(PLANS.length, 3);
+  const { PLANS, planById, customSkillLimit, planRecord, schoolEmailProblem } = await load("modules/plans.js");
+  for (const good of ["sam@mit.edu", "a.b@students.ox.ac.uk", "x@uni.edu.au", "kid@school.k12.ca.us", "pupil@abc.sch.uk", "Sam@CAMPUS.EDU"]) assert.equal(schoolEmailProblem(good), "", good);
+  for (const bad of ["", "nobody", "a@gmail.com", "a@edu.example.com", "a b@mit.edu", "@mit.edu", "a@@mit.edu", "x@notaschool.com"]) assert.ok(schoolEmailProblem(bad), bad);
+  assert.equal(PLANS.length, 4);
+  assert.equal(customSkillLimit("student"), 8);
+  assert.ok(planById("student").school && !planById("plus").school);
   assert.equal(planById("nonsense").id, "free");
   assert.equal(customSkillLimit("free"), 3);
   assert.equal(customSkillLimit("pro"), Infinity);

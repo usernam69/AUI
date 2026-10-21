@@ -84,7 +84,7 @@ section { padding: clamp(72px, 12vw, 190px) var(--margin) 0; }
 .copy p { max-width: 44ch; }
 .split .shot { border-radius: 0; }
 
-.plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(16px, 2.4vw, 32px); width: 100%; }
+.plans { display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(16px, 2.4vw, 32px); width: 100%; }
 .plans article { background: var(--ground); padding: clamp(20px, 3vw, 40px); display: grid; gap: 14px; align-content: start; }
 .price { font-size: clamp(44px, 5vw, 72px); font-weight: 500; letter-spacing: -0.04em; line-height: 1; }
 .price span { font-size: 17px; font-weight: 400; color: var(--ink-soft); letter-spacing: 0; }
@@ -108,9 +108,12 @@ footer a:hover { color: #fff; text-decoration: underline; }
   .button { transition: none; }
 }
 
+@media (max-width: 1100px) {
+  .plans { grid-template-columns: repeat(2, 1fr); }
+}
 @media (max-width: 900px) {
   .bar nav { display: none; }
-  .facts, .plans { grid-template-columns: 1fr; }
+  .facts, .plans, .cases { grid-template-columns: 1fr; }
   .split, .split.reverse { grid-template-columns: 1fr; }
   .split .shot { order: 2; }
   body { font-size: 17px; }
@@ -120,4 +123,28 @@ footer a:hover { color: #fff; text-decoration: underline; }
   .button { padding: 9px 16px; }
   .button.big { padding: 14px 22px; font-size: 17px; }
   .actions .button { width: 100%; }
+}
+
+/* Try it, study use cases, plan table */
+.tryBox { display: grid; gap: 12px; width: min(100%, 760px); margin-top: 8px; }
+.tryBox label { font-size: 16px; color: var(--ink-soft); }
+.tryRow { display: flex; gap: 10px; }
+.tryRow input { flex: 1; min-width: 0; padding: 14px 18px; border: 2px solid var(--ink); border-radius: 999px; background: var(--ground); color: var(--ink); font: 400 17px/1.3 var(--font); }
+.tryRow input::placeholder { color: var(--ink-soft); }
+.chips { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.chips a { display: inline-block; padding: 8px 14px; border-radius: 999px; background: var(--sky); color: var(--ink); text-decoration: none; font-size: 15px; }
+.chips a:hover { text-decoration: underline; }
+.students { background: var(--ground); }
+.cases { display: grid; grid-template-columns: repeat(2, 1fr); gap: clamp(16px, 2.4vw, 32px); width: 100%; max-width: 1200px; }
+.cases article { display: grid; gap: 10px; align-content: start; padding: clamp(20px, 3vw, 36px); background: var(--sky); }
+.cases p { color: var(--ink-soft); font-size: 17px; }
+.compare { width: 100%; max-width: 1000px; border-collapse: collapse; font-size: 17px; background: var(--ground); }
+.compare caption { text-align: left; font-weight: 500; padding: 0 0 10px; }
+.compare th, .compare td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--sky); }
+.compare thead th { color: var(--ink-soft); font-weight: 500; font-size: 15px; }
+.compare tbody th { font-weight: 500; }
+@media (max-width: 600px) {
+  .tryRow { flex-direction: column; }
+  .compare { font-size: 15px; }
+  .compare th, .compare td { padding: 10px 8px; }
 }

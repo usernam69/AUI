@@ -23,6 +23,7 @@
     <nav aria-label="Main">
       <a href="#privacy">Privacy</a>
       <a href="#skills">Skills</a>
+      <a href="#students">Students</a>
       <a href="#plans">Plans</a>
       <a href="#desktop">Desktop app</a>
     </nav>
@@ -40,6 +41,15 @@
         <a class="button big" href="/chat/">Start chatting</a>
         <a class="button big outline" href="/chat/?auth=google"><svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.3 6.5v5.4h6.9c4-3.7 6.7-9.2 6.7-15.9z"/><path fill="#34A853" d="M24 46c5.8 0 10.7-1.9 14.3-5.2l-6.9-5.4c-1.9 1.3-4.4 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.7v5.6C8.3 41.2 15.6 46 24 46z"/><path fill="#FBBC05" d="M11.8 28.5c-.4-1.3-.7-2.7-.7-4.5s.3-3.2.7-4.5v-5.6H4.7C3.2 16.9 2.4 20.3 2.4 24s.8 7.1 2.3 10.1l7.1-5.6z"/><path fill="#EA4335" d="M24 10.6c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.7 4.1 29.8 2 24 2 15.6 2 8.3 6.8 4.7 13.9l7.1 5.6c1.7-5.1 6.5-8.9 12.2-8.9z"/></svg>Continue with Google</a>
       </div>
+      <form class="tryBox" action="chat/" method="get">
+        <label for="tryInput">Try a question. It opens the chat with your question ready to send. No sign-in.</label>
+        <div class="tryRow"><input id="tryInput" name="q" maxlength="400" placeholder="Explain photosynthesis like I'm in 7th grade" autocomplete="off"><button class="button" type="submit">Ask AUI</button></div>
+        <ul class="chips" aria-label="Or start from one of these">
+          <li><a href="/chat/?q=Quiz%20me%20on%20the%20causes%20of%20World%20War%20I">Quiz me on a topic</a></li>
+          <li><a href="/chat/?q=Help%20me%20understand%20how%20to%20solve%202x%20%2B%203%20%3D%2011">Walk me through a math problem</a></li>
+          <li><a href="/chat/?q=Make%20flashcards%20about%20the%20parts%20of%20a%20cell">Make flashcards</a></li>
+        </ul>
+      </form>
       <p class="note">The first reply downloads a small model once; after that it works offline. Add an OpenRouter key in Settings any time for larger models.</p>
       <img class="shot" src="home/chat.jpg" width="1360" height="860" alt="AUI turning rough meeting notes into decisions, action items and open questions, with the Meeting notes skill switched on.">
     </section>
@@ -58,20 +68,37 @@
       <div class="copy">
         <h2>Teach it how you work.</h2>
         <p>A skill is a short set of instructions that AUI follows in every answer. Turn one on for a chat, or keep it always on.</p>
-        <p>Thirteen come built in. They summarize, proofread, translate, review code, tutor and take meeting notes. Homework Helper guides you to your own answer instead of handing one over. Write your own for the jobs you repeat, or import a SKILL.md file.</p>
+        <p>Twenty-six come built in. They summarize, proofread, translate, review code, quiz you, make flashcards, coach math, writing and languages, and take meeting notes. Homework Helper guides you to your own answer instead of handing one over. Write your own for the jobs you repeat, share one as a link, or import a SKILL.md file.</p>
         <a class="button" href="/chat/?open=skills">Browse skills</a>
       </div>
       <img class="shot" src="home/skills.jpg" width="1360" height="860" loading="lazy" alt="The AUI skills window listing Summarizer, Explain simply, Proofreader, Translator and Code reviewer, each with a switch for this chat.">
     </section>
 
+    <section class="field students" id="students">
+      <h2>Built for studying.</h2>
+      <p class="lead">Everything here is free, and it all stays in your browser.</p>
+      <div class="cases">
+        <article><h3>Before a test</h3><p>Ask AUI to quiz you, then turn any answer into flashcards. Cards come back after 1, 3 and 7 days, so they stick.</p></article>
+        <article><h3>Writing an essay</h3><p>Essay feedback comments on your thesis, evidence and structure. It points at what to fix and never rewrites your sentences. Make APA, MLA or Chicago citations without guessing the punctuation.</p></article>
+        <article><h3>Stuck on a problem</h3><p>The math coach asks what you tried, then gives one step at a time. Save a wrong answer to your mistake notebook and try it again later.</p></article>
+        <article><h3>Planning exams</h3><p>Enter each exam date and its topics. AUI builds a day-by-day plan you can add to your calendar, and keeps a streak that forgives one missed day.</p></article>
+      </div>
+      <a class="button" href="/chat/?open=study">Open the study space</a>
+    </section>
+
     <section class="field sky" id="plans">
-      <h2>Three plans, and none of them charge you.</h2>
+      <h2>Four plans, and none of them charge you.</h2>
       <p class="lead">AUI is free. Plans change how many custom skills you can keep and add a badge to your profile. The checkout is a demo: it checks that a card number is well formed with the Luhn test, takes no money, and keeps only the card brand and last four digits.</p>
       <div class="plans">
         <article>
           <h3>Free</h3>
           <p class="price">$0</p>
-          <ul><li>Unlimited on-device chat</li><li>All model sizes</li><li>13 built-in skills</li><li>3 custom skills</li></ul>
+          <ul><li>Unlimited on-device chat</li><li>All model sizes</li><li>26 built-in skills</li><li>The whole study space</li><li>3 custom skills</li></ul>
+        </article>
+        <article>
+          <h3>Student</h3>
+          <p class="price">$4<span>/month</span></p>
+          <ul><li>Everything in Free</li><li>8 custom skills</li><li>Student badge</li><li>Needs a school email</li></ul>
         </article>
         <article>
           <h3>Plus</h3>
@@ -84,20 +111,31 @@
           <ul><li>Everything in Plus</li><li>Unlimited custom skills</li><li>Pro badge</li></ul>
         </article>
       </div>
+      <table class="compare">
+        <caption>What each plan includes</caption>
+        <thead><tr><th scope="col">Plan</th><th scope="col">Price</th><th scope="col">Custom skills</th><th scope="col">Badge</th><th scope="col">School email</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Free</th><td>$0</td><td>3</td><td>None</td><td>Not needed</td></tr>
+          <tr><th scope="row">Student</th><td>$4 a month</td><td>8</td><td>Student</td><td>Needed (demo check)</td></tr>
+          <tr><th scope="row">Plus</th><td>$8 a month</td><td>15</td><td>Plus</td><td>Not needed</td></tr>
+          <tr><th scope="row">Pro</th><td>$20 a month</td><td>Unlimited</td><td>Pro</td><td>Not needed</td></tr>
+        </tbody>
+      </table>
+      <p class="note">Chat, the on-device model, every built-in skill and the study space are the same on every plan.</p>
       <a class="button" href="/chat/?open=plans">Try the demo checkout</a>
     </section>
 
     <section class="split reverse" id="desktop">
       <div class="copy">
         <h2>Take it to your desktop.</h2>
-        <p>The desktop app opens AUI in its own window, with the same chats and skills. Add an OpenRouter key in its Settings if you want bigger models. It updates itself when the website does.</p>
+        <p>The desktop app opens AUI in its own window, with the same chats and skills. Press Ctrl+Shift+Space from anywhere to open or hide it, drag over part of your screen to ask about it, and keep it in the tray. It updates itself.</p>
         <div class="actions" id="downloads">
           <a class="button" href="https://github.com/usernam69/AUI/releases/latest" rel="noopener">Download for Windows, Mac or Linux</a>
           <button class="button outline" id="installBtn" type="button" hidden>Install from this browser</button>
         </div>
         <p class="note">You can also install AUI straight from Chrome or Edge: look for the install icon in the address bar.</p>
       </div>
-      <img class="shot" src="home/plans.jpg" width="1360" height="860" loading="lazy" alt="The AUI plans window showing Free, Plus and Pro side by side.">
+      <img class="shot" src="home/plans.jpg" width="1360" height="860" loading="lazy" alt="The AUI plans window showing the plans side by side.">
     </section>
 
     <section class="close">

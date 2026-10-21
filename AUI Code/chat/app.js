@@ -1,21 +1,21 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b31";
-import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b31";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b32";
+import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b32";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b31";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b31";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b31";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b31";
-import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b31";
-import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b31";
-import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b31";
-import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL, FREE_MODEL } from "../modules/openrouter.js?v=20261018-b31";
-import { setupStudy, normalizeStudy, mergeStudy } from "../modules/study-ui.js?v=20261018-b31";
-import { fetchModels, cachedModels, searchModels, priceHint, contextHint, fallbackModels, AUTO_MODEL } from "../modules/models.js?v=20261018-b31";
+} from "../modules/uploads.js?v=20261018-b32";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b32";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b32";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b32";
+import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b32";
+import { PLANS, planById, customSkillLimit, priceLabel, planRecord, schoolEmailProblem } from "../modules/plans.js?v=20261018-b32";
+import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b32";
+import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL, FREE_MODEL } from "../modules/openrouter.js?v=20261018-b32";
+import { setupStudy, normalizeStudy, mergeStudy } from "../modules/study-ui.js?v=20261018-b32";
+import { fetchModels, cachedModels, searchModels, priceHint, contextHint, fallbackModels, AUTO_MODEL } from "../modules/models.js?v=20261018-b32";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -557,7 +557,7 @@ function setupQuickWins() {
 
 const SETTINGS_TABS = [
   ["accessibility", "Accessibility", ["simpleLanguageToggle", "simpleLayoutToggle", "lineFocusToggle", "readingRulerToggle"]],
-  ["general", "General", ["profileSelect", "languageSelect", "startupSelect", "enterToSendToggle", "counterSelect", "composerStyleSelect", "spellcheckToggle", "typingSoundToggle", "timestampsToggle", "clockSelect", "autoScrollToggle", "scrollSensitivitySelect", "streamPaceSelect", "showSpeedToggle", "exportSettingsBtn"]],
+  ["general", "General", ["profileSelect", "languageSelect", "startupSelect", "enterToSendToggle", "counterSelect", "composerStyleSelect", "spellcheckToggle", "typingSoundToggle", "timestampsToggle", "clockSelect", "autoScrollToggle", "scrollSensitivitySelect", "streamPaceSelect", "showSpeedToggle", "exportSettingsBtn", "desktopTray"]],
   ["notifications", "Notifications", ["notifyToggle", "soundToggle", "soundPackSelect", "notifyDownloadToggle", "notifyTimerToggle", "quietHoursSelect"]],
   ["appearance", "Appearance", ["themeSelect", "themeSwatches", "accentSwatches", "fontSelect", "fontWeightInput", "lineHeightSelect", "contentWidthSelect", "bubbleSelect", "bubbleColorInput", "iconWeightSelect", "fontScaleInput", "densitySelect", "codeThemeSelect", "showModelBadgeToggle", "compactSidebarToggle", "seasonalToggle", "effectsToggle"]],
   ["personal", "Personalization", ["userNameInput", "assistantNameInput", "assistantAvatarSelect", "answerLengthSelect", "emojiLevelSelect", "humorInput", "formalityInput", "learningStyleSelect", "learningNoteInput", "customInstructionsInput", "aiTitlesToggle", "markdownToggle", "onlineLookupsToggle"]],
@@ -1724,6 +1724,7 @@ const SLASH_COMMANDS = [
   ["/recap", "Your week of studying", () => studyApi?.openStudy("progress")],
   ["/mistakes", "Your mistake notebook", () => studyApi?.openStudy("mistakes")],
   ["/cite", "Make a citation in APA, MLA or Chicago", () => studyApi?.openCite()],
+  ["/screenshot", "Capture part of your screen (desktop app)", () => takeScreenshot()],
   ["/model", "Choose the model for this chat", () => chooseChatModel()],
   ["/credits", "Check your OpenRouter credit", () => showCredit()],
   ["/files", "Attach a file from an earlier chat", () => openRecentFiles()],
@@ -4843,7 +4844,7 @@ function setupMemoryFeatures() {
 
 let filesModulePromise = null;
 function loadFilesModule() {
-  filesModulePromise ||= import("../modules/files.js?v=20261018-b31");
+  filesModulePromise ||= import("../modules/files.js?v=20261018-b32");
   return filesModulePromise;
 }
 
@@ -6488,6 +6489,8 @@ function openCheckout(plan) {
   const dialog = simpleDialog("checkoutDialog", "Demo checkout", `${plan.name} · ${priceLabel(plan)}`, `
     <form class="setupBody checkoutForm" id="checkoutForm" novalidate autocomplete="off">
       <div class="planNotice" role="note"><strong>No payment is taken.</strong> Your card is only checked in this browser (length, network and the Luhn test). The number and security code are never saved or sent; only the card brand and last four digits are kept. Use a test number instead of a real card.</div>
+      ${plan.school ? `<label>School email <input name="schoolEmail" type="email" autocomplete="off" spellcheck="false" placeholder="you@school.edu" maxlength="120"><small class="fieldError" data-error="schoolEmail" role="alert"></small></label>
+      <p class="toolHint">Demo: AUI only checks that the address ends like a school address. It sends no message and can't confirm the mailbox is yours. The address is not saved.</p>` : ""}
       <label>Card number <span class="cardField"><input name="number" inputmode="numeric" autocomplete="off" placeholder="4242 4242 4242 4242" maxlength="23" required><span class="cardBrandMark" id="cardBrandMark" aria-hidden="true"></span></span><small class="fieldError" data-error="number" role="alert"></small></label>
       <div class="cardRow">
         <label>Expires <input name="expiry" inputmode="numeric" autocomplete="off" placeholder="MM/YY" maxlength="5" required><small class="fieldError" data-error="expiry" role="alert"></small></label>
@@ -6525,9 +6528,11 @@ function openCheckout(plan) {
   form.addEventListener("submit", event => {
     event.preventDefault();
     const result = checkCard(Object.fromEntries(new FormData(form)));
-    showErrors(result.errors);
-    if (!result.ok) {
-      form.elements[Object.keys(result.errors)[0]].focus();
+    const schoolProblem = plan.school ? schoolEmailProblem(form.schoolEmail.value) : "";
+    const errors = schoolProblem ? { schoolEmail: schoolProblem, ...result.errors } : result.errors;
+    showErrors(errors);
+    if (!result.ok || schoolProblem) {
+      form.elements[Object.keys(errors)[0]].focus();
       return;
     }
     // Keep the brand and last four digits only; wipe the form.
@@ -6809,6 +6814,65 @@ function fixError(message, fix) {
 
 let studyApi = null;
 
+// --- Desktop app (Electron shell): hotkey, tray, screenshots and updates reach the page here ---
+
+function takeScreenshot() {
+  const bridge = window.auiDesktop;
+  if (!bridge) return toast("Screenshots to chat work in the AUI desktop app. In a browser, upload or paste a picture.", "info");
+  bridge.captureRegion().then(dataUrl => { if (dataUrl) addScreenshot(dataUrl); }).catch(() => toast("Couldn't take the screenshot.", "error"));
+}
+
+function addScreenshot(dataUrl) {
+  attachDataUrl(dataUrl, `screenshot-${new Date().toTimeString().slice(0, 8).replace(/:/g, "")}.jpg`);
+  DOM.input.focus();
+  if (!engineOnline()) toast("The model on this device can't see pictures. Add an OpenRouter key to ask about it, or tap the picture to read its text.", "info", { duration: 9000 });
+}
+
+function setupDesktopBridge() {
+  const bridge = window.auiDesktop;
+  if (!bridge) return;
+  document.body.classList.add("isDesktopApp");
+  bridge.onQuickAsk(text => {
+    setComposerText(text || "");
+    toast(text ? "The copied text is in the message box. Add your question and send." : "Nothing is copied. Type your question.", "info");
+  });
+  bridge.onScreenshot(addScreenshot);
+  bridge.onScreenshotError(message => toast(message, "error"));
+  bridge.onUpdate(update => {
+    if (update.state === "ready") toast(`AUI ${update.version} is ready.`, "success", { label: "Restart to update", duration: 30000, onClick: () => bridge.installUpdate() });
+    refreshDesktopSettings();
+  });
+  const shot = byId("popoverScreenshot");
+  if (shot) {
+    shot.hidden = false;
+    shot.addEventListener("click", () => { byId("toolsPopover")?.hidePopover?.(); takeScreenshot(); });
+  }
+  const row = byId("desktopSettings");
+  if (!row) return;
+  row.hidden = false;
+  const bind = (id, name) => byId(id).addEventListener("change", event => bridge.setOption(name, event.target.checked).then(refreshDesktopSettings));
+  bind("desktopTray", "tray");
+  bind("desktopCloseToTray", "closeToTray");
+  bind("desktopLogin", "startAtLogin");
+  byId("desktopUpdateBtn").addEventListener("click", () => bridge.checkForUpdates().then(refreshDesktopSettings));
+  const dialog = byId("settingsDialog");
+  if (dialog) new MutationObserver(() => { if (dialog.open) refreshDesktopSettings(); }).observe(dialog, { attributes: true, attributeFilter: ["open"] });
+  refreshDesktopSettings();
+}
+
+async function refreshDesktopSettings() {
+  const bridge = window.auiDesktop;
+  const status = bridge && await bridge.status().catch(() => null);
+  if (!status) return;
+  const key = value => String(value).replace("CommandOrControl", /Mac/i.test(navigator.platform) ? "Cmd" : "Ctrl");
+  const update = { idle: "", checking: "Checking for updates…", current: "AUI is up to date.", downloading: "Downloading an update…", ready: "An update is ready. Restart AUI to install it.", error: "Couldn't check for updates.", unavailable: "Updates install from the downloaded app, not when run from source." }[status.update?.state] || "";
+  byId("desktopStatus").textContent = `Version ${status.version}. Open or hide AUI from anywhere with ${key(status.hotkey)}${status.hotkeyWorks ? "" : " (another app is using it, so it is off)"}. ${key(status.askHotkey)} puts the text you copied into the message box${status.askHotkeyWorks ? "" : " (another app is using it, so it is off)"}. ${update}`.trim();
+  byId("desktopTray").checked = status.tray;
+  byId("desktopCloseToTray").checked = status.closeToTray;
+  byId("desktopLogin").checked = status.startAtLogin;
+  byId("desktopUpdateBtn").disabled = !status.canUpdate;
+}
+
 function setComposerText(text) {
   DOM.input.value = text;
   scheduleTextareaResize();
@@ -7011,6 +7075,7 @@ async function init() {
   setupAccountExtras();
   setupSkillsAndPlans();
   setupStudyHub();
+  setupDesktopBridge();
   setupPrivacy();
   setTimeout(prefillFromUrl);
   setupBackgroundDownload();
@@ -8700,7 +8765,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b31");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b32");
   return markdownModulePromise;
 }
 

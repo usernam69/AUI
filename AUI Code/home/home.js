@@ -1,6 +1,6 @@
 // Home page. Links that carry a sign-in, invite or other app state still go to the chat.
 // The home page has no query string and only its own section anchors; anything else is an app link.
-const HOME_ANCHORS = ["", "#privacy", "#skills", "#plans", "#desktop", "#main"];
+const HOME_ANCHORS = ["", "#privacy", "#skills", "#students", "#plans", "#desktop", "#main"];
 if (location.search || !HOME_ANCHORS.includes(location.hash)) {
   location.replace("/chat/" + location.search + location.hash);
 }
