@@ -1,19 +1,19 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b28";
-import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b28";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b29";
+import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b29";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b28";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b28";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b28";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b28";
-import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b28";
-import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b28";
-import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b28";
-import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL, FREE_MODEL } from "../modules/openrouter.js?v=20261018-b28";
+} from "../modules/uploads.js?v=20261018-b29";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b29";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b29";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b29";
+import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b29";
+import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b29";
+import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b29";
+import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL, FREE_MODEL } from "../modules/openrouter.js?v=20261018-b29";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -4800,7 +4800,7 @@ function setupMemoryFeatures() {
 
 let filesModulePromise = null;
 function loadFilesModule() {
-  filesModulePromise ||= import("../modules/files.js?v=20261018-b28");
+  filesModulePromise ||= import("../modules/files.js?v=20261018-b29");
   return filesModulePromise;
 }
 
@@ -8334,7 +8334,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b28");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b29");
   return markdownModulePromise;
 }
 
