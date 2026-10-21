@@ -3407,7 +3407,7 @@
 @layer components {
   .message[data-status="streaming"] .messageContent > :last-child::after { content: "▍"; margin-left: 2px; color: var(--accent); animation: caretBlink 1s steps(2) infinite; }
   @keyframes caretBlink { 50% { opacity: 0; } }
-  .codeHeaderActions { opacity: 0.35; transition: opacity var(--duration-fast); }
+  .codeHeaderActions { opacity: 0.8; transition: opacity var(--duration-fast); }
   .codeBlock:hover .codeHeaderActions, .codeBlock:focus-within .codeHeaderActions { opacity: 1; }
   .codeHeader { position: sticky; top: 0; z-index: 2; background: inherit; }
   .codeBlock { position: relative; }
@@ -3430,13 +3430,13 @@
   .taskItem input { accent-color: var(--accent); margin-right: 6px; cursor: pointer; }
   [data-tex] { cursor: copy; }
   .callout { border-left-width: 4px; border-radius: 0 10px 10px 0; padding: 8px 14px; background: var(--surface); color: var(--text); }
-  .calloutTitle { display: block; margin-bottom: 4px; font-size: 13px; }
+  .calloutTitle { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 700; }
   .callout-note, .callout-important { border-left-color: var(--info); }
-  .callout-note .calloutTitle, .callout-important .calloutTitle { color: var(--info); }
+  .callout-note .calloutTitle, .callout-important .calloutTitle { color: var(--text); }
   .callout-tip { border-left-color: var(--success); }
-  .callout-tip .calloutTitle { color: var(--success); }
+  .callout-tip .calloutTitle { color: var(--text); }
   .callout-warning, .callout-caution { border-left-color: var(--warning); }
-  .callout-warning .calloutTitle, .callout-caution .calloutTitle { color: var(--warning); }
+  .callout-warning .calloutTitle, .callout-caution .calloutTitle { color: var(--text); }
   .footnoteRef { color: var(--accent); font-weight: 600; }
   .footnoteRule + ol { font-size: 0.88em; color: var(--text-secondary); }
   .replyToc { display: grid; gap: 2px; margin-bottom: 14px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; font-size: 13px; }
@@ -3528,12 +3528,12 @@
   .actionSheetPanel { width: min(100%, 520px); max-height: 80vh; overflow-y: auto; padding: 8px 12px max(12px, env(safe-area-inset-bottom)); border-radius: 20px 20px 0 0; background: var(--surface-raised); box-shadow: var(--shadow-lg); transform: translateY(100%); transition: transform var(--duration-normal) var(--ease-out); }
   .actionSheet.open .actionSheetPanel { transform: none; }
   .actionSheetPanel::before { content: ""; display: block; width: 40px; height: 4px; margin: 2px auto 10px; border-radius: 4px; background: var(--border-strong); }
-  .actionSheetTitle { margin: 0 4px 8px; color: var(--muted); font-size: 13px; text-align: center; }
+  .actionSheetTitle { margin: 0 4px 8px; color: var(--text-secondary); font-size: 13px; text-align: center; }
   .actionSheetBody { margin: 0 6px 10px; color: var(--text); font-size: 15px; line-height: 1.5; }
   .actionSheetBody ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
   .actionSheetPanel button { display: block; width: 100%; min-height: 48px; padding: 0 14px; border: 0; border-radius: 12px; background: transparent; color: var(--text); font: inherit; font-size: 16px; text-align: left; }
   .actionSheetPanel button:hover, .actionSheetPanel button:focus-visible { background: var(--surface-hover); }
-  .actionSheetPanel .actionSheetCancel { margin-top: 6px; background: var(--surface-hover); color: var(--accent); font-weight: 600; text-align: center; }
+  .actionSheetPanel .actionSheetCancel { margin-top: 6px; background: var(--surface-hover); color: var(--text); font-weight: 600; text-align: center; }
   .selectTextBody { white-space: pre-wrap; user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; font-size: 16px; line-height: 1.55; }
   .handoffBody { display: grid; justify-items: center; gap: 12px; text-align: center; }
   .handoffBody svg { width: min(78vw, 320px); height: auto; padding: 10px; border-radius: 12px; background: #fff; }
@@ -3598,7 +3598,8 @@
   .settingsSearchEmpty { padding: 20px; color: var(--muted); }
   .sectionReset { margin: 12px 0 4px; color: var(--muted); font-size: 13px; text-decoration: underline; background: none; border: 0; cursor: pointer; }
   .dangerZone { margin-top: 18px; padding: 4px 12px 8px; border: 1px solid var(--danger); border-radius: var(--radius-md); }
-  .dangerZone h3 { margin: 8px 0 4px; color: var(--danger); font-size: 14px; }
+  .dangerZone h3 { margin: 8px 0 4px; color: #ff8f8f; font-size: 14px; }
+  :root[data-theme="light"] .dangerZone h3, :root[data-theme="sky"] .dangerZone h3, :root[data-theme="sepia"] .dangerZone h3 { color: #b91c1c; }
   .savedMark { margin-left: 10px; color: var(--success); font-size: 12px; opacity: 0; transition: opacity var(--duration-fast); }
   .savedMark.visible { opacity: 1; }
   .inlineControls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -3649,7 +3650,7 @@
   .memoryMeter span { display: block; height: 6px; border-radius: 6px; background: linear-gradient(to right, var(--accent) calc(var(--fill) * 100%), var(--surface-hover) 0); }
   .memoryMeter small { color: var(--muted); font-size: 12px; }
   .memoryFilters { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-  .memoryFilters .tagChip.active { background: var(--accent); color: #fff; }
+  .memoryFilters .tagChip.active { background: var(--accent-soft); color: var(--text); border-color: var(--accent); font-weight: 600; }
   .memorySummary, .memoryHistory { margin: 8px 0; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); }
   .memorySummary summary, .memoryHistory summary { cursor: pointer; font-weight: 600; }
   .memorySummary h4 { margin: 10px 0 2px; font-size: 13px; color: var(--muted); }
@@ -3688,7 +3689,8 @@
   .contextPart pre { max-height: 260px; overflow: auto; margin: 0; padding: 10px; border-radius: var(--radius-md); background: var(--surface-hover); white-space: pre-wrap; font-size: 12.5px; }
 }
 @layer components {
-  .memoryMore .dangerTextBtn { color: color-mix(in srgb, var(--danger) 70%, var(--text)); }
+  .memoryMore .dangerTextBtn { color: #ff8f8f; }
+  :root[data-theme="light"] .memoryMore .dangerTextBtn, :root[data-theme="sky"] .memoryMore .dangerTextBtn, :root[data-theme="sepia"] .memoryMore .dangerTextBtn { color: #b91c1c; }
 }
 @layer components {
   .memoryCardBody p { font-size: 14.5px; color: var(--text); }
@@ -3848,4 +3850,18 @@
 
 @layer components {
   .engineOnline .preloadRow { display: none; }
+}
+@layer components {
+  /* The highlight.js theme makes code scroll too; the block around it already does. */
+  .codeBlock pre code { overflow: visible !important; }
+}
+@layer components {
+  /* The demo checkout must fit a phone: grid children may shrink, inputs fill their column. */
+  .checkoutForm, .checkoutForm > *, .checkoutForm label, .cardRow > label { min-width: 0; }
+  .checkoutForm input { width: 100%; min-width: 0; }
+  .checkoutForm .setupActions { flex-wrap: wrap; }
+  .cardRow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+@layer components {
+  .memoryMore .linkBtn, .dangerTextBtn { background: transparent; }
 }

@@ -7,6 +7,7 @@
   --navy: #0b1b45;
   --sky: #dbe8ff;
   --on-navy: #f2f6ff;
+  --on-blue: #ffffff;
   --on-navy-soft: #b9c7e8;
   --margin: clamp(16px, 4vw, 48px);
   --font: Lexend, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -20,6 +21,7 @@
     --ink-soft: #aebbdc;
     --blue: #5b8cff;
     --blue-hover: #7aa2ff;
+    --on-blue: #06102e;
     --navy: #06102e;
     --sky: #12213f;
   }
@@ -46,7 +48,7 @@ a { color: inherit; }
 .textLink { font-size: 16px; text-decoration: none; }
 .textLink:hover { text-decoration: underline; }
 
-.button { display: inline-flex; align-items: center; justify-content: center; gap: 10px; background: var(--blue); color: #fff; border: 2px solid var(--blue); border-radius: 999px; padding: 10px 22px; font: 500 16px/1.2 var(--font); text-decoration: none; cursor: pointer; transition: background 140ms, transform 140ms; }
+.button { display: inline-flex; align-items: center; justify-content: center; gap: 10px; background: var(--blue); color: var(--on-blue); border: 2px solid var(--blue); border-radius: 999px; padding: 10px 22px; font: 500 16px/1.2 var(--font); text-decoration: none; cursor: pointer; transition: background 140ms, transform 140ms; }
 .button:hover { background: var(--blue-hover); border-color: var(--blue-hover); }
 .button:active { transform: translateY(1px); }
 .button.big { padding: 16px 30px; font-size: 18px; }

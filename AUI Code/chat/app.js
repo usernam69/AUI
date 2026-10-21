@@ -1,19 +1,19 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b27";
-import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b27";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b28";
+import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b28";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b27";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b27";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b27";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b27";
-import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b27";
-import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b27";
-import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b27";
-import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL, FREE_MODEL } from "../modules/openrouter.js?v=20261018-b27";
+} from "../modules/uploads.js?v=20261018-b28";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b28";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b28";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b28";
+import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b28";
+import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b28";
+import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b28";
+import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL, FREE_MODEL } from "../modules/openrouter.js?v=20261018-b28";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -1969,7 +1969,7 @@ function updateContextMeter() {
   if (!meter) return;
   const chat = getChat();
   const history = (chat?.messages || []).reduce((total, message) => total + message.content.length, 0);
-  const used = Math.min(1, (history + DOM.input.value.length + 900) / getPromptBudget());
+  const used = Math.min(1, (history + DOM.input.value.length + 900) / activePromptBudget(chat));
   meter.style.setProperty("--fill", String(used));
   meter.title = used >= 1
     ? "This chat is longer than the model can see at once; the oldest messages are left out"
@@ -4441,7 +4441,7 @@ function openContextViewer() {
   if (!chat) return;
   const typed = DOM.input.value.trim() || "(your next message)";
   const history = createHistory(chat, null, true);
-  const messages = fitSlmMessages(getChatSystemPrompt(chat), history, withMemoryNotes(buildSlmUserText(typed, state.pendingAttachments), selectMemories(chat.memoryOff || !state.settings.memory ? [] : state.memory, typed)), getPromptBudget());
+  const messages = fitSlmMessages(getChatSystemPrompt(chat), history, withMemoryNotes(buildSlmUserText(typed, state.pendingAttachments), selectMemories(chat.memoryOff || !state.settings.memory ? [] : state.memory, typed)), activePromptBudget(chat));
   const dropped = history.length - (messages.length - 2);
   const total = messages.reduce((sum, message) => sum + message.content.length, 0);
   let dialog = byId("contextDialog");
@@ -4453,9 +4453,9 @@ function openContextViewer() {
       if (event.target === dialog || event.target.closest("[data-close-dialog]")) dialog.close();
     });
   }
-  dialog.innerHTML = `<div class="dialogPanel"><header><div><p class="eyebrow">Context</p><h2>What the model reads</h2></div><button class="iconBtn" type="button" data-close-dialog aria-label="Close">×</button></header><div class="dialogContent contextViewer">
-    <p class="contextSummary">${messages.length} parts · ${total.toLocaleString()} of ${getPromptBudget().toLocaleString()} characters${dropped > 0 ? ` · ${dropped} older message${dropped === 1 ? "" : "s"} left out` : ""}</p>
-    ${messages.map(message => `<section class="contextPart"><h3>${message.role === "system" ? "Instructions" : message.role === "user" ? "You" : "AUI"} <small>${message.content.length.toLocaleString()} chars</small></h3><pre>${escapeHtml(message.content)}</pre></section>`).join("")}
+  dialog.innerHTML = `<div class="dialogPanel"><header><div><p class="eyebrow">Context</p><h2>What the model reads</h2></div><button class="iconBtn" type="button" data-close-dialog aria-label="Close">×</button></header><div class="dialogContent contextViewer" tabindex="0">
+    <p class="contextSummary">${messages.length} parts · ${total.toLocaleString()} of ${activePromptBudget(chat).toLocaleString()} characters${dropped > 0 ? ` · ${dropped} older message${dropped === 1 ? "" : "s"} left out` : ""}</p>
+    ${messages.map(message => `<section class="contextPart"><h3>${message.role === "system" ? "Instructions" : message.role === "user" ? "You" : "AUI"} <small>${message.content.length.toLocaleString()} chars</small></h3><pre tabindex="0">${escapeHtml(message.content)}</pre></section>`).join("")}
   </div></div>`;
   dialog.showModal();
 }
@@ -4800,7 +4800,7 @@ function setupMemoryFeatures() {
 
 let filesModulePromise = null;
 function loadFilesModule() {
-  filesModulePromise ||= import("../modules/files.js?v=20261018-b27");
+  filesModulePromise ||= import("../modules/files.js?v=20261018-b28");
   return filesModulePromise;
 }
 
@@ -5962,6 +5962,7 @@ function unlockScreen() {
     screen.querySelector("[data-forgot]").addEventListener("click", () => {
       if (!confirm("Without the passphrase the encrypted chats can't be opened. Erase them from this browser and start fresh? (Chats synced to your account are not affected.)")) return;
       eraseLockedData();
+      removeKey();
       location.reload();
     });
   });
@@ -6506,11 +6507,12 @@ function setupSkillsAndPlans() {
 // --- Online skills (Homework Helper): replies come from OpenRouter with the user's own key ---
 
 const ONLINE_PROMPT_BUDGET = 24000;
+const activePromptBudget = chat => (chatIsOnline(chat) ? ONLINE_PROMPT_BUDGET : getPromptBudget());
 
 // Nobody has to bring a key: until a visitor adds an OpenRouter key (or picks it in Settings)
 // AUI answers with the small model on their device. Once there is a key, it answers through the
 // key. An online skill (Homework Helper) always needs the key.
-const engineOnline = () => state.settings.engine === "online" || (state.settings.engine == null && hasKey());
+const engineOnline = () => hasKey() && state.settings.engine !== "device";
 
 function chatIsOnline(chat) {
   return engineOnline() || Boolean(onlineSkill(state.settings, chat));
@@ -6543,18 +6545,16 @@ function syncEngineUi() {
 
 // The base prompt says the model runs on the device and should answer directly; online
 // homework chats must say what is true and must not undercut the skill's rules.
-function onlineSystemPrompt(prompt) {
-  return prompt
-    .replace("running privately on the user's device", "answering through the user's own OpenRouter key")
-    .replace("Help with any reasonable request. ", "")
-    .replace("Answer clearly and directly.", "");
+function onlineSystemPrompt(prompt, strict) {
+  const honest = prompt.replace("running privately on the user's device", "answering through the user's own OpenRouter key");
+  return strict ? honest.replace("Help with any reasonable request. ", "").replace("Answer clearly and directly.", "") : honest;
 }
 
 function openOpenRouterSetup() {
   const saved = hasKey();
   const dialog = simpleDialog("openrouterDialog", "AUI", "Use your own OpenRouter key", `
     <form class="setupBody" id="openrouterForm" novalidate autocomplete="off">
-      <div class="planNotice" role="note"><strong>With a key, AUI answers through OpenRouter</strong> (bigger models, billed to your account). Without one it uses a small model on your device. With a key, what you type, the text of files you attach and the earlier messages in the chat are sent to OpenRouter and the model it picks, under your account. They don't go to AUI. Chats, memories and settings stay in this browser (and in your AUI account if you sign in).</div>
+      <div class="planNotice" role="note"><strong>With a key, AUI answers through OpenRouter</strong> (bigger models, billed to your account). Without one it uses a small model on your device. With a key, what you type, the text of files you attach and the earlier messages in the chat are sent to OpenRouter and the model it picks, under your account. They don't go to AUI. Memories AUI adds to a message go too. Chats, memories and settings stay in this browser (and in your AUI account if you sign in).</div>
       <label>OpenRouter key <input name="key" type="password" autocomplete="off" spellcheck="false" placeholder="${saved ? "A key is saved. Type a new one to replace it." : "sk-or-v1-..."}"></label>
       <label>Model <input name="model" autocomplete="off" spellcheck="false" value="${escapeHtml(getModel())}"></label>
       <small class="toolHint">The default <code>${DEFAULT_MODEL}</code> picks a free model for each question, so it works with no credits (free models have daily limits). Use a name from openrouter.ai/models to choose one yourself. If your credits run out, AUI switches to the free router by itself.</small>
@@ -7252,6 +7252,8 @@ async function sendMessage(options = {}) {
   }
 
   const online = chatIsOnline(chat);
+  // Homework Helper is stricter than the key alone: no calculator, notes or memories that could hand over answers.
+  const strictOnline = Boolean(onlineSkill(state.settings, chat));
   if (online && !hasKey()) {
     toast(chatIsOnline(chat) && !onlineSkill(state.settings, chat) ? "Add your OpenRouter key, or switch to the model on this device." : "Homework Helper answers through OpenRouter. Add your key to use it.", "info");
     openOpenRouterSetup();
@@ -7473,13 +7475,14 @@ async function sendMessage(options = {}) {
     }
     // An online homework chat gets no calculator or knowledge notes (they would hand over answers)
     // and no memories (nothing personal is sent that the student didn't type in this chat).
-    const tools = online ? { notes: [], sources: [] } : await runTools(text);
-    if (!online) await addKnowledgeNotes(text, tools).catch(() => {});
-    const memories = online ? [] : memoriesForMessage(chat, text);
+    // A plain key chat keeps them; memories and notes then travel to OpenRouter with the message.
+    const tools = strictOnline ? { notes: [], sources: [] } : await runTools(text);
+    if (!strictOnline) await addKnowledgeNotes(text, tools).catch(() => {});
+    const memories = strictOnline ? [] : memoriesForMessage(chat, text);
     if (memories.length) assistantMessage.memoryUsed = memories.map(item => memoryText(item).slice(0, 80));
     if (tools.sources.length) assistantMessage.toolSources = tools.sources;
     const slmMessages = fitSlmMessages(
-      online ? onlineSystemPrompt(getChatSystemPrompt(chat)) : getChatSystemPrompt(chat),
+      online ? onlineSystemPrompt(getChatSystemPrompt(chat), strictOnline) : getChatSystemPrompt(chat),
       history,
       withMemoryNotes(withToolNotes(buildSlmUserText(text, attachments), tools), memories),
       online ? ONLINE_PROMPT_BUDGET : getPromptBudget()
@@ -8331,7 +8334,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b27");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b28");
   return markdownModulePromise;
 }
 

@@ -16,8 +16,11 @@
     .row { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
     .row small { display: block; color: var(--muted); }
     .state { font-weight: 700; }
-    .ok { color: var(--success); }
-    .bad { color: var(--danger); }
+    .ok { color: #166534; }
+    .bad { color: #b91c1c; }
+    :root[data-theme="dark"] .ok { color: #4ade80; }
+    :root[data-theme="dark"] .bad { color: #ff8f8f; }
+    main > a:first-child { display: inline-flex; align-items: center; min-height: 44px; }
     .wait { color: var(--muted); }
     a { color: var(--accent); }
   </style>

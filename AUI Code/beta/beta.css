@@ -1,0 +1,176 @@
+/* Beta Lab and the approval inbox. These pages share style.css with the chat app, whose body is
+   locked to the window, so everything here is unlayered and wins over it. Violet marks Beta. */
+:root {
+  --b-bg: #f6f4fb;
+  --b-surface: #ffffff;
+  --b-raised: #ece8f7;
+  --b-border: #d9d2ee;
+  --b-text: #17122b;
+  --b-soft: #4a4463;
+  --b-accent: #6d28d9;
+  --b-accent-hover: #5b21b6;
+  --b-on-accent: #ffffff;
+  --b-good: #166534;
+  --b-good-bg: #dcfce7;
+  --b-bad: #991b1b;
+  --b-bad-bg: #fee2e2;
+  --b-wait: #854d0e;
+  --b-wait-bg: #fef3c7;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --b-bg: #0d0a1a;
+    --b-surface: #16112b;
+    --b-raised: #1f1840;
+    --b-border: #342b5c;
+    --b-text: #f1eeff;
+    --b-soft: #b8b0d9;
+    --b-accent: #a78bfa;
+    --b-accent-hover: #c4b5fd;
+    --b-on-accent: #170f33;
+    --b-good: #86efac;
+    --b-good-bg: #12301f;
+    --b-bad: #fca5a5;
+    --b-bad-bg: #3b1519;
+    --b-wait: #fcd34d;
+    --b-wait-bg: #382a0a;
+  }
+}
+
+html, body { height: auto; min-height: 100%; overflow: auto; }
+body { background: var(--b-bg); color: var(--b-text); font: 400 16px/1.6 var(--font-sans, system-ui, sans-serif); }
+.betaPage, .betaAdminPage { max-width: 1180px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px) 64px; }
+.betaPage a, .betaAdminPage a { color: inherit; }
+.betaPage :focus-visible, .betaAdminPage :focus-visible { outline: 3px solid var(--b-accent); outline-offset: 3px; }
+
+/* Navigation */
+.betaNav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0; flex-wrap: wrap; }
+.betaBrand { display: inline-flex; align-items: center; gap: 10px; font-weight: 650; font-size: 20px; text-decoration: none; min-height: 44px; }
+.betaBrand small { font-size: 12px; font-weight: 600; color: var(--b-accent); border: 1px solid var(--b-accent); border-radius: 999px; padding: 1px 8px; }
+.betaBrandMark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: var(--b-accent); color: var(--b-on-accent); font-weight: 700; }
+.betaNavActions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.betaNavActions a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; text-decoration: none; border-radius: 999px; }
+.betaNavActions a:hover { background: var(--b-raised); }
+.betaNavActions .betaNavPrimary { background: var(--b-accent); color: var(--b-on-accent); font-weight: 600; }
+.betaNavActions .betaNavPrimary:hover { background: var(--b-accent-hover); }
+
+/* Buttons */
+.betaPrimaryBtn, .betaSecondaryBtn, .betaAdminDecision, .betaInviteForm button, .bulkBar button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 22px; border-radius: 999px; border: 2px solid var(--b-accent); font: 600 15px/1.2 var(--font-sans, system-ui, sans-serif); text-decoration: none; cursor: pointer; transition: background 140ms, color 140ms; }
+.betaPrimaryBtn { background: var(--b-accent); color: var(--b-on-accent) !important; }
+.betaPrimaryBtn:hover { background: var(--b-accent-hover); border-color: var(--b-accent-hover); }
+.betaSecondaryBtn, .betaInviteForm button, .bulkBar button { background: transparent; color: var(--b-text); }
+.betaSecondaryBtn:hover, .betaInviteForm button:hover, .bulkBar button:hover { background: var(--b-raised); }
+.betaPrimaryBtn:disabled, .betaSecondaryBtn:disabled, button:disabled.betaPrimaryBtn { opacity: 0.55; cursor: not-allowed; }
+.betaActions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+
+/* Hero */
+.betaHero { position: relative; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: clamp(24px, 5vw, 64px); align-items: center; padding: clamp(24px, 6vw, 72px) 0; }
+.betaGlow { display: none; }
+.betaStatus { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--b-accent); }
+.betaStatus span { width: 9px; height: 9px; border-radius: 50%; background: var(--b-accent); }
+.betaEyebrow { margin: 12px 0 6px; font-size: 14px; font-weight: 600; color: var(--b-accent); }
+.betaHero h1 { font-size: clamp(38px, 6.2vw, 76px); line-height: 1.02; letter-spacing: -0.035em; font-weight: 600; margin: 0 0 18px; max-width: 14ch; }
+.betaLead { font-size: clamp(17px, 1.8vw, 21px); line-height: 1.5; color: var(--b-soft); max-width: 52ch; margin: 0 0 20px; }
+.betaFinePrint { margin-top: 18px; font-size: 14px; color: var(--b-soft); max-width: 60ch; }
+
+.betaSignalCard { background: var(--b-surface); border: 1px solid var(--b-border); border-radius: 20px; padding: clamp(18px, 3vw, 28px); display: grid; gap: 18px; }
+.betaSignalHeader { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; color: var(--b-soft); }
+.betaSignalHeader strong { color: var(--b-text); }
+.betaSignal { display: flex; gap: 12px; align-items: flex-start; }
+.betaSignal small { display: block; color: var(--b-soft); }
+.betaSignalPulse { flex: none; width: 12px; height: 12px; margin-top: 7px; border-radius: 50%; background: var(--b-accent); }
+.betaStats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0; }
+.betaStats div { background: var(--b-raised); border-radius: 12px; padding: 12px; }
+.betaStats dt { font-size: 13px; color: var(--b-soft); }
+.betaStats dd { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+.betaAccessPanel { display: grid; gap: 12px; justify-items: start; }
+.betaAccessPanel p { margin: 0; color: var(--b-soft); font-size: 15px; }
+.betaExtras { display: grid; gap: 10px; justify-items: start; }
+.betaExtras p { margin: 0; font-size: 15px; }
+.betaInviteForm { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.betaInviteForm label { display: grid; gap: 4px; font-size: 14px; }
+.betaInviteForm p { flex-basis: 100%; margin: 0; font-size: 14px; }
+
+/* Sections */
+.betaSection, .betaPromise, .betaCta { padding: clamp(32px, 6vw, 72px) 0 0; }
+.betaSection h2, .betaPromise h2, .betaCta h2 { font-size: clamp(30px, 4.6vw, 54px); line-height: 1.05; letter-spacing: -0.03em; font-weight: 600; margin: 0 0 20px; max-width: 20ch; }
+.betaFeatureGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.betaFeatureGrid article { background: var(--b-surface); border: 1px solid var(--b-border); border-radius: 16px; padding: 20px; }
+.betaFeatureGrid article span { display: block; font-size: 13px; font-weight: 600; color: var(--b-accent); margin-bottom: 6px; }
+.betaFeatureGrid h3 { margin: 0 0 6px; font-size: 19px; }
+.betaFeatureGrid p { margin: 0; color: var(--b-soft); font-size: 15px; }
+.betaPromise { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: clamp(20px, 5vw, 64px); align-items: start; }
+.betaPromise ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.betaPromise li { background: var(--b-surface); border: 1px solid var(--b-border); border-radius: 14px; padding: 16px 18px; }
+
+/* Request form */
+.betaCta > p { color: var(--b-soft); max-width: 60ch; }
+.betaRequestTiming { display: grid; gap: 4px; background: var(--b-wait-bg); color: var(--b-wait); border-radius: 14px; padding: 14px 16px; margin: 16px 0; max-width: 70ch; font-size: 15px; }
+.betaRequestForm { display: grid; gap: 18px; background: var(--b-surface); border: 1px solid var(--b-border); border-radius: 20px; padding: clamp(16px, 3vw, 28px); max-width: 860px; }
+.betaRequestGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.betaRequestGrid label { display: grid; gap: 6px; font-size: 15px; font-weight: 500; }
+.betaRequestGrid .betaRequestReason { grid-column: 1 / -1; }
+.betaRequestGrid small { font-weight: 400; color: var(--b-soft); }
+.betaPage input, .betaPage select, .betaPage textarea, .betaAdminPage input, .betaAdminPage select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--b-border); border-radius: 10px; background: var(--b-bg); color: var(--b-text); font: inherit; }
+.betaPage textarea { resize: vertical; min-height: 120px; }
+.betaPage input::placeholder, .betaPage textarea::placeholder { color: var(--b-soft); opacity: 0.8; }
+.betaPage input[readonly] { opacity: 0.8; }
+.betaRequestStatus { margin: 0; font-size: 15px; color: var(--b-soft); }
+.betaRequestStatus.error { color: var(--b-bad); }
+.betaRequestStatus.success { color: var(--b-good); }
+
+/* History */
+.betaRequestHistory, .betaReviewedList, .betaAdminRequestList { display: grid; gap: 12px; }
+.betaRequestEmpty { color: var(--b-soft); }
+.betaRequestHistoryCard, .betaAdminRequestCard, .betaReviewedRequestCard { background: var(--b-surface); border: 1px solid var(--b-border); border-radius: 16px; padding: 16px 18px; display: grid; gap: 10px; }
+.betaRequestHistoryCard header, .betaAdminRequestCard header, .betaReviewedRequestCard header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.betaRequestHistoryCard h3, .betaAdminRequestCard h3, .betaReviewedRequestCard h3 { margin: 2px 0 0; font-size: 18px; }
+.betaRequestHistoryCard small, .betaAdminRequestCard small, .betaReviewedRequestCard small { color: var(--b-soft); }
+.betaRequestHistoryCard p, .betaAdminRequestCard p { margin: 0; }
+.betaRequestHistoryCard aside, .betaAdminNote { background: var(--b-raised); border-radius: 10px; padding: 10px 12px; display: grid; gap: 2px; font-size: 15px; }
+.betaRequestAccessWindow, .betaRequestFulfillmentNote { color: var(--b-soft); font-size: 15px; }
+.betaRequestBadge { flex: none; border-radius: 999px; padding: 2px 12px; font-size: 13px; font-weight: 600; text-transform: capitalize; background: var(--b-wait-bg); color: var(--b-wait); }
+.betaRequestBadge.approved { background: var(--b-good-bg); color: var(--b-good); }
+.betaRequestBadge.declined { background: var(--b-bad-bg); color: var(--b-bad); }
+
+/* Footer */
+.betaFooter { display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: space-between; align-items: center; margin-top: clamp(40px, 8vw, 96px); padding-top: 20px; border-top: 1px solid var(--b-border); color: var(--b-soft); font-size: 15px; }
+.betaFooter div { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.betaFooter a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; text-decoration: none; }
+.betaFooter a:hover { text-decoration: underline; }
+
+/* Approval inbox */
+.betaAdminHero { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; flex-wrap: wrap; padding: clamp(16px, 4vw, 40px) 0 16px; }
+.betaAdminHero h1 { font-size: clamp(32px, 5vw, 56px); letter-spacing: -0.03em; font-weight: 600; margin: 0 0 8px; }
+.betaAdminHero p { color: var(--b-soft); max-width: 60ch; margin: 0; }
+.betaAdminGate { background: var(--b-surface); border: 1px solid var(--b-border); border-radius: 16px; padding: 20px; display: grid; gap: 10px; justify-items: start; max-width: 640px; }
+.betaAdminGate p { margin: 0; color: var(--b-soft); }
+.betaAdminDashboard[hidden], .betaAdminGate[hidden] { display: none; }
+.betaAdminStats { display: flex; gap: 12px; margin-bottom: 16px; }
+.betaAdminStats article { background: var(--b-surface); border: 1px solid var(--b-border); border-radius: 14px; padding: 12px 18px; display: grid; }
+.betaAdminStats span { font-size: 13px; color: var(--b-soft); }
+.betaAdminStats strong { font-size: 30px; line-height: 1.1; }
+.betaAdminToolbar label { display: grid; gap: 6px; font-size: 14px; max-width: 480px; }
+.betaAdminStatus { color: var(--b-soft); min-height: 1.4em; }
+.betaAdminRequestDetails { white-space: pre-wrap; overflow-wrap: anywhere; }
+.betaAdminRequestActions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.betaAdminDuration { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 14px; }
+.betaAdminDuration input { width: 90px; }
+.betaAdminDuration select { width: auto; }
+.betaAdminDecision.approve, .betaAdminDecision.approved { background: var(--b-good-bg); color: var(--b-good); border-color: var(--b-good); }
+.betaAdminDecision.decline, .betaAdminDecision.declined, .betaAdminDecision.danger { background: var(--b-bad-bg); color: var(--b-bad); border-color: var(--b-bad); }
+.betaAdminReviewed { color: var(--b-soft); font-size: 14px; }
+.bulkBar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
+.bulkBar label { display: inline-flex; align-items: center; gap: 8px; }
+.bulkBar input, .betaAdminRequestCard input[type="checkbox"] { width: 20px; min-height: 20px; height: 20px; }
+.betaReviewedArchive { margin-top: 24px; background: var(--b-surface); border: 1px solid var(--b-border); border-radius: 14px; padding: 4px 16px 16px; }
+.betaReviewedArchive summary { display: flex; justify-content: space-between; align-items: center; min-height: 48px; cursor: pointer; font-weight: 600; }
+.betaReviewedCount { background: var(--b-raised); border-radius: 999px; padding: 0 10px; font-size: 14px; }
+
+@media (max-width: 860px) {
+  .betaHero, .betaPromise { grid-template-columns: 1fr; }
+  .betaRequestGrid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .betaPrimaryBtn, .betaSecondaryBtn { transition: none; }
+}

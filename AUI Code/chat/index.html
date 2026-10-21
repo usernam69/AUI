@@ -31,7 +31,7 @@
   <link rel="shortcut icon" href="/favicon-t-20260728.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
-  <link rel="stylesheet" href="/style.css?v=20261018-b27">
+  <link rel="stylesheet" href="/style.css?v=20261018-b28">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -243,7 +243,7 @@
         <label class="settingRow"><span><strong>Spell check</strong><small>Underline misspelled words while you type</small></span><input id="spellcheckToggle" type="checkbox" role="switch" checked></label>
         <label class="settingRow"><span><strong>Send after dictation</strong><small>Send automatically when voice input stops</small></span><input id="voiceAutoSendToggle" type="checkbox" role="switch"></label>
         <label class="settingRow"><span><strong>Typing sounds</strong><small>Soft clicks as you type</small></span><input id="typingSoundToggle" type="checkbox" role="switch"></label>
-        <div class="settingRow"><span><strong>Profile</strong><small>Separate settings for each person using this browser</small></span><span class="inlineControls"><select id="profileSelect"></select><button class="secondaryBtn" id="profileSaveBtn" type="button">New profile</button></span></div>
+        <div class="settingRow"><span><strong>Profile</strong><small>Separate settings for each person using this browser</small></span><span class="inlineControls"><select id="profileSelect" aria-label="Settings profile"></select><button class="secondaryBtn" id="profileSaveBtn" type="button">New profile</button></span></div>
         <label class="settingRow"><span><strong>Language</strong><small>Language of AUI's buttons and menus</small></span><select id="languageSelect"><option value="en" selected>English</option><option value="he">עברית (Hebrew)</option></select></label>
         <label class="settingRow"><span><strong>When AUI opens</strong><small>Show your last chat or start a fresh one</small></span><select id="startupSelect"><option value="last" selected>Last chat</option><option value="new">New chat</option></select></label>
         <label class="settingRow"><span><strong>Clock</strong><small>How times are shown</small></span><select id="clockSelect"><option value="auto" selected>Like my device</option><option value="12">12-hour</option><option value="24">24-hour</option></select></label>
@@ -458,6 +458,6 @@
   <div class="toastRegion" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
   <div class="srOnly" id="announcer" aria-live="polite" aria-atomic="true"></div>
 
-  <script type="module" src="/chat/app.js?v=20261018-b27"></script>
+  <script type="module" src="/chat/app.js?v=20261018-b28"></script>
 </body>
 </html>

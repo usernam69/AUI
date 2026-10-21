@@ -207,7 +207,10 @@ function enhanceRendered(container) {
   container.querySelectorAll('input[type="checkbox"]').forEach((box, index) => {
     box.disabled = false;
     box.dataset.taskIndex = String(index);
-    box.closest("li")?.classList.add("taskItem");
+    const item = box.closest("li");
+    item?.classList.add("taskItem");
+    // A checkbox needs a name; the task's own text is the clearest one.
+    box.setAttribute("aria-label", (item?.textContent || "").replace(/\s+/g, " ").trim().slice(0, 120) || `Task ${index + 1}`);
   });
 
   // 270 click math to copy its LaTeX source
@@ -389,6 +392,8 @@ function enhanceCodeBlocks(container) {
     const code = pre.querySelector("code");
     const languageClass = [...(code?.classList || [])].find(name => name.startsWith("language-"));
     const language = languageClass?.replace("language-", "") || "code";
+    // Long lines scroll sideways, so the block has to be reachable from the keyboard.
+    pre.tabIndex = 0;
     const wrapper = document.createElement("div");
     wrapper.className = "codeBlock";
     const header = document.createElement("div");
