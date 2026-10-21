@@ -31,7 +31,7 @@
   <link rel="shortcut icon" href="/favicon-t-20260728.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
-  <link rel="stylesheet" href="/style.css?v=20261018-b26">
+  <link rel="stylesheet" href="/style.css?v=20261018-b27">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -262,7 +262,7 @@
         <label class="settingRow"><span><strong>Assistant's name</strong><small>Call AUI something else</small></span><input id="assistantNameInput" type="text" maxlength="40" placeholder="AUI"></label>
         <label class="settingRow"><span><strong>Assistant's icon</strong><small>Shown next to its replies</small></span><select id="assistantAvatarSelect"><option value="" selected>A</option><option value="🤖">🤖 Robot</option><option value="🦉">🦉 Owl</option><option value="🐙">🐙 Octopus</option><option value="✨">✨ Sparkles</option><option value="🧠">🧠 Brain</option><option value="🐱">🐱 Cat</option></select></label>
         <label class="settingRow"><span><strong>Emoji</strong><small>How many emoji AUI uses</small></span><select id="emojiLevelSelect"><option value="some" selected>Some</option><option value="none">None</option><option value="lots">Lots</option></select></label>
-        <label class="settingRow"><span><strong>Humor</strong><small>From serious to unhinged</small></span><input id="humorInput" type="range" min="0" max="3" step="1" value="1" aria-valuetext="Humor level"></label>
+        <label class="settingRow"><span><strong>Humor</strong><small>From serious to very funny</small></span><input id="humorInput" type="range" min="0" max="3" step="1" value="1" aria-valuetext="Humor level"></label>
         <label class="settingRow"><span><strong>Formality</strong><small>From casual to formal</small></span><input id="formalityInput" type="range" min="0" max="2" step="1" value="1" aria-valuetext="Formality level"></label>
         <label class="settingRow"><span><strong>What AUI saves</strong><small>Facts you confirm, or also a log of recent exchanges</small></span><select id="memoryAutoSelect"><option value="facts" selected>Only facts I confirm</option><option value="all">Facts and recent exchanges</option></select></label>
         <label class="settingRow"><span><strong>Forget unused memories</strong><small>Remove memories that haven't been used for a while</small></span><select id="memoryExpirySelect"><option value="0" selected>Never</option><option value="30">After 30 days</option><option value="90">After 90 days</option><option value="365">After a year</option></select></label>
@@ -458,6 +458,6 @@
   <div class="toastRegion" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
   <div class="srOnly" id="announcer" aria-live="polite" aria-atomic="true"></div>
 
-  <script type="module" src="/chat/app.js?v=20261018-b26"></script>
+  <script type="module" src="/chat/app.js?v=20261018-b27"></script>
 </body>
 </html>
