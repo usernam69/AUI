@@ -1,21 +1,21 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b33";
-import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b33";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b34";
+import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b34";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b33";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b33";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b33";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b33";
-import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b33";
-import { PLANS, planById, customSkillLimit, priceLabel, planRecord, schoolEmailProblem } from "../modules/plans.js?v=20261018-b33";
-import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b33";
-import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL, FREE_MODEL } from "../modules/openrouter.js?v=20261018-b33";
-import { setupStudy, normalizeStudy, mergeStudy } from "../modules/study-ui.js?v=20261018-b33";
-import { fetchModels, cachedModels, searchModels, priceHint, contextHint, fallbackModels, AUTO_MODEL } from "../modules/models.js?v=20261018-b33";
+} from "../modules/uploads.js?v=20261018-b34";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b34";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b34";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b34";
+import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b34";
+import { PLANS, planById, customSkillLimit, priceLabel, planRecord, schoolEmailProblem } from "../modules/plans.js?v=20261018-b34";
+import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b34";
+import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL, FREE_MODEL } from "../modules/openrouter.js?v=20261018-b34";
+import { setupStudy, normalizeStudy, mergeStudy } from "../modules/study-ui.js?v=20261018-b34";
+import { fetchModels, cachedModels, searchModels, priceHint, contextHint, fallbackModels, AUTO_MODEL } from "../modules/models.js?v=20261018-b34";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -4886,7 +4886,7 @@ function setupMemoryFeatures() {
 
 let filesModulePromise = null;
 function loadFilesModule() {
-  filesModulePromise ||= import("../modules/files.js?v=20261018-b33");
+  filesModulePromise ||= import("../modules/files.js?v=20261018-b34");
   return filesModulePromise;
 }
 
@@ -8713,7 +8713,7 @@ function createMessageFooter(message, index) {
       if (message.versions?.length > 1) actions.append(actionButton("Changes", "diff"));
       actions.append(actionButton("Report", "report"));
       actions.append(actionButton("Image", "image"));
-      actions.append(actionButton("Make cards", "make-cards"), actionButton("Save mistake", "save-mistake"));
+      actions.append(actionButton("Make cards", "make-cards"), actionButton("Save mistake", "save-mistake"), actionButton("Branch", "branch"));
       actions.append(actionButton("Regenerate", "regenerate"), actionButton("Continue", "continue"));
       if (getUserTier() !== "guest" && MODEL_NAMES[message.model]) {
         if (Object.keys(MODEL_NAMES).length > 1) actions.append(actionButton("Compare model", "compare"));
@@ -8807,7 +8807,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b33");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b34");
   return markdownModulePromise;
 }
 
@@ -8933,6 +8933,9 @@ async function handleChatAction(event) {
     case "make-cards":
       studyApi?.cardsFromMessage(message, chat);
       break;
+    case "branch":
+      branchChat(chat, message);
+      break;
     case "save-mistake":
       studyApi?.saveMistake(message, chat);
       break;
@@ -8978,6 +8981,23 @@ async function handleChatAction(event) {
       break;
     }
   }
+}
+
+// A new chat that holds the conversation up to this reply, so another direction can be tried without losing this one.
+function branchChat(chat, message) {
+  if (state.loading) return;
+  const at = chat.messages.findIndex(item => item.id === message.id);
+  if (at < 0) return;
+  const copy = normalizeChats([JSON.parse(JSON.stringify({ ...chat, id: undefined, title: `${chat.title} (branch)`, pinned: false, lock: "", messages: chat.messages.slice(0, at + 1) }))])[0];
+  copy.messages.forEach(item => { item.id = createId("message"); delete item.versions; delete item.versionIndex; });
+  copy.createdAt = copy.updatedAt = Date.now();
+  state.chats.unshift(copy);
+  state.currentChatId = copy.id;
+  persistChatChange();
+  renderChats();
+  renderMessages();
+  DOM.input.focus();
+  toast("Branched. This chat has the conversation up to that reply. The original is untouched.", "success");
 }
 
 function regenerateMessage(message) {
