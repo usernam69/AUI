@@ -1,19 +1,19 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b25";
-import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b25";
+import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData, isVaultEnabled, unlockVault, enableVault, disableVault, flushVault, eraseLockedData } from "../modules/storage.js?v=20261018-b26";
+import { seal as sealText, open as openSealed, isSealed } from "../modules/vault.js?v=20261018-b26";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20261018-b25";
-import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b25";
-import { pickRelevantText } from "../modules/rag.js?v=20261018-b25";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b25";
-import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b25";
-import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b25";
-import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b25";
-import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL, FREE_MODEL } from "../modules/openrouter.js?v=20261018-b25";
+} from "../modules/uploads.js?v=20261018-b26";
+import { streamSlm, describeProgress, loadSlm, pickModel, isSlmSupported, isModelCached, warmSlm, getSlmSpeed, setSlmSpeed, SLM_SPEEDS, isSlmReady, unloadSlm, deleteCachedModels } from "../modules/slm.js?v=20261018-b26";
+import { pickRelevantText } from "../modules/rag.js?v=20261018-b26";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20261018-b26";
+import { checkCard, cardBrand, formatCardNumber, formatExpiry } from "../modules/luhn.js?v=20261018-b26";
+import { PLANS, planById, customSkillLimit, priceLabel, planRecord } from "../modules/plans.js?v=20261018-b26";
+import { BUILTIN_SKILLS, MAX_NAME, MAX_DESCRIPTION, MAX_INSTRUCTIONS, allSkills, findSkill, commandOf, normalizeSkill, toSkillFile, parseSkillFile, activeSkillIds, skillsPrompt, skillsKey, onlineSkill } from "../modules/skills.js?v=20261018-b26";
+import { streamOpenRouter, hasKey, getKey, getModel, saveKey, removeKey, checkKey, DEFAULT_MODEL, FREE_MODEL } from "../modules/openrouter.js?v=20261018-b26";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -4800,7 +4800,7 @@ function setupMemoryFeatures() {
 
 let filesModulePromise = null;
 function loadFilesModule() {
-  filesModulePromise ||= import("../modules/files.js?v=20261018-b25");
+  filesModulePromise ||= import("../modules/files.js?v=20261018-b26");
   return filesModulePromise;
 }
 
@@ -8069,7 +8069,7 @@ function createEmptyState() {
   wrapper.innerHTML = `
     <div class="emptyBrand landingBot" aria-hidden="true"><svg viewBox="0 0 64 64" width="44" height="44"><rect x="12" y="18" width="40" height="32" rx="12" fill="currentColor" opacity="0.95"/><circle cx="25" cy="34" r="4" fill="var(--accent)"/><circle cx="39" cy="34" r="4" fill="var(--accent)"/><path d="M26 43q6 4 12 0" stroke="var(--accent)" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M32 18v-7" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="9" r="3.5" fill="#facc15"/></svg></div>
     <h1 id="landingTitle">${getGreeting()}${greetingName()}. What can I help with?</h1>
-    <p class="heroTagline">AUI · Smart. Funny. <span>Slightly unhinged.</span></p>
+    <p class="heroTagline">AUI</p>
     <div class="suggestionGrid">
       <button type="button" data-suggestion="Help me plan a focused week with realistic priorities" aria-label="Start with: Plan my week"><strong>Plan my week</strong><span>Turn a messy list into a clear plan</span></button>
       <button type="button" data-suggestion="Explain a difficult concept to me using a simple analogy" aria-label="Start with: Make it click"><strong>Make it click</strong><span>Explain something without the jargon</span></button>
@@ -8331,7 +8331,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b25");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20261018-b26");
   return markdownModulePromise;
 }
 
