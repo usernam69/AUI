@@ -109,7 +109,8 @@ const defaultState = {
     sound: false,
     fontScale: 1,
     density: "comfortable",
-    customInstructions: ""
+    customInstructions: "",
+    skillsOn: ["homework"]
   },
   sidebarCollapsed: false,
   pendingAttachments: [],
